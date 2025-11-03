@@ -266,7 +266,7 @@ export function AppointmentsList() {
     </div>
 
     {/* Calendar Date Picker */}
-    {/* <Popover>
+     <Popover>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -291,7 +291,7 @@ export function AppointmentsList() {
   />
 </PopoverContent>
 
-    </Popover> */}
+    </Popover> 
   </div>
 
   {/* Search bar with icon on right */}
