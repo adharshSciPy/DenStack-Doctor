@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useClinicTheme } from "./hooks/useClinicTheme";
 import {
   Calendar,
   FileText,
@@ -7,6 +8,7 @@ import {
   ShoppingBag,
   Bell,
   LayoutDashboard,
+  LogIn,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,96 +39,102 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ✅ Step 1: Handle /login-redirect from URL (same-tab redirect)
-useEffect(() => {
-  console.log("🩺 Doctor Portal loaded — setting up message listener...");
+  useEffect(() => {
+    console.log("🩺 Doctor Portal loaded — setting up message listener...");
 
-  const handleMessage = (event: MessageEvent) => {
-    if (event.origin !== "http://localhost:3000") return;
-    const { type, token, role, doctorId, clinicId } = event.data || {};
-    if (type !== "LOGIN_DATA" || !token || !role) return;
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== "http://localhost:3000") return;
+      const { type, token, role, doctorId, clinicId } = event.data || {};
+      if (type !== "LOGIN_DATA" || !token || !role) return;
 
-    console.log("✅ LOGIN_DATA received:", { token, role, doctorId, clinicId });
+      console.log("✅ LOGIN_DATA received:", {
+        token,
+        role,
+        doctorId,
+        clinicId,
+      });
 
-    sessionStorage.clear();
-    localStorage.clear();
+      sessionStorage.clear();
+      localStorage.clear();
 
-    sessionStorage.setItem("authToken", token);
-    sessionStorage.setItem("userRole", role);
-    if (doctorId) sessionStorage.setItem("doctorId", doctorId);
-    if (clinicId) sessionStorage.setItem("clinicId", clinicId);
+      sessionStorage.setItem("authToken", token);
+      sessionStorage.setItem("userRole", role);
+      if (doctorId) sessionStorage.setItem("doctorId", doctorId);
+      if (clinicId) sessionStorage.setItem("clinicId", clinicId);
 
-    setAuthToken(token);
-    setUserRole(role);
+      setAuthToken(token);
+      setUserRole(role);
 
-    if (role === "600") navigate(`/doctor/${doctorId}/dashboard`);
-    else if (role === "456") navigate(`/clinic/${clinicId}/dashboard`);
-    else navigate("/dashboard");
-  };
+      if (role === "600") navigate(`/doctor/${doctorId}/dashboard`);
+      else if (role === "456") navigate(`/clinic/${clinicId}/dashboard`);
+      else navigate("/dashboard");
+    };
 
-  window.addEventListener("message", handleMessage);
+    window.addEventListener("message", handleMessage);
 
-  // ✅ Handle URL-based login redirect (same-tab)
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
-  const role = params.get("role");
-  const doctorId = params.get("doctorId");
-  const clinicId = params.get("clinicId");
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const role = params.get("role");
+    const doctorId = params.get("doctorId");
+    const clinicId = params.get("clinicId");
 
-  if (token && role) {
-    console.log("🎯 Login data from URL:", { token, role, doctorId, clinicId });
+    if (token && role) {
+      console.log("🎯 Login data from URL:", {
+        token,
+        role,
+        doctorId,
+        clinicId,
+      });
 
-    // 1️⃣ Save credentials securely
-    localStorage.setItem("authToken", token);
-    localStorage.setItem("userRole", role);
-    if (doctorId) localStorage.setItem("doctorId", doctorId);
-    if (clinicId) localStorage.setItem("clinicId", clinicId);
+      localStorage.setItem("authToken", token);
+      localStorage.setItem("userRole", role);
+      if (doctorId) localStorage.setItem("doctorId", doctorId);
+      if (clinicId) localStorage.setItem("clinicId", clinicId);
 
-    setAuthToken(token);
-    setUserRole(role);
+      setAuthToken(token);
+      setUserRole(role);
 
-    // 2️⃣ Clean up the URL (remove query params)
-    window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState({}, document.title, window.location.pathname);
 
-    // 3️⃣ Navigate based on role
-    if (role === "600") navigate(`/doctor/${doctorId}/dashboard`, { replace: true });
-    else if (role === "456") navigate(`/clinic/${clinicId}/dashboard`, { replace: true });
-    else navigate("/dashboard", { replace: true });
-  } else {
-    // ✅ Fallback: restore from session/local storage
-    const storedToken =
-      sessionStorage.getItem("authToken") || localStorage.getItem("authToken");
-    const storedRole =
-      sessionStorage.getItem("userRole") || localStorage.getItem("userRole");
-    if (storedToken && storedRole) {
-      console.log("💾 Loaded from storage:", { storedToken, storedRole });
-      setAuthToken(storedToken);
-      setUserRole(storedRole);
+      if (role === "600")
+        navigate(`/doctor/${doctorId}/dashboard`, { replace: true });
+      else if (role === "456")
+        navigate(`/clinic/${clinicId}/dashboard`, { replace: true });
+      else navigate("/dashboard", { replace: true });
     } else {
-      console.log("ℹ️ No stored credentials found (fresh load).");
+      const storedToken =
+        sessionStorage.getItem("authToken") ||
+        localStorage.getItem("authToken");
+      const storedRole =
+        sessionStorage.getItem("userRole") || localStorage.getItem("userRole");
+      if (storedToken && storedRole) {
+        console.log("💾 Loaded from storage:", { storedToken, storedRole });
+        setAuthToken(storedToken);
+        setUserRole(storedRole);
+      } else {
+        console.log("ℹ️ No stored credentials found (fresh load).");
+      }
     }
-  }
 
-  return () => window.removeEventListener("message", handleMessage);
-}, [navigate]);
-
-
-
-
+    return () => window.removeEventListener("message", handleMessage);
+  }, [navigate]);
 
   useEffect(() => {
-  const params = new URLSearchParams(location.search);
-  const token = params.get("token");
-  const role = params.get("role");
-  if (token && role) {
-    localStorage.setItem("authToken", token);
-    localStorage.setItem("userRole", role);
-    navigate("/dashboard", { replace: true });
-  }
-}, [location]);
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    const role = params.get("role");
+    if (token && role) {
+      localStorage.setItem("authToken", token);
+      localStorage.setItem("userRole", role);
+      navigate("/dashboard", { replace: true });
+    }
+  }, [location]);
 
+  const clinicId =
+    localStorage.getItem("clinicId") || sessionStorage.getItem("clinicId");
+  useClinicTheme(clinicId || "");
+  console.log("clinc", clinicId);
 
-  // ✅ Step 3: Role-based menu setup
   const getMenuItems = () => {
     const baseMenuItems = [
       { id: "overview", title: "Overview", icon: LayoutDashboard },
@@ -137,7 +145,6 @@ useEffect(() => {
       { id: "analytics", title: "Productivity", icon: TrendingUp },
     ];
 
-    // Add Marketplace only for Doctor (600)
     if (userRole === "600") {
       return [
         ...baseMenuItems,
@@ -150,7 +157,6 @@ useEffect(() => {
 
   const menuItems = getMenuItems();
 
-  // ✅ Step 4: View renderer
   const renderContent = () => {
     switch (activeView) {
       case "overview":
@@ -182,7 +188,6 @@ useEffect(() => {
     }
   };
 
-  // ✅ Step 5: Debug log for every re-render
   useEffect(() => {
     console.log("🧭 Active View:", activeView);
     console.log("👤 Current Role:", userRole);
@@ -191,20 +196,25 @@ useEffect(() => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <Sidebar className="border-r">
+      <div className="flex min-h-screen w-full ">
+        {/* Updated Sidebar with matching color theme */}
+        <Sidebar className="border-r border-border bg-white">
           <SidebarContent>
-            <div className="px-6 py-4 border-b">
-              <h2 className="text-xl font-medium text-sidebar-foreground">
+            {/* Header - matching DashboardSidebar style */}
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-xl font-medium text-foreground">
                 Doctor Portal
               </h2>
-              <p className="text-sm text-sidebar-foreground/70">
+              <p className="text-sm text-muted-foreground">
                 Hospital Management System
               </p>
             </div>
 
+            {/* Main Menu Group */}
             <SidebarGroup>
-              <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Main Menu
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {menuItems.map((item) => (
@@ -213,9 +223,18 @@ useEffect(() => {
                         onClick={() => setActiveView(item.id)}
                         isActive={activeView === item.id}
                         tooltip={item.title}
+                        className={`
+                          w-full flex items-center gap-3 px-3 py-2 rounded-md 
+                           duration-200
+                          ${
+                            activeView === item.id
+                              ? "bg-primary text-white"
+                              : "hover:bg-accent hover:text-accent-foreground text-foreground"
+                          }
+                        `}
                       >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="text-sm font-medium">{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -225,12 +244,13 @@ useEffect(() => {
           </SidebarContent>
         </Sidebar>
 
-        <SidebarInset className="flex-1">
+        {/* Main Content Area */}
+        <SidebarInset className="flex-1 flex flex-col">
           <DashboardHeader doctorName="Emily Parker" alertCount={5} />
 
           <main className="flex-1 p-6 bg-background">
             <div className="mb-6">
-              <h1>
+              <h1 className="text-2xl font-semibold text-foreground">
                 {menuItems.find((item) => item.id === activeView)?.title ||
                   "Overview"}
               </h1>
