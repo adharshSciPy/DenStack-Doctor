@@ -266,11 +266,11 @@ export function AppointmentsList() {
     </div>
 
     {/* Calendar Date Picker */}
-    {/* <Popover>
+     <Popover>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 min-w-[160px] justify-start"
         >
           <CalendarIcon className="h-4 w-4" />
           {selectedDate
@@ -278,20 +278,20 @@ export function AppointmentsList() {
             : "Pick a date"}
         </Button>
       </PopoverTrigger>
-   <PopoverContent className="p-0" align="end">
-  <Calendar
-    mode="single"
-    selected={selectedDate || undefined}
-    onSelect={(date: Date | undefined) => {
-      const normalizedDate = date ?? null;
-      setSelectedDate(normalizedDate);
-      fetchAppointments(1, searchQuery, true, normalizedDate);
-    }}
-    initialFocus
-  />
-</PopoverContent>
-
-    </Popover> */}
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selectedDate || undefined}
+          onSelect={(date: Date | undefined) => {
+            const normalizedDate = date ?? null;
+            setSelectedDate(normalizedDate);
+            fetchAppointments(1, searchQuery, true, normalizedDate);
+          }}
+          initialFocus
+          className="rounded-md border"
+        />
+      </PopoverContent>
+    </Popover>
   </div>
 
   {/* Search bar with icon on right */}
