@@ -196,7 +196,7 @@ export default function App() {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full ">
+      <div className="flex min-h-screen w-full">
         {/* Updated Sidebar with matching color theme */}
         <Sidebar className="border-r border-border bg-white">
           <SidebarContent>
@@ -224,17 +224,40 @@ export default function App() {
                         isActive={activeView === item.id}
                         tooltip={item.title}
                         className={`
-                          w-full flex items-center gap-3 px-3 py-2 rounded-md 
-                           duration-200
-                          ${
-                            activeView === item.id
-                              ? "bg-primary text-white"
-                              : "hover:bg-accent hover:text-accent-foreground text-foreground"
+                      w-full flex items-center gap-3 px-3 py-2 rounded-md 
+                      transition-all duration-200
+                      ${
+                        activeView === item.id
+                          ? "text-white"
+                          : "text-gray-600 hover:text-gray-900"
+                      }
+                    `}
+                        style={
+                          activeView === item.id
+                            ? {
+                                background:
+                                  "linear-gradient(135deg, var(--primary) 0%, var(--primary-end) 100%)",
+                              }
+                            : {}
+                        }
+                        onMouseEnter={(e) => {
+                          if (activeView !== item.id) {
+                            e.currentTarget.style.background =
+                              "linear-gradient(135deg, var(--primary) 0%, var(--primary-end) 100%)";
+                            e.currentTarget.style.color = "";
                           }
-                        `}
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeView !== item.id) {
+                            e.currentTarget.style.background = "";
+                            e.currentTarget.style.color = "";
+                          }
+                        }}
                       >
                         <item.icon className="h-4 w-4 flex-shrink-0" />
-                        <span className="text-sm font-medium">{item.title}</span>
+                        <span className="text-sm font-medium">
+                          {item.title}
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -248,7 +271,7 @@ export default function App() {
         <SidebarInset className="flex-1 flex flex-col">
           <DashboardHeader doctorName="Emily Parker" alertCount={5} />
 
-          <main className="flex-1 p-6 bg-background">
+          <main className="flex-1 p-6 bg-[linear-gradient(to_left,var(--primary),var(--primary-end))]">
             <div className="mb-6">
               <h1 className="text-2xl font-semibold text-foreground">
                 {menuItems.find((item) => item.id === activeView)?.title ||

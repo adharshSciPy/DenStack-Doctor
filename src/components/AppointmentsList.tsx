@@ -396,7 +396,7 @@ export function AppointmentsList() {
 if (selectedHistory) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col ">
         {/* Modal Header - Fixed */}
         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
