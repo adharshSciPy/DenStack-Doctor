@@ -111,12 +111,43 @@ interface PatientHistoryItem {
   isPaid?: boolean;
   status?: string;
   files?: any[];
+  hasTreatmentPlan?: boolean; // ✅ add this
+  treatmentPlan?: any; // ✅ add this (if you’re checking it)
+}
+interface TreatmentPlan {
+  _id: string;
+  planName: string;
+  description?: string;
+  createdAt: string;
+    startedAt?: string;
+  status: "pending" | "in-progress" | "completed";
+  stages?: {
+    stageName: string;
+    description: string;
+    status: string;
+    scheduledDate: string;
+    note:string;
+      procedures: Procedure[];
+  }[];
 }
 type Stage = {
   stageName: string;
   description: string;
   scheduledDate: string;
 };
+interface Procedure {
+  name: string;
+  doctorId: string;
+  referredByDoctorId: string;
+  referredToDoctorId: string;
+  referralNotes: string;
+  completed: boolean;
+}
+
+interface TreatmentPlanDetailsModalProps {
+  plan: TreatmentPlan | null;
+  onClose: () => void;
+}
 export function AppointmentsList() {
   const [clinicAppointments, setClinicAppointments] = useState<
     ClinicAppointments[]
@@ -163,6 +194,9 @@ export function AppointmentsList() {
   const [planDescription, setPlanDescription] = useState("");
   const [stages, setStages] = useState<Stage[]>([]);
   const [treatmentPlanLoading, setTreatmentPlanLoading] = useState(false);
+const [patientTreatmentPlans, setPatientTreatmentPlans] = useState<TreatmentPlan[]>([]);
+const [treatmentPlansLoading, setTreatmentPlansLoading] = useState(false);
+const [selectedTreatmentPlan, setSelectedTreatmentPlan] = useState<TreatmentPlan | null>(null);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
@@ -181,9 +215,9 @@ export function AppointmentsList() {
     });
   };
 
-//  useEffect(()=>(
-// console.log("clnicId",selectedClinic?.clinicId)
-//  ),[]) 
+  //  useEffect(()=>(
+  // console.log("clnicId",selectedClinic?.clinicId)
+  //  ),[])
   const fetchAppointments = async (
     page: number = 1,
     search: string = "",
@@ -254,7 +288,6 @@ export function AppointmentsList() {
       setLoading(false);
     }
   };
-
   const fetchAppointmentDetails = async (appointmentId: string) => {
     try {
       setDetailLoading(true);
@@ -262,9 +295,8 @@ export function AppointmentsList() {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("No authentication token found");
 
-      // === Fetch appointment details ===
+      // === 1️⃣ Fetch appointment details ===
       const url = `${patientServiceBaseUrl}/api/v1/patient-service/appointment/fetch/${appointmentId}`;
-
       const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -281,27 +313,29 @@ export function AppointmentsList() {
       const appointmentData = result.appointment || result.data;
       setAppointmentDetail(appointmentData);
 
-      // === Fetch patient history ===
+      // === 2️⃣ Fetch patient history ===
       const patientId = appointmentData.patientId._id;
       const clinicId = appointmentData.clinicId;
-
-      const historyUrl = `${patientServiceBaseUrl}/api/v1/patient-service/appointment/patient-history/${patientId}`;
-
-      const historyResponse = await axios.post(
-        historyUrl,
-        { clinicId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+const historyUrl = `${patientServiceBaseUrl}/api/v1/patient-service/appointment/patient-history/${patientId}?clinicId=${clinicId}`;
+const historyResponse = await axios.get(historyUrl, {
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  },
+});
 
       const historyResult = historyResponse.data;
-      if (historyResult.success) {
-        setPatientHistory(historyResult.data || []);
-      }
+     if (historyResult.success) {
+  const { data: historyData = [] } = historyResult;
+
+  const updatedHistory = historyData.map((item: any) => ({
+    ...item,
+    hasTreatmentPlan: !!item.treatmentPlan,
+  }));
+
+  setPatientHistory(updatedHistory);
+}
+
     } catch (err) {
       console.error("Error fetching details:", err);
     } finally {
@@ -311,7 +345,7 @@ export function AppointmentsList() {
 
   const handleClinicClick = (clinic: ClinicAppointments) => {
     setSelectedClinic(clinic);
-    console.log("clinic iddddddd",clinic.clinicId)
+    console.log("clinic iddddddd", clinic.clinicId);
   };
 
   const handleBackToClinicList = () => {
@@ -418,22 +452,6 @@ export function AppointmentsList() {
     return status.charAt(0).toUpperCase() + status.slice(1).replace("-", " ");
   };
 
-  // const formatPrescriptions = () => {
-  //   // Example format: "Amoxicillin - 500mg - 3/day - 5 days"
-  //   return prescriptions
-  //     .split("\n")
-  //     .filter((line) => line.trim() !== "")
-  //     .map((line) => {
-  //       const parts = line.split("-").map((p) => p.trim());
-  //       return {
-  //         medicineName: parts[0] || "",
-  //         dosage: parts[1] || "",
-  //         frequency: parts[2] || "",
-  //         duration: parts[3] || "",
-  //       };
-  //     });
-  // };
-
   const handlePrescriptionChange = (
     index: number,
     field: string,
@@ -471,6 +489,9 @@ export function AppointmentsList() {
 
     try {
       const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("No authentication token found");
+
+      const clinicId = selectedClinic!.clinicId;
 
       const payload = {
         symptoms: chiefComplaint
@@ -492,6 +513,16 @@ export function AppointmentsList() {
           referredToDoctorId: "",
           referralReason: "",
         },
+
+        // ✅ include treatment plan if doctor has defined one
+        treatmentPlan: showTreatmentPlan
+          ? {
+              clinicId,
+              planName,
+              description: planDescription,
+              stages,
+            }
+          : null,
       };
 
       const res = await axios.post(
@@ -504,39 +535,17 @@ export function AppointmentsList() {
         }
       );
 
-     if (res?.data?.success) {
-  alert("Consultation saved successfully!");
-
-  setClinicAppointments((prev) =>
-    prev.map((clinic) =>
-      clinic.clinicId === selectedClinic?.clinicId
-        ? {
-            ...clinic,
-            appointments: clinic.appointments.map((appt) =>
-              appt._id === appointmentDetail._id
-                ? { ...appt, status: "completed" } // ✅ instantly update
-                : appt
-            ),
-          }
-        : clinic
-    )
-  );
-
-  handleBackToAppointments?.();
-}
- else {
+      if (res?.data?.success) {
+        alert(
+          "✅ Consultation (and treatment plan if added) saved successfully!"
+        );
+        handleBackToAppointments?.();
+      } else {
         alert(res?.data?.message || "Failed to save consultation");
       }
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("❌ Error saving consultation:", err);
-      if (axios.isAxiosError(err)) {
-        alert(
-          err.response?.data?.message ||
-            "Something went wrong. Please try again."
-        );
-      } else {
-        alert("Unexpected error occurred.");
-      }
+      alert("Error saving consultation");
     } finally {
       setLoading(false);
     }
@@ -559,213 +568,411 @@ export function AppointmentsList() {
     );
   };
 
-const handleStartTreatmentPlan = async () => {
-  if (treatmentPlanLoading) return; // prevent multiple clicks instantly
-  setTreatmentPlanLoading(true);
-
+const fetchPatientTreatmentPlans = async () => {
   try {
+    if (!appointmentDetail?.patientId?._id) return;
+    setTreatmentPlansLoading(true);
+
     const token = localStorage.getItem("authToken");
-    if (!token) throw new Error("No authentication token found");
-
-    if (!appointmentDetail) {
-      alert("Missing appointment details");
-      return;
-    }
-
-    const clinicId = selectedClinic!.clinicId;
-
-    const payload = {
-      clinicId,
-      planName,
-      description: planDescription,
-      stages,
-    };
-
-    console.log("Starting treatment plan with payload:", payload);
-
-    const response = await axios.post(
-      `${patientServiceBaseUrl}/api/v1/patient-service/consultation/start-treatment/${appointmentDetail.patientId._id}`,
-      payload,
+    const response = await axios.get(
+      `${patientServiceBaseUrl}/api/v1/patient-service/appointment/treatment-plans/${appointmentDetail.patientId._id}`,
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     );
 
-    const result = response.data;
-
-    if (result.success) {
-      alert("✅ Treatment plan started successfully!");
-    } else {
-      alert(result.message || "Failed to start treatment plan");
-    }
+    setPatientTreatmentPlans(response.data.data || []);
   } catch (err) {
-    console.error("Error starting treatment plan:", err);
-    alert("❌ Error starting treatment plan");
+    console.error("Error fetching treatment plans", err);
   } finally {
-    setTreatmentPlanLoading(false); // ✅ always reset
+    setTreatmentPlansLoading(false);
   }
 };
 
+useEffect(() => {
+  if (appointmentDetail?.patientId?._id) {
+    fetchPatientTreatmentPlans();
+  }
+}, [appointmentDetail]);
+const TreatmentPlanDetailsModal = ({
+  plan,
+  onClose,
+}: TreatmentPlanDetailsModalProps) => {
+  const [localPlan, setLocalPlan] = useState<TreatmentPlan | null>(plan);
+  const [loading, setLoading] = useState(false);
 
+  if (!localPlan) return null;
 
+  const API_BASE = "/api/v1/patient-service/consultation";
 
-  // History Detail Modal
- if (selectedHistory) {
+  // Add a new stage
+  const handleAddStage = async () => {
+    const stageName = `Stage ${localPlan.stages?.length! + 1}`;
+    setLoading(true);
+
+    try {
+      const { data } = await axios.post(`${patientServiceBaseUrl}${API_BASE}/add-stage/${localPlan._id}`, {
+        stageName,
+        description: "",
+        scheduledDate: new Date().toISOString(),
+      });
+
+      if (!data.success) throw new Error(data.message);
+
+      setLocalPlan(data.treatmentPlan);
+    } catch (err: any) {
+      alert(err.message || "Failed to add stage");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Finish a stage
+const handleFinishStage = async (stageIndex: number) => {
+  try {
+    setLoading(true);
+
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      alert("Authentication token not found. Please log in again.");
+      return;
+    }
+
+    const planId = localPlan._id;
+    if (!planId) {
+      alert("Invalid plan ID");
+      return;
+    }
+
+    const stage = localPlan.stages?.[stageIndex];
+    if (!stage) {
+      alert("Stage not found");
+      return;
+    }
+
+    // ✅ Ensure at least one procedure
+    const procedures =
+      stage.procedures && stage.procedures.length > 0
+        ? stage.procedures
+        : [{ name: "Default Procedure" }];
+
+    console.log(
+      "Finishing stage:",
+      stage.stageName,
+      "with",
+      procedures.length,
+      "procedure(s)"
+    );
+
+    let updatedPlan = localPlan;
+
+    // ✅ Loop through procedures
+    for (let i = 0; i < procedures.length; i++) {
+      const url = `${patientServiceBaseUrl}${API_BASE}/update-procedure-status/${planId}/${stageIndex}/${i}`;
+      console.log("Calling:", url);
+
+      const { data } = await axios.patch(
+        url,
+        { completed: true },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (data.success) {
+        updatedPlan = data.treatmentPlan; // Use updated plan from response
+      } else {
+        throw new Error(data.message || "Procedure update failed");
+      }
+    }
+
+    // ✅ Update local plan directly (no GET needed)
+    setLocalPlan(updatedPlan);
+    alert("Stage completed successfully!");
+  } catch (error: any) {
+    console.error("Error finishing stage:", error);
+    const msg =
+      error.response?.data?.message ||
+      error.message ||
+      "Failed to complete stage";
+    alert(msg);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Complete entire treatment plan
+  const handleCompletePlan = async () => {
+    setLoading(true);
+
+    try {
+      const { data } = await axios.patch(`${patientServiceBaseUrl}${API_BASE}/finish-treatment/${localPlan._id}`);
+
+      if (!data.success) throw new Error(data.message);
+
+      setLocalPlan(data.treatmentPlan);
+    } catch (err: any) {
+      alert(err.message || "Failed to complete plan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNoteChange = (index: number, note: string) => {
+    const updatedStages = [...(localPlan.stages || [])];
+    updatedStages[index].note = note;
+    setLocalPlan({ ...localPlan, stages: updatedStages });
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
-        {/* Header */}
-        <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between flex-shrink-0">
-          <div>
-            <h2 className="text-xl font-semibold">Visit History Details</h2>
-            <p className="text-sm text-muted-foreground">
-              {formatDate(
-                selectedHistory.visitDate ||
-                  selectedHistory.appointmentDate ||
-                  ""
-              )}
-            </p>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+        >
+          <X size={18} />
+        </button>
+
+        <h2 className="text-xl font-semibold text-primary mb-1">
+          {localPlan.planName}
+        </h2>
+        <p className="text-sm text-gray-600 mb-4">{localPlan.description}</p>
+
+        <div className="space-y-3 text-xs text-gray-600">
+          <p>
+            <strong>Status:</strong> {localPlan.status}
+          </p>
+          <p>
+            <strong>Created:</strong> {formatDate(localPlan.createdAt)}
+          </p>
+        </div>
+
+        <div className="mt-4">
+          <h4 className="font-medium text-sm mb-2 text-primary">
+            Treatment Stages
+          </h4>
+          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+            {(localPlan.stages || []).map((stage, i) => (
+              <div
+                key={i}
+                className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-all"
+              >
+                <p className="font-semibold text-sm">{stage.stageName}</p>
+                <p className="text-xs text-gray-600 mb-1">{stage.description}</p>
+                <p className="text-xs text-gray-500 mb-2">
+                  Scheduled: {formatDate(stage.scheduledDate)}
+                </p>
+
+                <Textarea
+                  placeholder="Add note..."
+                  value={stage.note || ""}
+                  onChange={(e) => handleNoteChange(i, e.target.value)}
+                  className="text-xs mb-2"
+                />
+
+                <div className="flex items-center justify-between">
+                  <Badge
+                    className={`${
+                      stage.status === "completed"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    } text-[10px]`}
+                  >
+                    {stage.status}
+                  </Badge>
+                  {stage.status !== "completed" && (
+                    <Button
+                      size="lg"
+                      onClick={() => handleFinishStage(i)}
+                      className="text-[11px]"
+                      disabled={loading}
+                    >
+                      Finish Stage
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCloseHistory}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
+        </div>
+
+        <div className="flex justify-between mt-5">
+          <Button variant="outline" onClick={handleAddStage} disabled={loading}>
+            <Plus size={14} className="mr-1" /> Add Stage
           </Button>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-
-            {/* Doctor Info */}
-            {selectedHistory.doctor && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Doctor Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm text-gray-700">
-                  <p>
-                    <strong>Name:</strong> {selectedHistory.doctor.name}
-                  </p>
-                  <p>
-                    <strong>Phone:</strong> {selectedHistory.doctor.phoneNumber}
-                  </p>
-                  <p>
-                    <strong>Specialization:</strong>{" "}
-                    {selectedHistory.doctor.specialization}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Symptoms */}
-            {selectedHistory.symptoms &&
-              selectedHistory.symptoms.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Symptoms</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-800 leading-relaxed">
-                      {selectedHistory.symptoms.join(", ")}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-            {/* Chief Complaint */}
-            {selectedHistory.chiefComplaint && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Chief Complaint</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-800 leading-relaxed">
-                    {selectedHistory.chiefComplaint}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Diagnosis */}
-            {selectedHistory.diagnosis &&
-              selectedHistory.diagnosis.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Diagnosis</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-800 leading-relaxed">
-                      {selectedHistory.diagnosis.join(", ")}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-            {/* Prescriptions */}
-            {selectedHistory.prescriptions &&
-              selectedHistory.prescriptions.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg font-semibold">
-                      Prescriptions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {selectedHistory.prescriptions.map((pres, idx) => (
-                      <div key={pres._id || idx} className="border-b pb-2">
-                        <p className="text-base font-medium text-gray-900">
-                          {idx + 1}. {pres.medicineName}
-                        </p>
-                        <p className="text-sm text-gray-700">
-                          <strong>Dosage:</strong> {pres.dosage || "—"} |{" "}
-                          <strong>Frequency:</strong> {pres.frequency || "—"}{" "}
-                          /day | <strong>Duration:</strong>{" "}
-                          {pres.duration || "—"} days
-                        </p>
-                        {pres.instructions && (
-                          <p className="text-sm italic text-gray-600 mt-1">
-                            {pres.instructions}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-            {/* Additional Notes */}
-            {selectedHistory.notes && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Additional Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm whitespace-pre-wrap text-gray-800">
-                    {selectedHistory.notes}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t px-6 py-4 flex justify-end flex-shrink-0">
-          <Button onClick={handleCloseHistory}>Close</Button>
+          <Button
+            variant="default"
+            onClick={handleCompletePlan}
+            disabled={localPlan.status === "completed" || loading}
+          >
+            Complete Plan
+          </Button>
         </div>
       </div>
     </div>
   );
-}
+};
 
+
+  // History Detail Modal
+  if (selectedHistory) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
+          {/* Header */}
+          <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between flex-shrink-0">
+            <div>
+              <h2 className="text-xl font-semibold">Visit History Details</h2>
+              <p className="text-sm text-muted-foreground">
+                {formatDate(
+                  selectedHistory.visitDate ||
+                    selectedHistory.appointmentDate ||
+                    ""
+                )}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCloseHistory}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </div>
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-6">
+              {/* Doctor Info */}
+              {selectedHistory.doctor && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Doctor Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1 text-sm text-gray-700">
+                    <p>
+                      <strong>Name:</strong> {selectedHistory.doctor.name}
+                    </p>
+                    <p>
+                      <strong>Phone:</strong>{" "}
+                      {selectedHistory.doctor.phoneNumber}
+                    </p>
+                    <p>
+                      <strong>Specialization:</strong>{" "}
+                      {selectedHistory.doctor.specialization}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Symptoms */}
+              {selectedHistory.symptoms &&
+                selectedHistory.symptoms.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Symptoms</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-800 leading-relaxed">
+                        {selectedHistory.symptoms.join(", ")}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+              {/* Chief Complaint */}
+              {selectedHistory.chiefComplaint && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Chief Complaint</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-800 leading-relaxed">
+                      {selectedHistory.chiefComplaint}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Diagnosis */}
+              {selectedHistory.diagnosis &&
+                selectedHistory.diagnosis.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Diagnosis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-800 leading-relaxed">
+                        {selectedHistory.diagnosis.join(", ")}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+              {/* Prescriptions */}
+              {selectedHistory.prescriptions &&
+                selectedHistory.prescriptions.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">
+                        Prescriptions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {selectedHistory.prescriptions.map((pres, idx) => (
+                        <div key={pres._id || idx} className="border-b pb-2">
+                          <p className="text-base font-medium text-gray-900">
+                            {idx + 1}. {pres.medicineName}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            <strong>Dosage:</strong> {pres.dosage || "—"} |{" "}
+                            <strong>Frequency:</strong> {pres.frequency || "—"}{" "}
+                            /day | <strong>Duration:</strong>{" "}
+                            {pres.duration || "—"} days
+                          </p>
+                          {pres.instructions && (
+                            <p className="text-sm italic text-gray-600 mt-1">
+                              {pres.instructions}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+              {/* Additional Notes */}
+              {selectedHistory.notes && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Additional Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm whitespace-pre-wrap text-gray-800">
+                      {selectedHistory.notes}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t px-6 py-4 flex justify-end flex-shrink-0">
+            <Button onClick={handleCloseHistory}>Close</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Detail View Screen
   if (selectedAppointmentId && appointmentDetail) {
@@ -864,61 +1071,120 @@ const handleStartTreatmentPlan = async () => {
                 </div>
               </div>
 
-              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                <h4 className="font-semibold mb-3 text-primary">
-                  Patient History
-                </h4>
-                {detailLoading ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading history...
-                  </p>
-                ) : patientHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No previous visits
-                  </p>
-                ) : (
-                  <ScrollArea className="h-[300px] pr-2">
-                    <div className="space-y-3">
-                      {patientHistory.map((item) => (
-                        <div
-                          key={item._id}
-                          className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
-                        >
-                          <p className="text-xs font-medium text-primary mb-1">
-                            {formatDate(
-                              item.visitDate || item.appointmentDate || ""
-                            )}
-                          </p>
-                          {item.department && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {item.department}
-                            </p>
-                          )}
-                          {item.doctor && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Dr. {item.doctor.name}
-                            </p>
-                          )}
-                          {item.chiefComplaint && (
-                            <p className="text-sm mb-1">
-                              <span className="font-medium">Complaint:</span>{" "}
-                              {item.chiefComplaint}
-                            </p>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full mt-2"
-                            onClick={() => handleViewHistory(item)}
-                          >
-                            View Full Details
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
+
+{/* ✅ Patient Treatment Plans */}
+<div className="bg-primary/10 rounded-xl p-4 border border-primary/20 mt-4">
+  <h4 className="font-semibold mb-3 text-primary">Patient Treatment Plans</h4>
+
+  {treatmentPlansLoading ? (
+    <p className="text-sm text-muted-foreground">Loading treatment plans...</p>
+  ) : patientTreatmentPlans.length === 0 ? (
+    <p className="text-sm text-muted-foreground">No treatment plans found</p>
+  ) : (
+    <ScrollArea className="h-[250px] pr-2">
+      <div className="space-y-2">
+        {patientTreatmentPlans.map((plan) => (
+          <div
+            key={plan._id}
+            className="flex items-center justify-between p-3 border border-primary/20 rounded-lg bg-white/60 hover:bg-white transition-all cursor-pointer"
+            onClick={() => setSelectedTreatmentPlan(plan)}
+          >
+            <div className="flex items-center gap-3">
+              <CalendarIcon className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-700">
+                {formatDate(plan.startedAt || plan.createdAt)}
+              </span>
+            </div>
+            <Badge
+              className={`${
+                plan.status === "completed"
+                  ? "bg-green-100 text-green-700"
+                  : plan.status === "in-progress"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-yellow-100 text-yellow-700"
+              } text-[10px]`}
+            >
+              {plan.status}
+            </Badge>
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
+  )}
+</div>
+
+{/* ✅ Modal for Treatment Plan Details */}
+{selectedTreatmentPlan && (
+  <TreatmentPlanDetailsModal
+    plan={selectedTreatmentPlan}
+    onClose={() => setSelectedTreatmentPlan(null)}
+  />
+)}
+
+{/* ✅ Modal for Treatment Plan Details */}
+{selectedTreatmentPlan && (
+  <TreatmentPlanDetailsModal
+    plan={selectedTreatmentPlan}
+    onClose={() => setSelectedTreatmentPlan(null)}
+  />
+)}
+
+
+ <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+  <h4 className="font-semibold mb-3 text-primary">Patient History</h4>
+
+  {detailLoading ? (
+    <p className="text-sm text-muted-foreground">Loading history...</p>
+  ) : patientHistory.length === 0 ? (
+    <p className="text-sm text-muted-foreground">No previous visits</p>
+  ) : (
+    <ScrollArea className="h-[300px] pr-2">
+      <div className="space-y-3">
+        {patientHistory.map((item) => {
+          // console.log(item._id, !!item.treatmentPlan, item.treatmentPlan);
+
+          const hasTreatmentPlan = !!item.treatmentPlan;
+
+          return (
+            <div
+              key={item._id}
+              className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-xs font-medium text-primary">
+                  {formatDate(item.visitDate || item.appointmentDate || "")}
+                </p>
+
+                {hasTreatmentPlan && (
+                  <span className="bg-green-100 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                    Treatment Plan
+                  </span>
                 )}
               </div>
+
+              {item.doctor && (
+                <p className="text-xs text-muted-foreground mb-1">
+                  Dr. {item.doctor.name}
+                </p>
+              )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => handleViewHistory(item)}
+              >
+                View Full Details
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </ScrollArea>
+  )}
+</div>
+
+
             </div>
           </div>
 
@@ -1217,17 +1483,6 @@ const handleStartTreatmentPlan = async () => {
                           >
                             + Add Stage
                           </button>
-                        </div>
-
-                        <div className="flex justify-end">
-                         <Button
-  className="bg-green-600 text-white hover:bg-green-700"
-  onClick={handleStartTreatmentPlan}
-  disabled={treatmentPlanLoading} // disable while loading
->
-  {treatmentPlanLoading ? "Starting..." : "Start Plan"}
-</Button>
-
                         </div>
                       </div>
                     )}
