@@ -705,21 +705,57 @@ const handleFinishStage = async (stageIndex: number) => {
 };
 
   // Complete entire treatment plan
-  const handleCompletePlan = async () => {
+ const handleCompletePlan = async () => {
+  try {
     setLoading(true);
 
-    try {
-      const { data } = await axios.patch(`${patientServiceBaseUrl}${API_BASE}/finish-treatment/${localPlan._id}`);
-
-      if (!data.success) throw new Error(data.message);
-
-      setLocalPlan(data.treatmentPlan);
-    } catch (err: any) {
-      alert(err.message || "Failed to complete plan");
-    } finally {
-      setLoading(false);
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      alert("Authentication token not found. Please log in again.");
+      return;
     }
-  };
+
+    const planId = localPlan._id;
+    if (!planId) {
+      alert("Invalid treatment plan ID");
+      return;
+    }
+
+    const url = `${patientServiceBaseUrl}${API_BASE}/finish-treatment/${planId}`;
+    console.log("Completing entire treatment plan:", url);
+
+    const { data } = await axios.patch(
+      url,
+      {}, // backend does NOT expect body
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    if (!data.success) {
+      throw new Error(data.message || "Failed to complete treatment plan");
+    }
+
+    setLocalPlan(data.treatmentPlan);
+    alert("Treatment plan completed successfully!");
+    fetchPatientTreatmentPlans()
+     onClose(); 
+
+  } catch (error: any) {
+    console.error("Error completing treatment plan:", error);
+    const msg =
+      error.response?.data?.message ||
+      error.message ||
+      "Failed to complete plan";
+    alert(msg);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleNoteChange = (index: number, note: string) => {
     const updatedStages = [...(localPlan.stages || [])];
