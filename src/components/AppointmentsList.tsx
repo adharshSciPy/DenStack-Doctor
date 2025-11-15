@@ -31,6 +31,7 @@ import "react-day-picker/dist/style.css";
 import { Textarea } from "./ui/textarea";
 import { cn } from "./ui/utils";
 import axios from "axios";
+import clinicServiceBaseUrl from "../clinicServiceUrl";
 
 interface Patient {
   _id: string;
@@ -148,6 +149,18 @@ interface TreatmentPlanDetailsModalProps {
   plan: TreatmentPlan | null;
   onClose: () => void;
 }
+interface Department {
+  _id: string;
+  departmentName: string;
+}
+
+interface Doctor {
+  doctorId: string;   // existing
+  doctor?: any;       // add only if your API actually sends this
+}
+
+
+
 export function AppointmentsList() {
   const [clinicAppointments, setClinicAppointments] = useState<
     ClinicAppointments[]
@@ -197,6 +210,13 @@ export function AppointmentsList() {
 const [patientTreatmentPlans, setPatientTreatmentPlans] = useState<TreatmentPlan[]>([]);
 const [treatmentPlansLoading, setTreatmentPlansLoading] = useState(false);
 const [selectedTreatmentPlan, setSelectedTreatmentPlan] = useState<TreatmentPlan | null>(null);
+const [departments, setDepartments] = useState<Department[]>([]);
+const [selectedDepartment, setSelectedDepartment] = useState("");
+const [doctors, setDoctors] = useState<Doctor[]>([]);
+const [referralDoctorId, setReferralDoctorId] = useState("");
+const [referralReason, setReferralReason] = useState("");
+
+
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
@@ -479,6 +499,79 @@ const historyResponse = await axios.get(historyUrl, {
     const updated = prescriptions.filter((_, i) => i !== index);
     setPrescriptions(updated);
   };
+const fetchDepartments = async () => {
+  if (!selectedClinic?.clinicId) {
+    console.warn("⚠ No selectedClinic.clinicId");
+    return;
+  }
+
+  console.log("📌 Fetching departments for clinic:", selectedClinic.clinicId);
+
+  try {
+    const url = `${clinicServiceBaseUrl}/api/v1/clinic-service/department/details/${selectedClinic.clinicId}`;
+    console.log("➡ API URL:", url);
+const response = await axios.get(url);
+
+console.log("Departments response:", response.data);
+
+const raw = response.data?.departments || [];
+
+const formatted = raw.map((d: any, index: number) => {
+  if (typeof d === "string") {
+    return {
+      _id: index.toString(),  // temporary ID
+      departmentName: d,
+    };
+  }
+  return d;
+});
+
+setDepartments(formatted);
+
+  } catch (err) {
+    console.error("❌ Error fetching departments:", err);
+  }
+};
+
+
+
+  // to fetch doctors for referal only ones inside clinic
+const fetchDoctorsByDepartment = async (department: string) => {
+  if (!department) {
+    console.warn("⚠ No department selected");
+    return;
+  }
+
+  console.log("📌 Fetching doctors for department:", department);
+  console.log("📌 Using clinicId:", selectedClinic?.clinicId);
+
+  try {
+    const url = `${clinicServiceBaseUrl}/api/v1/clinic-service/department-based/availability`;
+    console.log("➡ Doctors API URL:", url);
+
+    const response = await axios.get(url, {
+      params: {
+        clinicId: selectedClinic?.clinicId,
+        department,
+      },
+    });
+
+    console.log("✅ Doctors Response:", response.data);
+
+    setDoctors(response.data?.doctors || []);
+  } catch (err) {
+    console.error("❌ Error fetching doctors:", err);
+  }
+};
+
+
+useEffect(() => {
+  console.log("🏥 Selected Clinic changed:", selectedClinic);
+
+  if (selectedClinic) fetchDepartments();
+}, [selectedClinic]);
+
+
   const handleSaveConsultation = async () => {
     if (!appointmentDetail?._id) {
       alert("Invalid appointment data");
@@ -509,10 +602,13 @@ const historyResponse = await axios.get(historyUrl, {
         prescriptions: prescriptions || [],
         notes: additionalNotes?.trim() || "",
         procedures: [],
-        referral: {
-          referredToDoctorId: "",
-          referralReason: "",
-        },
+        referral: referralDoctorId
+  ? {
+      referredToDoctorId: referralDoctorId,
+      referralReason: referralReason?.trim() || "",
+    }
+  : null,
+
 
         // ✅ include treatment plan if doctor has defined one
         treatmentPlan: showTreatmentPlan
@@ -606,22 +702,47 @@ const TreatmentPlanDetailsModal = ({
   const API_BASE = "/api/v1/patient-service/consultation";
 
   // Add a new stage
+
   const handleAddStage = async () => {
+    // ✅ Prevent adding stages to completed plans
+    if (localPlan.status === "completed") {
+      alert("Cannot add stage to a completed treatment plan");
+      return;
+    }
+
     const stageName = `Stage ${localPlan.stages?.length! + 1}`;
     setLoading(true);
 
     try {
-      const { data } = await axios.post(`${patientServiceBaseUrl}${API_BASE}/add-stage/${localPlan._id}`, {
-        stageName,
-        description: "",
-        scheduledDate: new Date().toISOString(),
-      });
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Authentication token not found. Please log in again.");
+        return;
+      }
+
+      const { data } = await axios.patch(
+        `${patientServiceBaseUrl}${API_BASE}/add-stage/${localPlan._id}`,
+        {
+          stageName,
+          description: "",
+          scheduledDate: new Date().toISOString(),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!data.success) throw new Error(data.message);
 
       setLocalPlan(data.treatmentPlan);
+      alert("Stage added successfully!");
     } catch (err: any) {
-      alert(err.message || "Failed to add stage");
+      console.error("Error adding stage:", err);
+      const msg = err.response?.data?.message || err.message || "Failed to add stage";
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -1523,6 +1644,82 @@ const handleFinishStage = async (stageIndex: number) => {
                       </div>
                     )}
                   </div>
+                  {/* Referral Section */}
+<div className="border-t border-gray-200 pt-6 mt-4">
+  <h3 className="text-lg font-semibold text-gray-800 mb-3">
+    Refer Patient
+  </h3>
+
+  {/* Department Select */}
+<select
+  className="w-full p-2 border rounded"
+  value={selectedDepartment}
+  onChange={(e) => {
+    const depName = e.target.value;   // <-- this will be "ENT"
+    console.log("🟦 Department selected:", depName);
+    setSelectedDepartment(depName);
+    fetchDoctorsByDepartment(depName);
+  }}
+>
+  <option value="">Select Department</option>
+
+  {departments.map((dep: any) => (
+    <option key={dep._id} value={dep.departmentName}>
+      {dep.departmentName}
+    </option>
+  ))}
+</select>
+
+
+
+
+
+  {/* Doctors Dropdown */}
+  <div className="mb-4">
+  <label className="text-sm font-medium block mb-1">
+    Refer To Doctor
+  </label>
+<select
+  className="w-full p-2 border rounded"
+  value={referralDoctorId}
+  onChange={(e) => {
+    const doctorId = e.target.value;
+    console.log("🟩 Doctor selected:", doctorId);
+    setReferralDoctorId(doctorId);
+  }}
+>
+  <option value="">Select Doctor</option>
+
+  {doctors.map((doc) => (
+    <option key={doc.doctorId} value={doc.doctorId}>
+      {doc.doctor?.name || "Unnamed Doctor"}
+    </option>
+  ))}
+</select>
+
+
+
+
+
+</div>
+
+
+  {/* Referral Reason */}
+  {referralDoctorId && (
+    <div className="mb-4">
+      <label className="text-sm font-medium block mb-1">
+        Referral Reason
+      </label>
+      <textarea
+        className="w-full border p-2 rounded-lg text-sm min-h-[80px]"
+        placeholder="Explain why patient is being referred..."
+        value={referralReason}
+        onChange={(e) => setReferralReason(e.target.value)}
+      />
+    </div>
+  )}
+</div>
+
 
                   {/* Buttons */}
                   <div className="flex justify-end gap-3 pt-4">
