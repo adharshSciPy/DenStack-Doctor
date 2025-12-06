@@ -1,17 +1,17 @@
-import { Plus, FileText, Send, Mail, MessageCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
+import { Plus, FileText, Send, Mail, MessageCircle, Clock, User, Phone, Calendar } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Badge } from "./ui/badge";
+} from "../components/ui/select";
+import { Badge } from "../components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -20,8 +20,35 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { useState } from "react";
+} from "../components/ui/dialog";
+import { useState, useEffect } from "react";
+
+const API_BASE_URL = "http://localhost:8002/api/v1/patient-service";
+
+interface Patient {
+  _id: string;
+  name: string;
+  phone: string;
+  age: number;
+  gender: string;
+  patientUniqueId: string;
+}
+
+interface Appointment {
+  _id: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  status: string;
+  opNumber: string;
+  patient: Patient;
+}
+
+interface ClinicGroup {
+  clinicId: string | null;
+  clinicName: string;
+  clinicPhone: string | null;
+  appointments: Appointment[];
+}
 
 interface Prescription {
   id: string;
@@ -51,9 +78,58 @@ const mockPrescriptions: Prescription[] = [
   },
 ];
 
-export function EPrescription() {
+export default function EPrescription() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+  const [appointments, setAppointments] = useState<ClinicGroup[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [error, setError] = useState("");
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const token = localStorage.getItem("authToken"); // Adjust based on your auth implementation
+      
+      const queryParams = new URLSearchParams({
+        status: "all",
+        date: selectedDate,
+        search: search,
+        limit: "50"
+      });
+
+      const response = await fetch(`${API_BASE_URL}/appointment/fetch?${queryParams}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setAppointments(data.data || []);
+      } else {
+        setError(data.message || "Failed to fetch appointments");
+      }
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      setError("Failed to connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [selectedDate]);
+
+  const handleSearch = () => {
+    fetchAppointments();
+  };
 
   const handleShare = (prescription: Prescription) => {
     setSelectedPrescription(prescription);
@@ -61,172 +137,139 @@ export function EPrescription() {
   };
 
   const handleSendEmail = () => {
-    // Mock email send
     console.log("Sending via email...");
     setShareDialogOpen(false);
   };
 
   const handleSendWhatsApp = () => {
-    // Mock WhatsApp send
     console.log("Sending via WhatsApp...");
     setShareDialogOpen(false);
   };
 
+  const totalAppointments = appointments.reduce((sum, clinic) => sum + clinic.appointments.length, 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {/* Today's Appointments Section */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>E-Prescription & Treatment Plans</CardTitle>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Prescription
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Prescription</DialogTitle>
-                  <DialogDescription>
-                    Fill out the prescription details for your patient
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="patient">Patient Name</Label>
-                    <Input id="patient" placeholder="Search patient..." />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="medication">Medication</Label>
-                    <Input id="medication" placeholder="Enter medication name" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="dosage">Dosage</Label>
-                      <Input id="dosage" placeholder="e.g., 500mg" />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="frequency">Frequency</Label>
-                      <Select>
-                        <SelectTrigger id="frequency">
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="once">Once daily</SelectItem>
-                          <SelectItem value="twice">Twice daily</SelectItem>
-                          <SelectItem value="thrice">3 times daily</SelectItem>
-                          <SelectItem value="needed">As needed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="duration">Duration</Label>
-                    <Input id="duration" placeholder="e.g., 7 days" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="instructions">Special Instructions</Label>
-                    <Textarea
-                      id="instructions"
-                      placeholder="Enter any special instructions..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline">Save as Draft</Button>
-                  <Button className="bg-primary hover:bg-primary/90">Create & Approve</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              <span>Today's Appointments</span>
+              {totalAppointments > 0 && (
+                <Badge variant="secondary">{totalAppointments}</Badge>
+              )}
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {mockPrescriptions.map((prescription) => (
-              <div
-                key={prescription.id}
-                className="border rounded-lg p-4 hover:bg-[var(--hover)] transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <h4 className="font-medium">{prescription.patientName}</h4>
-                      <Badge
-                        className={
-                          prescription.status === "approved"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : prescription.status === "sent"
-                            ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
-                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                        }
-                      >
-                        {prescription.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Medication:</span>
-                        <p className="font-medium">{prescription.medication}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Dosage:</span>
-                        <p className="font-medium">{prescription.dosage}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Duration:</span>
-                        <p className="font-medium">{prescription.duration}</p>
-                      </div>
-                    </div>
+          {/* Filters */}
+          <div className="flex gap-4 mb-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by name, phone, or patient ID..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+            </div>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-48"
+            />
+            <Button onClick={handleSearch}>Search</Button>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="text-center py-4 text-destructive">
+              <p>{error}</p>
+            </div>
+          )}
+
+          {/* Appointments List */}
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>Loading appointments...</p>
+            </div>
+          ) : appointments.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No appointments found for selected date</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {appointments.map((clinic) => (
+                <div key={clinic.clinicId || "unknown"} className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                    <FileText className="w-4 h-4" />
+                    {clinic.clinicName}
+                    {clinic.clinicPhone && (
+                      <span className="text-muted-foreground font-normal">
+                        • {clinic.clinicPhone}
+                      </span>
+                    )}
                   </div>
                   
-                  <div className="flex flex-col gap-2">
-                    {prescription.status === "pending" && (
-                      <Button size="sm" className="bg-primary hover:bg-primary/90">
-                        Approve
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleShare(prescription)}
-                    >
-                      <Send className="mr-2 h-4 w-4" />
-                      Share
-                    </Button>
+                  <div className="space-y-2">
+                    {clinic.appointments.map((appointment) => (
+                      <div
+                        key={appointment._id}
+                        className="flex justify-between items-start p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex flex-col gap-2 flex-1">
+                          <div className="flex items-center gap-3">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <p className="font-semibold">{appointment.patient?.name || "Unknown Patient"}</p>
+                            <Badge
+                              variant={
+                                appointment.status === "scheduled"
+                                  ? "default"
+                                  : appointment.status === "cancelled"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
+                              {appointment.status.toUpperCase()}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-4 text-sm">
+                            <span className="font-medium">
+                              OP No: <span className="font-bold">{appointment.opNumber}</span>
+                            </span>
+                            <span className="font-medium">
+                              Patient ID:{" "}
+                              <span className="font-bold">
+                                {appointment.patient?.patientUniqueId}
+                              </span>
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4 text-muted-foreground" />
+                              <span>{appointment.patient?.phone}</span>
+                            </div>
+                            <div className="text-primary font-semibold">
+                              {appointment.appointmentTime}
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button size="sm" className="ml-4">
+                          Create Prescription
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Templates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2">
-              <FileText className="h-6 w-6" />
-              <span>Post-Surgery Care</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2">
-              <FileText className="h-6 w-6" />
-              <span>Antibiotics</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2">
-              <FileText className="h-6 w-6" />
-              <span>Pain Management</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* Share Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
         <DialogContent>
           <DialogHeader>

@@ -32,6 +32,7 @@ import { Textarea } from "./ui/textarea";
 import { cn } from "./ui/utils";
 import axios from "axios";
 import clinicServiceBaseUrl from "../clinicServiceUrl";
+import { DashboardHeader } from "./DashboardHeader";
 
 interface Patient {
   _id: string;
