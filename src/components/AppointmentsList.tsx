@@ -15,6 +15,10 @@ import {
   X,
   Plus,
   Pill,
+  Upload,
+  FileText,
+  File,
+  Image,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -216,7 +220,8 @@ const [selectedDepartment, setSelectedDepartment] = useState("");
 const [doctors, setDoctors] = useState<Doctor[]>([]);
 const [referralDoctorId, setReferralDoctorId] = useState("");
 const [referralReason, setReferralReason] = useState("");
-
+const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+const [filePreviews, setFilePreviews] = useState<any[]>([]);
 
 
   const formatTime = (time: string) => {
@@ -326,6 +331,7 @@ const [referralReason, setReferralReason] = useState("");
       });
 
       const result = response.data;
+      // console.log("121212121",result)
       if (!result.success)
         throw new Error(
           result.message || "Failed to fetch appointment details"
@@ -346,6 +352,7 @@ const historyResponse = await axios.get(historyUrl, {
 });
 
       const historyResult = historyResponse.data;
+      console.log("32323232",historyResult)
      if (historyResult.success) {
   const { data: historyData = [] } = historyResult;
 
@@ -392,6 +399,8 @@ const historyResponse = await axios.get(historyUrl, {
       },
     ]);
     setSelectedHistory(null);
+    setUploadFiles([]);
+    setFilePreviews([]);
   };
 
   const handleViewHistory = (historyItem: PatientHistoryItem) => {
@@ -572,8 +581,41 @@ useEffect(() => {
   if (selectedClinic) fetchDepartments();
 }, [selectedClinic]);
 
+ // ✅ NEW: File upload handlers
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    
+    if (selectedFiles.length === 0) return;
 
-  const handleSaveConsultation = async () => {
+    setUploadFiles(prev => [...prev, ...selectedFiles]);
+
+    selectedFiles.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFilePreviews(prev => [...prev, {
+            name: file.name,
+            type: 'image',
+            url: reader.result
+          }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setFilePreviews(prev => [...prev, {
+          name: file.name,
+          type: file.type.includes('pdf') ? 'pdf' : 'other',
+          url: null
+        }]);
+      }
+    });
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setUploadFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+   const handleSaveConsultation = async () => {
     if (!appointmentDetail?._id) {
       alert("Invalid appointment data");
       return;
@@ -587,58 +629,66 @@ useEffect(() => {
 
       const clinicId = selectedClinic!.clinicId;
 
-      const payload = {
-        symptoms: chiefComplaint
-          ? chiefComplaint
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
-        diagnosis: diagnosis
-          ? diagnosis
-              .split(",")
-              .map((d) => d.trim())
-              .filter(Boolean)
-          : [],
-        prescriptions: prescriptions || [],
-        notes: additionalNotes?.trim() || "",
-        procedures: [],
-        referral: referralDoctorId
-  ? {
-      referredToDoctorId: referralDoctorId,
-      referralReason: referralReason?.trim() || "",
-    }
-  : null,
+      // ✅ Create FormData instead of regular object
+      const formData = new FormData();
 
+      // ✅ Append text fields as JSON strings
+      formData.append('symptoms', JSON.stringify(
+        chiefComplaint.split(',').map(s => s.trim()).filter(Boolean)
+      ));
+      
+      formData.append('diagnosis', JSON.stringify(
+        diagnosis.split(',').map(d => d.trim()).filter(Boolean)
+      ));
+      
+      formData.append('prescriptions', JSON.stringify(prescriptions));
+      formData.append('notes', additionalNotes?.trim() || '');
+      formData.append('procedures', JSON.stringify([]));
+      formData.append('files', JSON.stringify([])); // Empty array for manual URLs
 
-        // ✅ include treatment plan if doctor has defined one
-        treatmentPlan: showTreatmentPlan
-          ? {
-              clinicId,
-              planName,
-              description: planDescription,
-              stages,
-            }
-          : null,
-      };
+      // ✅ Append referral if exists
+      if (referralDoctorId) {
+        formData.append('referral', JSON.stringify({
+          referredToDoctorId: referralDoctorId,
+          referralReason: referralReason?.trim() || '',
+        }));
+      }
 
-      const res = await axios.post(
+      // ✅ Append treatment plan if exists
+      if (showTreatmentPlan) {
+        formData.append('treatmentPlan', JSON.stringify({
+          clinicId,
+          planName,
+          description: planDescription,
+          stages,
+        }));
+      }
+
+      // ✅ Append uploaded files
+      uploadFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
+      // ✅ Use fetch instead of axios for FormData
+      const res = await fetch(
         `${patientServiceBaseUrl}/api/v1/patient-service/consultation/consult-patient/${appointmentDetail._id}`,
-        payload,
         {
+          method: 'POST',
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`,
           },
+          body: formData
         }
       );
 
-      if (res?.data?.success) {
-        alert(
-          "✅ Consultation (and treatment plan if added) saved successfully!"
-        );
+      const data = await res.json();
+
+      if (data?.success) {
+        alert("✅ Consultation saved successfully!");
+        console.log('Uploaded files:', data.files);
         handleBackToAppointments?.();
       } else {
-        alert(res?.data?.message || "Failed to save consultation");
+        alert(data?.message || "Failed to save consultation");
       }
     } catch (err) {
       console.error("❌ Error saving consultation:", err);
@@ -1122,6 +1172,63 @@ const handleFinishStage = async (stageIndex: number) => {
               )}
             </div>
           </div>
+          {/* Files Section */}
+{selectedHistory.files && selectedHistory.files.length > 0 && (
+<Card>
+  <CardHeader>
+    <CardTitle className="text-lg">Attached Files</CardTitle>
+  </CardHeader>
+
+  <CardContent className="space-y-4">
+    {selectedHistory.files.map((file, index) => {
+      const filePath = `${patientServiceBaseUrl}${file.url}`;
+      
+      const isImage = file.type?.includes("image");
+
+      return (
+        <div
+          key={file._id || index}
+          className="flex items-center justify-between border p-3 rounded-lg"
+        >
+          <div className="flex items-center gap-3">
+            {/* Preview */}
+            {isImage ? (
+              <img
+                src={filePath}
+                crossOrigin="anonymous"
+                // onError={(e) => (e.target.src = "/no-preview.png")} // fallback
+                alt="Preview"
+                className="h-14 w-14 rounded-md object-cover border"
+              />
+            ) : (
+              <div className="h-14 w-14 flex items-center justify-center border rounded-md bg-red-50 text-red-600 font-semibold">
+                PDF
+              </div>
+            )}
+
+            {/* File Info */}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                {isImage ? "Image" : "PDF"}
+              </p>
+              <p className="text-xs text-gray-500">
+                {new Date(file.uploadedAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          {/* View Button */}
+          <Button variant="outline" size="sm" onClick={() => window.open(filePath, "_blank")}>
+            View
+          </Button>
+        </div>
+      );
+    })}
+  </CardContent>
+</Card>
+
+)}
+
 
           {/* Footer */}
           <div className="border-t px-6 py-4 flex justify-end flex-shrink-0">
@@ -1527,6 +1634,73 @@ const handleFinishStage = async (stageIndex: number) => {
                       value={additionalNotes}
                       onChange={(e) => setAdditionalNotes(e.target.value)}
                     />
+                  </div>
+                     <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Attach Files (Images, PDFs, X-rays, etc.)
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <label className="cursor-pointer">
+                        <div className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all">
+                          <Upload className="h-4 w-4 text-gray-600" />
+                          <span className="text-sm text-gray-600">Choose Files</span>
+                        </div>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,.pdf,.doc,.docx"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                        />
+                      </label>
+                      {uploadFiles.length > 0 && (
+                        <span className="text-xs text-gray-500">
+                          {uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} selected
+                        </span>
+                      )}
+                    </div>
+
+                    {/* File Previews */}
+                    {filePreviews.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                        {filePreviews.map((preview, index) => (
+                          <div
+                            key={index}
+                            className="relative border rounded-lg p-3 bg-gray-50 hover:bg-gray-100 transition-all"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFile(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-all shadow-md"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+
+                            {preview.type === 'image' && preview.url ? (
+                              <img
+                                src={preview.url}
+                                alt={preview.name}
+                                
+                                className="w-full h-24 object-cover rounded mb-2"
+                              />
+                            ) : (
+                              <div className="w-full h-24 flex items-center justify-center bg-gray-200 rounded mb-2">
+                                {preview.type === 'pdf' ? (
+                                  <FileText className="h-5 w-5 text-red-500" />
+                                ) : (
+                                  <File className="h-5 w-5 text-gray-500" />
+                                )}
+                              </div>
+                            )}
+
+                            <p className="text-xs text-gray-600 truncate" title={preview.name}>
+                              {preview.name}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="border-t border-gray-200 pt-6 mt-4">
                     <div className="flex justify-between items-center mb-3">
