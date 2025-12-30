@@ -37,6 +37,7 @@ import { cn } from "./ui/utils";
 import axios from "axios";
 import clinicServiceBaseUrl from "../clinicServiceUrl";
 import { DashboardHeader } from "./DashboardHeader";
+// import DentalChart from "./DentalChart";
 
 interface Patient {
   _id: string;
@@ -222,6 +223,7 @@ const [referralDoctorId, setReferralDoctorId] = useState("");
 const [referralReason, setReferralReason] = useState("");
 const [uploadFiles, setUploadFiles] = useState<File[]>([]);
 const [filePreviews, setFilePreviews] = useState<any[]>([]);
+const [showDentalChart, setShowDentalChart] = useState(false);
 
 
   const formatTime = (time: string) => {
@@ -1080,7 +1082,6 @@ const handleFinishStage = async (stageIndex: number) => {
                   </CardContent>
                 </Card>
               )}
-
               {/* Symptoms */}
               {selectedHistory.symptoms &&
                 selectedHistory.symptoms.length > 0 && (
@@ -1307,6 +1308,7 @@ const handleFinishStage = async (stageIndex: number) => {
                       </span>
                     </div>
                   )}
+
                 </div>
               </div>
 
@@ -1660,7 +1662,35 @@ const handleFinishStage = async (stageIndex: number) => {
                         </span>
                       )}
                     </div>
+{/* ✅ Dental Chart Section - Full Modal */}
+{/* ✅ Dental Chart Section */}
+<div className="mt-6">
+  <Button
+    variant="outline"
+    className="w-full"
+    onClick={() => setShowDentalChart(true)}
+  >
+    <FileText className="mr-2 h-4 w-4" />
+    Open Dental Chart
+  </Button>
+</div>
 
+{/* ✅ Dental Chart - Full Screen */}
+{/* {showDentalChart && (
+  <DentalChart
+    patientId={appointmentDetail.patientId._id}
+    visitId={appointmentDetail._id}
+    mode="edit"
+    patientName={appointmentDetail.patientId.name}
+    patientUniqueId={appointmentDetail.patientId.patientUniqueId}
+    onClose={() => setShowDentalChart(false)}
+    onProcedureAdded={() => {
+      fetchAppointmentDetails(appointmentDetail._id);
+      setShowDentalChart(false);
+      alert("Dental procedure added successfully!");
+    }}
+  />
+)} */}
                     {/* File Previews */}
                     {filePreviews.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
@@ -2023,6 +2053,7 @@ const handleFinishStage = async (stageIndex: number) => {
                         >
                           {getStatusLabel(appointment.status)}
                         </Badge>
+                        
                       </div>
                     </div>
                   ))}
