@@ -224,6 +224,10 @@ const [referralReason, setReferralReason] = useState("");
 const [uploadFiles, setUploadFiles] = useState<File[]>([]);
 const [filePreviews, setFilePreviews] = useState<any[]>([]);
 const [showDentalChart, setShowDentalChart] = useState(false);
+const [showRecall, setShowRecall] = useState(false);
+const [recallDate, setRecallDate] = useState<Date | null>(null);
+const [recallTime, setRecallTime] = useState("");
+const [recallDepartment, setRecallDepartment] = useState("");
 
 
   const formatTime = (time: string) => {
@@ -403,6 +407,10 @@ const historyResponse = await axios.get(historyUrl, {
     setSelectedHistory(null);
     setUploadFiles([]);
     setFilePreviews([]);
+      setShowRecall(false);
+  setRecallDate(null);
+  setRecallTime("");
+  setRecallDepartment("");
   };
 
   const handleViewHistory = (historyItem: PatientHistoryItem) => {
@@ -655,6 +663,13 @@ useEffect(() => {
           referralReason: referralReason?.trim() || '',
         }));
       }
+      if (recallDate && recallTime) {
+  formData.append('recall', JSON.stringify({
+    appointmentDate: recallDate.toISOString().split('T')[0],
+    appointmentTime: recallTime,
+    department: recallDepartment || appointmentDetail.department,
+  }));
+}
 
       // ✅ Append treatment plan if exists
       if (showTreatmentPlan) {
@@ -1921,6 +1936,106 @@ const handleFinishStage = async (stageIndex: number) => {
         value={referralReason}
         onChange={(e) => setReferralReason(e.target.value)}
       />
+    </div>
+  )}
+</div>
+{/* Recall/Follow-up Section */}
+<div className="border-t border-gray-200 pt-6 mt-4">
+  <div className="flex justify-between items-center mb-3">
+    <h3 className="text-lg font-semibold text-gray-800">
+      Schedule Recall/Follow-up
+    </h3>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setShowRecall((prev) => !prev)}
+    >
+      {showRecall ? "Hide" : "Add Recall"}
+    </Button>
+  </div>
+
+  {showRecall && (
+    <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Recall Date Picker */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Recall Date
+          </label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {recallDate ? (
+                  format(recallDate, "MMM dd, yyyy")
+                ) : (
+                  <span>Pick a date</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={recallDate || undefined}
+                onSelect={(date) => setRecallDate(date || null)}
+                disabled={(date) => date < new Date()}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Recall Time */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Recall Time
+          </label>
+          <div className="relative">
+            <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="time"
+              className="pl-10"
+              value={recallTime}
+              onChange={(e) => setRecallTime(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Department (Optional) */}
+      {/* <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Department (Optional)
+        </label>
+        <Input
+          type="text"
+          placeholder={`Default: ${appointmentDetail?.department || 'Current Department'}`}
+          value={recallDepartment}
+          onChange={(e) => setRecallDepartment(e.target.value)}
+          className="w-full"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Leave empty to use current department
+        </p>
+      </div> */}
+
+      {/* Preview */}
+      {recallDate && recallTime && (
+        <div className="bg-white p-3 rounded-lg border border-blue-200">
+          <p className="text-sm font-medium text-gray-700">
+            Recall Appointment Preview:
+          </p>
+          <p className="text-sm text-gray-600 mt-1">
+            📅 {format(recallDate, "EEEE, MMMM dd, yyyy")} at {recallTime}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Department: {recallDepartment || appointmentDetail?.department || 'Current'}
+          </p>
+        </div>
+      )}
     </div>
   )}
 </div>
