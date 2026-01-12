@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { useClinicTheme } from "./hooks/useClinicTheme";
+import MyBlogList from "./components/MyBlogList";
 import {
   Calendar,
   FileText,
@@ -8,8 +10,10 @@ import {
   ShoppingBag,
   Bell,
   LayoutDashboard,
-  LogIn,
+  LogOut,
+  BookOpen,
 } from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
@@ -22,109 +26,165 @@ import {
   SidebarProvider,
   SidebarInset,
 } from "./components/ui/sidebar";
+
 import { Badge } from "./components/ui/badge";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { AppointmentsList } from "./components/AppointmentsList";
 import { PatientRecords } from "./components/PatientRecords";
-import  EPrescription  from "./components/EPrescription";
+import EPrescription from "./components/EPrescription";
 import { ProductivityCharts } from "./components/ProductivityCharts";
 import { Marketplace } from "./components/Marketplace";
 import { AlertsPanel } from "./components/AlertsPanel";
-import { useLocation, useNavigate } from "react-router-dom";
+import BlogList from "./components/BlogList";
+import CreateBlog from "./components/CreateBlog";
+import BlogDetail from "./components/BlogDetail";
+
+/* -------------------------------- CONSTANTS -------------------------------- */
+
+const MAIN_APP_ORIGIN = "http://localhost:3000";
+const NOTIFICATION_SERVICE_URL = "http://localhost:8011";
+const STORAGE_KEYS = {
+  AUTH_TOKEN: "authToken",
+  USER_ROLE: "userRole",
+  DOCTOR_ID: "doctorId",
+  CLINIC_ID: "clinicId",
+} as const;
+
+/* -------------------------------- TYPES -------------------------------- */
 
 interface Notification {
   _id: string;
-  type: string;
   title: string;
   message: string;
   isRead: boolean;
+  type: string;
   createdAt: string;
-  appointmentId?: string;
-  patientId?: string;
-  clinicId?: string;
-  metadata?: any;
 }
 
+interface MenuItem {
+  path?: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  showBadge?: boolean;
+  onClick?: () => void;
+}
+
+interface AuthState {
+  token: string | null;
+  role: string | null;
+  doctorId: string | null;
+}
+
+/* -------------------------------- HELPERS -------------------------------- */
+
+const isValidDoctorId = (id: any): id is string => {
+  if (typeof id !== "string") return false;
+  const trimmed = id.trim();
+  return trimmed !== "" && trimmed !== "undefined" && trimmed !== "null";
+};
+
+const getStorageValue = (key: string): string | null => {
+  return sessionStorage.getItem(key) || localStorage.getItem(key);
+};
+
+const setStorageValue = (key: string, value: string, persistent = false) => {
+  sessionStorage.setItem(key, value);
+  if (persistent) {
+    localStorage.setItem(key, value);
+  }
+};
+
+const clearStorage = () => {
+  sessionStorage.clear();
+  localStorage.clear();
+};
+
+const removeStorageKey = (key: string) => {
+  sessionStorage.removeItem(key);
+  localStorage.removeItem(key);
+};
+
+/* -------------------------------- APP -------------------------------- */
+
 export default function App() {
-  const [activeView, setActiveView] = useState("overview");
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [doctorId, setDoctorId] = useState<string | null>(null);
-  
+  const [authState, setAuthState] = useState<AuthState>({
+    token: null,
+    role: null,
+    doctorId: null,
+  });
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Helper: Check if a doctorId is valid (not null, undefined, 'undefined', 'null', or empty)
-  const isValidDoctorId = (id: any): id is string => {
-    return typeof id === 'string' && id.trim() !== '' && id !== 'undefined' && id !== 'null';
-  };
+  /* -------------------- CLEAN CORRUPTED DOCTOR ID -------------------- */
 
-  // Clean up any corrupted doctorId from storage on app start
   useEffect(() => {
-    const storedDoctorId = sessionStorage.getItem("doctorId") || localStorage.getItem("doctorId");
-    
+    const storedDoctorId = getStorageValue(STORAGE_KEYS.DOCTOR_ID);
+
     if (storedDoctorId && !isValidDoctorId(storedDoctorId)) {
-      console.warn("🧹 Detected invalid doctorId in storage, clearing:", storedDoctorId);
-      sessionStorage.removeItem("doctorId");
-      localStorage.removeItem("doctorId");
+      console.warn("🧹 Clearing invalid doctorId:", storedDoctorId);
+      removeStorageKey(STORAGE_KEYS.DOCTOR_ID);
     } else if (isValidDoctorId(storedDoctorId)) {
-      console.log("✅ Valid DoctorId loaded from storage:", storedDoctorId);
-      setDoctorId(storedDoctorId);
+      setAuthState((prev) => ({ ...prev, doctorId: storedDoctorId }));
     }
   }, []);
 
-  // Main authentication & routing logic
-  useEffect(() => {
-    console.log("🩺 Doctor Portal loaded — setting up message listener...");
+  /* -------------------- AUTH HANDLER -------------------- */
 
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== "http://localhost:3000") return;
-      const { type, token, role, doctorId: msgDoctorId, clinicId } = event.data || {};
-      if (type !== "LOGIN_DATA" || !token || !role) return;
+  const handleAuthUpdate = useCallback(
+    (
+      token: string,
+      role: string,
+      doctorId?: string,
+      clinicId?: string,
+      persistent = false
+    ) => {
+      clearStorage();
 
-      console.log("✅ LOGIN_DATA received:", {
-        token: !!token,
+      setStorageValue(STORAGE_KEYS.AUTH_TOKEN, token, persistent);
+      setStorageValue(STORAGE_KEYS.USER_ROLE, role, persistent);
+
+      if (isValidDoctorId(doctorId)) {
+        setStorageValue(STORAGE_KEYS.DOCTOR_ID, doctorId, persistent);
+      }
+
+      if (clinicId) {
+        setStorageValue(STORAGE_KEYS.CLINIC_ID, clinicId, persistent);
+      }
+
+      setAuthState({
+        token,
         role,
-        doctorId: msgDoctorId,
-        clinicId,
+        doctorId: isValidDoctorId(doctorId) ? doctorId : null,
       });
 
-      // Clear previous session
-      sessionStorage.clear();
-      localStorage.clear();
+      navigate("/dashboard", { replace: true });
+    },
+    [navigate]
+  );
 
-      sessionStorage.setItem("authToken", token);
-      sessionStorage.setItem("userRole", role);
+  /* -------------------- AUTH + ROUTING CORE -------------------- */
 
-      if (isValidDoctorId(msgDoctorId)) {
-        sessionStorage.setItem("doctorId", msgDoctorId);
-        setDoctorId(msgDoctorId);
-        console.log("✅ Valid DoctorId set from message:", msgDoctorId);
-      } else if (msgDoctorId) {
-        console.warn("⚠️ Invalid doctorId from message, ignoring:", msgDoctorId);
-      }
+  useEffect(() => {
+    console.log("🩺 Doctor Portal initialized");
 
-      if (clinicId) sessionStorage.setItem("clinicId", clinicId);
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== MAIN_APP_ORIGIN) return;
 
-      setAuthToken(token);
-      setUserRole(role);
+      const { type, token, role, doctorId, clinicId } = event.data || {};
 
-      // Navigate safely
-      if (role === "600" && isValidDoctorId(msgDoctorId)) {
-        navigate(`/doctor/${msgDoctorId}/dashboard`, { replace: true });
-      } else if (role === "456" && clinicId) {
-        navigate(`/clinic/${clinicId}/dashboard`, { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
+      if (type !== "LOGIN_DATA" || !token || !role) return;
+
+      handleAuthUpdate(token, role, doctorId, clinicId, false);
     };
 
     window.addEventListener("message", handleMessage);
 
-    // Handle login via URL query params
+    /* -------- URL LOGIN SUPPORT -------- */
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     const role = params.get("role");
@@ -132,73 +192,33 @@ export default function App() {
     const clinicId = params.get("clinicId");
 
     if (token && role) {
-      console.log("🎯 Login data from URL:", {
-        token: !!token,
-        role,
-        doctorId: urlDoctorId,
-        clinicId,
-      });
-
-      localStorage.setItem("authToken", token);
-      localStorage.setItem("userRole", role);
-
-      if (isValidDoctorId(urlDoctorId)) {
-        localStorage.setItem("doctorId", urlDoctorId);
-        setDoctorId(urlDoctorId);
-        console.log("✅ Valid DoctorId set from URL:", urlDoctorId);
-      } else if (urlDoctorId) {
-        console.warn("⚠️ Invalid doctorId from URL, ignoring:", urlDoctorId);
-      }
-
-      if (clinicId) localStorage.setItem("clinicId", clinicId);
-
-      setAuthToken(token);
-      setUserRole(role);
-
-      // Clean URL
+      handleAuthUpdate(token, role, urlDoctorId || undefined, clinicId || undefined, true);
       window.history.replaceState({}, document.title, window.location.pathname);
-
-      // Navigate correctly
-      if (role === "600" && isValidDoctorId(urlDoctorId)) {
-        navigate(`/doctor/${urlDoctorId}/dashboard`, { replace: true });
-      } else if (role === "456" && clinicId) {
-        navigate(`/clinic/${clinicId}/dashboard`, { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
     } else {
-      // Load from storage (persistent login)
-      const storedToken = sessionStorage.getItem("authToken") || localStorage.getItem("authToken");
-      const storedRole = sessionStorage.getItem("userRole") || localStorage.getItem("userRole");
-      const storedDoctorId = sessionStorage.getItem("doctorId") || localStorage.getItem("doctorId");
+      /* -------- PERSISTENT LOGIN -------- */
+
+      const storedToken = getStorageValue(STORAGE_KEYS.AUTH_TOKEN);
+      const storedRole = getStorageValue(STORAGE_KEYS.USER_ROLE);
+      const storedDoctorId = getStorageValue(STORAGE_KEYS.DOCTOR_ID);
 
       if (storedToken && storedRole) {
-        console.log("💾 Loaded from storage:", {
-          storedToken: !!storedToken,
-          storedRole,
-          doctorId: storedDoctorId
+        setAuthState({
+          token: storedToken,
+          role: storedRole,
+          doctorId: isValidDoctorId(storedDoctorId) ? storedDoctorId : null,
         });
 
-        setAuthToken(storedToken);
-        setUserRole(storedRole);
-
-        if (isValidDoctorId(storedDoctorId)) {
-          setDoctorId(storedDoctorId);
-          console.log("✅ Valid DoctorId restored:", storedDoctorId);
-        } else if (storedDoctorId) {
-          console.warn("⚠️ Invalid stored doctorId, clearing:", storedDoctorId);
-          sessionStorage.removeItem("doctorId");
-          localStorage.removeItem("doctorId");
+        if (storedDoctorId && !isValidDoctorId(storedDoctorId)) {
+          removeStorageKey(STORAGE_KEYS.DOCTOR_ID);
         }
-      } else {
-        console.log("ℹ️ No stored credentials found (fresh load).");
       }
     }
 
     return () => window.removeEventListener("message", handleMessage);
-  }, [navigate]);
+  }, [handleAuthUpdate]);
 
-  // Handle repeated token/role in URL (e.g. social login redirect)
+  /* -------------------- HANDLE REPEATED URL TOKENS -------------------- */
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const token = params.get("token");
@@ -207,220 +227,116 @@ export default function App() {
     const clinicId = params.get("clinicId");
 
     if (token && role) {
-      localStorage.setItem("authToken", token);
-      localStorage.setItem("userRole", role);
-      
-      if (isValidDoctorId(urlDoctorId)) {
-        localStorage.setItem("doctorId", urlDoctorId);
-        setDoctorId(urlDoctorId);
-      }
-      
-      if (clinicId) {
-        localStorage.setItem("clinicId", clinicId);
-      }
-      
-      setAuthToken(token);
-      setUserRole(role);
-      
-      navigate("/dashboard", { replace: true });
+      handleAuthUpdate(token, role, urlDoctorId || undefined, clinicId || undefined, true);
     }
-  }, [location, navigate]);
+  }, [location, handleAuthUpdate]);
 
-  // Apply clinic theme
-  const clinicId = localStorage.getItem("clinicId") || sessionStorage.getItem("clinicId");
+  /* -------------------- THEME -------------------- */
+
+  const clinicId = getStorageValue(STORAGE_KEYS.CLINIC_ID);
   useClinicTheme(clinicId || "");
-  console.log("🏥 Clinic ID:", clinicId);
 
-  // Notification handlers
-  const handleNotificationsUpdate = (newNotifications: Notification[], newUnreadCount: number) => {
-    setNotifications(newNotifications);
-    setUnreadCount(newUnreadCount);
-  };
+  /* -------------------- LOGOUT -------------------- */
 
-  const handleMarkAsRead = async (notificationId: string) => {
-    if (!isValidDoctorId(doctorId)) {
-      console.error("❌ Cannot mark as read: Invalid or missing doctorId");
-      return;
-    }
+  const handleLogout = useCallback(() => {
+    clearStorage();
+    window.location.href = MAIN_APP_ORIGIN;
+  }, []);
 
-    try {
-      const response = await fetch(`http://localhost:8011/api/notifications/in-app/${notificationId}/read`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: doctorId })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const updated = notifications.map(n => 
-          n._id === notificationId ? { ...n, isRead: true } : n
-        );
-        setNotifications(updated);
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    } catch (error) {
-      console.error("❌ Error marking notification as read:", error);
-    }
-  };
+  /* -------------------- MENU -------------------- */
 
-  const handleDismiss = async (notificationId: string) => {
-    handleMarkAsRead(notificationId);
-  };
-
-  // Menu items based on role
-  const getMenuItems = () => {
-    const baseMenuItems = [
-      { id: "overview", title: "Overview", icon: LayoutDashboard },
-      { id: "appointments", title: "Appointments", icon: Calendar },
-      { id: "patients", title: "Patient Records", icon: FileText },
-      { id: "prescriptions", title: "E-Prescription", icon: ClipboardList },
-      { id: "alerts", title: "Alerts", icon: Bell },
-      { id: "analytics", title: "Productivity", icon: TrendingUp },
+  const menuItems = useMemo<MenuItem[]>(() => {
+    const items: MenuItem[] = [
+      { path: "/dashboard", title: "Overview", icon: LayoutDashboard },
+      { path: "/appointments", title: "Appointments", icon: Calendar },
+      { path: "/patients", title: "Patient Records", icon: FileText },
+      { path: "/prescriptions", title: "E-Prescription", icon: ClipboardList },
+      {
+        path: "/alerts",
+        title: "Alerts",
+        icon: Bell,
+        showBadge: true,
+      },
+      { path: "/analytics", title: "Productivity", icon: TrendingUp },
+      { path: "/blog", title: "Blog", icon: BookOpen },
+      // { path: "/myblogs", title: "My Blogs", icon: BookOpen },
     ];
 
-    if (userRole === "600") {
-      return [
-        ...baseMenuItems,
-        { id: "marketplace", title: "Marketplace", icon: ShoppingBag },
-      ];
+    if (authState.role === "600") {
+      items.push({
+        path: "/marketplace",
+        title: "Marketplace",
+        icon: ShoppingBag,
+      });
     }
 
-    return baseMenuItems;
-  };
+    items.push({
+      title: "Logout",
+      icon: LogOut,
+      onClick: handleLogout,
+    });
 
-  const menuItems = getMenuItems();
+    return items;
+  }, [authState.role, handleLogout]);
 
-  const renderContent = () => {
-    switch (activeView) {
-      case "overview":
-        return (
-          <div className="grid grid-cols-2 gap-6">
-            <AppointmentsList />
-            <AlertsPanel 
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkAsRead={handleMarkAsRead}
-              onDismiss={handleDismiss}
-            />
-          </div>
-        );
-      case "appointments":
-        return <AppointmentsList />;
-      case "patients":
-        return <PatientRecords />;
-      case "prescriptions":
-        return <EPrescription />;
-      case "alerts":
-        return (
-          <AlertsPanel 
-            notifications={notifications}
-            unreadCount={unreadCount}
-            onMarkAsRead={handleMarkAsRead}
-            onDismiss={handleDismiss}
-          />
-        );
-      case "analytics":
-        return <ProductivityCharts />;
-      case "marketplace":
-        return <Marketplace />;
-      default:
-        return (
-          <div className="grid grid-cols-2 gap-6">
-            <AppointmentsList />
-            <AlertsPanel 
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkAsRead={handleMarkAsRead}
-              onDismiss={handleDismiss}
-            />
-          </div>
-        );
-    }
-  };
+  /* -------------------- NOTIFICATIONS -------------------- */
 
-  // Debug logging
-  useEffect(() => {
-    console.log("🧭 Active View:", activeView);
-    console.log("👤 Current Role:", userRole);
-    console.log("🔑 Auth Token:", authToken ? "Available ✅" : "Missing ❌");
-    console.log("👨‍⚕️ Doctor ID:", doctorId || "Not set");
-  }, [activeView, userRole, authToken, doctorId]);
+  const handleNotificationsUpdate = useCallback(
+    (data: Notification[], count: number) => {
+      setNotifications(data);
+      setUnreadCount(count);
+    },
+    []
+  );
 
-  console.log('🎨 Rendering App with doctorId:', {
-    doctorId,
-    type: typeof doctorId,
-    isValid: isValidDoctorId(doctorId),
-    length: doctorId?.length
-  });
+  const handleMarkAsRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }, []);
+
+  const handleDismiss = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n._id !== id));
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }, []);
+
+  /* -------------------- RENDER -------------------- */
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        {/* Updated Sidebar with matching color theme */}
-        <Sidebar className="border-r border-border bg-white">
+        <Sidebar className="border-r bg-white">
           <SidebarContent>
-            {/* Header - matching DashboardSidebar style */}
-            <div className="px-6 py-4 border-b border-border">
-              <h2 className="text-xl font-medium text-foreground">
-                Doctor Portal
-              </h2>
+            <div className="px-6 py-4 border-b">
+              <h2 className="text-xl font-medium">Doctor Portal</h2>
               <p className="text-sm text-muted-foreground">
                 Hospital Management System
               </p>
             </div>
 
-            {/* Main Menu Group */}
             <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Main Menu
-              </SidebarGroupLabel>
+              <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {menuItems.map((item) => (
-                    <SidebarMenuItem key={item.id}>
+                  {menuItems.map((item, index) => (
+                    <SidebarMenuItem key={item.path || `action-${index}`}>
                       <SidebarMenuButton
-                        onClick={() => setActiveView(item.id)}
-                        isActive={activeView === item.id}
-                        tooltip={item.title}
-                        className={`
-                          w-full flex items-center gap-3 px-3 py-2 rounded-md 
-                          transition-all duration-200
-                          ${
-                            activeView === item.id
-                              ? "text-white"
-                              : "text-gray-600 hover:text-gray-900"
-                          }
-                        `}
-                        style={
-                          activeView === item.id
-                            ? {
-                                background:
-                                  "linear-gradient(135deg, var(--primary) 0%, var(--primary-end) 100%)",
-                              }
-                            : {}
-                        }
-                        onMouseEnter={(e) => {
-                          if (activeView !== item.id) {
-                            e.currentTarget.style.background =
-                              "linear-gradient(135deg, var(--primary) 0%, var(--primary-end) 100%)";
-                            e.currentTarget.style.color = "white";
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (activeView !== item.id) {
-                            e.currentTarget.style.background = "";
-                            e.currentTarget.style.color = "";
+                        isActive={item.path ? location.pathname === item.path : false}
+                        onClick={() => {
+                          if (item.onClick) {
+                            item.onClick();
+                          } else if (item.path) {
+                            navigate(item.path);
                           }
                         }}
                       >
-                        <item.icon className="h-4 w-4 flex-shrink-0" />
-                        <span className="text-sm font-medium">
-                          {item.title}
-                        </span>
-                        {item.id === "alerts" && unreadCount > 0 && (
-                          <Badge className="ml-auto bg-red-500 text-white text-xs">
-                            {unreadCount > 99 ? "99+" : unreadCount}
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+
+                        {item.showBadge && unreadCount > 0 && (
+                          <Badge className="ml-auto" variant="destructive">
+                            {unreadCount}
                           </Badge>
                         )}
                       </SidebarMenuButton>
@@ -432,56 +348,59 @@ export default function App() {
           </SidebarContent>
         </Sidebar>
 
-        {/* Main Content Area */}
-        <SidebarInset className="flex-1 flex flex-col">
-          {isValidDoctorId(doctorId) ? (
-            <>
-              {console.log('✅ Rendering DashboardHeader with valid doctorId:', doctorId)}
-              <DashboardHeader 
-                doctorName="Emily Parker"
-                doctorId={doctorId}
-                userRole={userRole || "doctor"}
-                notificationServiceUrl="http://localhost:8011"
-                onNotificationsUpdate={handleNotificationsUpdate}
-              />
-            </>
-          ) : (
-            <header className="border-b bg-white px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground">
-                    {authToken ? "Loading doctor profile..." : "Please log in to continue."}
-                  </p>
-                </div>
-              </div>
-            </header>
+        <SidebarInset className="flex flex-col flex-1">
+          {isValidDoctorId(authState.doctorId) && (
+            <DashboardHeader
+              doctorName="Emily Parker"
+              doctorId={authState.doctorId}
+              userRole={authState.role || "doctor"}
+              notificationServiceUrl={NOTIFICATION_SERVICE_URL}
+              onNotificationsUpdate={handleNotificationsUpdate}
+            />
           )}
 
-          <main className="flex-1 p-6 bg-[linear-gradient(to_left,var(--primary),var(--primary-end))]">
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold text-foreground">
-                {menuItems.find((item) => item.id === activeView)?.title ||
-                  "Overview"}
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {activeView === "overview" &&
-                  "Welcome back! Here's your daily overview."}
-                {activeView === "appointments" &&
-                  "Manage your daily appointments and patient visits."}
-                {activeView === "patients" &&
-                  "Access patient records, medical history, and treatment notes."}
-                {activeView === "prescriptions" &&
-                  "Create and manage e-prescriptions and treatment plans."}
-                {activeView === "alerts" &&
-                  "Stay updated with follow-ups, pending tasks, and new reports."}
-                {activeView === "analytics" &&
-                  "Track your performance and productivity metrics."}
-                {activeView === "marketplace" &&
-                  "Browse and order dentistry products and supplies."}
-              </p>
-            </div>
+          <main className="flex-1 p-4 md:p-6 overflow-auto">
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <AppointmentsList />
+                    <AlertsPanel
+                      notifications={notifications}
+                      unreadCount={unreadCount}
+                      onMarkAsRead={handleMarkAsRead}
+                      onDismiss={handleDismiss}
+                    />
+                  </div>
+                }
+              />
 
-            {renderContent()}
+              <Route path="/appointments" element={<AppointmentsList />} />
+              <Route path="/patients" element={<PatientRecords />} />
+              <Route path="/prescriptions" element={<EPrescription />} />
+              <Route path="/analytics" element={<ProductivityCharts />} />
+              <Route
+                path="/alerts"
+                element={
+                  <AlertsPanel
+                    notifications={notifications}
+                    unreadCount={unreadCount}
+                    onMarkAsRead={handleMarkAsRead}
+                    onDismiss={handleDismiss}
+                  />
+                }
+              />
+              <Route path="/blog" element={<BlogList />} />
+              <Route path="/myblogs" element={<MyBlogList />} />
+              <Route path="/blogs/create" element={<CreateBlog />} />
+              <Route path="/blogs/edit/:id" element={<CreateBlog />} />
+              <Route path="/blogs/:id" element={<BlogDetail />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+
+              <Route path="/" element={<AppointmentsList />} />
+              <Route path="*" element={<AppointmentsList />} />
+            </Routes>
           </main>
         </SidebarInset>
       </div>
