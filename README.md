@@ -8,4 +8,4 @@
   Run `npm i` to install the dependencies.
 
   Run `npm run dev` to start the development server.
-  
+  Never use the 'stages' array inisde the treatment plan to bind any where instead use "teeth" array and map that 

@@ -37,7 +37,7 @@ import { cn } from "./ui/utils";
 import axios from "axios";
 import clinicServiceBaseUrl from "../clinicServiceUrl";
 import { DashboardHeader } from "./DashboardHeader";
-// import DentalChart from "./DentalChart";
+import DentalChart from "./DentalChart";
 
 interface Patient {
   _id: string;
@@ -126,22 +126,55 @@ interface TreatmentPlan {
   planName: string;
   description?: string;
   createdAt: string;
-    startedAt?: string;
-  status: "pending" | "in-progress" | "completed";
+  startedAt?: string;
+  status: "pending" | "in-progress" | "completed" | "ongoing"; // Added "ongoing"
   stages?: {
     stageName: string;
     description: string;
     status: string;
     scheduledDate: string;
-    note:string;
-      procedures: Procedure[];
+    note: string;
+    procedures: Procedure[];
+  }[];
+  // Add these missing properties from your data
+  conflictChecked?: boolean;
+  patient: {
+    _id: string;
+    name: string;
+    phone: number;
+    email?: string;
+    patientRandomId?: string;
+    patientUniqueId: string;
+  };
+  clinic: string;
+  createdByDoctor: string;
+  treatments?: TreatmentItem[];
+  updatedAt?: string;
+}
+interface TreatmentItem {
+  toothNumber: number;
+  priority: string;
+  isCompleted: boolean;
+  procedures: DentalProcedure[];
+}
+interface DentalProcedure {
+  procedureId: string;
+  name: string;
+  surface: string;
+  status: string;
+  estimatedCost: number;
+  notes?: string;
+}
+interface Stage {
+  stageName: string;
+  description?: string;
+  scheduledDate: string;
+  note?: string;
+  procedureRefs?: {
+    toothNumber: number;
+    procedureName: string;
   }[];
 }
-type Stage = {
-  stageName: string;
-  description: string;
-  scheduledDate: string;
-};
 interface Procedure {
   name: string;
   doctorId: string;
@@ -228,7 +261,15 @@ const [showRecall, setShowRecall] = useState(false);
 const [recallDate, setRecallDate] = useState<Date | null>(null);
 const [recallTime, setRecallTime] = useState("");
 const [recallDepartment, setRecallDepartment] = useState("");
-
+const [dentalData, setDentalData] = useState<{
+  performedTeeth: any[];
+  plannedProcedures: any[];
+   treatmentPlan?: any;
+}>({
+  performedTeeth: [],
+  plannedProcedures: []
+});
+// const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
@@ -625,95 +666,180 @@ useEffect(() => {
     setFilePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-   const handleSaveConsultation = async () => {
-    if (!appointmentDetail?._id) {
-      alert("Invalid appointment data");
-      return;
+// Alternative using axios
+const handleSaveConsultation = async () => {
+  if (!appointmentDetail?._id) {
+    alert("Invalid appointment data");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const token = localStorage.getItem("authToken");
+    if (!token) throw new Error("No authentication token found");
+
+    const clinicId = selectedClinic!.clinicId;
+
+    const formData = new FormData();
+
+    // Append all fields
+    const symptomsArray = chiefComplaint.split(',').map(s => s.trim()).filter(Boolean);
+    const diagnosisArray = diagnosis.split(',').map(d => d.trim()).filter(Boolean);
+
+    formData.append('symptoms', JSON.stringify(symptomsArray));
+    formData.append('diagnosis', JSON.stringify(diagnosisArray));
+    formData.append('prescriptions', JSON.stringify(prescriptions));
+    formData.append('notes', additionalNotes?.trim() || '');
+    formData.append('files', JSON.stringify([]));
+
+    // ✅ Transform dental data to lowercase
+    if (dentalData.performedTeeth.length > 0) {
+      const transformedPerformedTeeth = dentalData.performedTeeth.map(tooth => ({
+        ...tooth,
+        conditions: tooth.conditions.map((cond: string) => 
+          cond.toLowerCase()
+        ),
+        surfaceConditions: tooth.surfaceConditions.map((sc: any) => ({
+          ...sc,
+          conditions: sc.conditions.map((cond: string) => 
+            cond.toLowerCase()
+          )
+        }))
+      }));
+      
+      formData.append('performedTeeth', JSON.stringify(transformedPerformedTeeth));
     }
 
-    setLoading(true);
-
-    try {
-      const token = localStorage.getItem("authToken");
-      if (!token) throw new Error("No authentication token found");
-
-      const clinicId = selectedClinic!.clinicId;
-
-      // ✅ Create FormData instead of regular object
-      const formData = new FormData();
-
-      // ✅ Append text fields as JSON strings
-      formData.append('symptoms', JSON.stringify(
-        chiefComplaint.split(',').map(s => s.trim()).filter(Boolean)
-      ));
-      
-      formData.append('diagnosis', JSON.stringify(
-        diagnosis.split(',').map(d => d.trim()).filter(Boolean)
-      ));
-      
-      formData.append('prescriptions', JSON.stringify(prescriptions));
-      formData.append('notes', additionalNotes?.trim() || '');
-      formData.append('procedures', JSON.stringify([]));
-      formData.append('files', JSON.stringify([])); // Empty array for manual URLs
-
-      // ✅ Append referral if exists
-      if (referralDoctorId) {
-        formData.append('referral', JSON.stringify({
-          referredToDoctorId: referralDoctorId,
-          referralReason: referralReason?.trim() || '',
-        }));
-      }
-      if (recallDate && recallTime) {
-  formData.append('recall', JSON.stringify({
-    appointmentDate: recallDate.toISOString().split('T')[0],
-    appointmentTime: recallTime,
-    department: recallDepartment || appointmentDetail.department,
-  }));
-}
-
-      // ✅ Append treatment plan if exists
-      if (showTreatmentPlan) {
-        formData.append('treatmentPlan', JSON.stringify({
-          clinicId,
-          planName,
-          description: planDescription,
-          stages,
-        }));
-      }
-
-      // ✅ Append uploaded files
-      uploadFiles.forEach(file => {
-        formData.append('files', file);
-      });
-
-      // ✅ Use fetch instead of axios for FormData
-      const res = await fetch(
-        `${patientServiceBaseUrl}/api/v1/patient-service/consultation/consult-patient/${appointmentDetail._id}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData
-        }
-      );
-
-      const data = await res.json();
-
-      if (data?.success) {
-        alert("✅ Consultation saved successfully!");
-        console.log('Uploaded files:', data.files);
-        handleBackToAppointments?.();
-      } else {
-        alert(data?.message || "Failed to save consultation");
-      }
-    } catch (err) {
-      console.error("❌ Error saving consultation:", err);
-      alert("Error saving consultation");
-    } finally {
-      setLoading(false);
+    if (dentalData.plannedProcedures.length > 0) {
+      formData.append('plannedProcedures', JSON.stringify(dentalData.plannedProcedures));
     }
-  };
+
+    // ✅ FIXED: PRIORITIZE dentalData.treatmentPlan over form treatment plan
+    let finalTreatmentPlan = null;
+    
+    // 1. First priority: Use treatment plan from DentalChart (which includes teeth data)
+    if (dentalData.treatmentPlan) {
+      console.log("Using treatment plan from DentalChart:", dentalData.treatmentPlan);
+      finalTreatmentPlan = dentalData.treatmentPlan;
+    }
+    // 2. Second priority: If form has treatment plan AND there are teeth from dental chart
+    else if (showTreatmentPlan && planName.trim() && dentalData.plannedProcedures.length > 0) {
+      console.log("Building treatment plan from form with dental procedures");
+      
+      // Format stages properly
+      const formattedStages = stages.length > 0 
+        ? stages.map(stage => ({
+            stageName: stage.stageName,
+            description: stage.description || '',
+            procedureRefs: stage.procedureRefs || [],
+            scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
+            status: 'pending'
+          }))
+        : [{
+            stageName: "Initial Treatment",
+            description: "Primary procedures",
+            procedureRefs: dentalData.plannedProcedures.map(proc => ({
+              toothNumber: proc.toothNumber,
+              procedureName: proc.name
+            })),
+            scheduledDate: new Date().toISOString().split('T')[0],
+            status: 'pending'
+          }];
+
+      // Extract unique teeth from planned procedures
+      const uniqueTeeth = Array.from(new Set(dentalData.plannedProcedures.map(p => p.toothNumber)))
+        .map(toothNumber => {
+          const proceduresForTooth = dentalData.plannedProcedures.filter(p => p.toothNumber === toothNumber);
+          return {
+            toothNumber: toothNumber,
+            procedures: proceduresForTooth.map(proc => ({
+              name: proc.name,
+              surface: proc.surface || "occlusal",
+              estimatedCost: proc.estimatedCost || 0,
+              notes: proc.notes || "",
+              status: "planned" as const
+            })),
+            priority: 'medium' as const
+          };
+        });
+
+      finalTreatmentPlan = {
+        planName: planName.trim(),
+        description: planDescription.trim(),
+        teeth: uniqueTeeth,
+        stages: formattedStages
+      };
+      
+      console.log("Created combined treatment plan:", finalTreatmentPlan);
+    }
+
+    // Append treatment plan if exists
+    if (finalTreatmentPlan) {
+      console.log("Final treatment plan being sent:", finalTreatmentPlan);
+      formData.append('treatmentPlan', JSON.stringify(finalTreatmentPlan));
+    }
+
+    if (referralDoctorId) {
+      formData.append('referral', JSON.stringify({
+        referredToDoctorId: referralDoctorId,
+        referralReason: referralReason?.trim() || '',
+      }));
+    }
+
+    if (recallDate && recallTime) {
+      formData.append('recall', JSON.stringify({
+        appointmentDate: recallDate.toISOString().split('T')[0],
+        appointmentTime: recallTime,
+        department: recallDepartment || appointmentDetail.department,
+      }));
+    }
+
+    // Append files
+    uploadFiles.forEach(file => {
+      formData.append('files', file);
+    });
+
+    // Debug log
+    console.log("=== FORM DATA BEING SENT ===");
+    console.log("Has treatment plan:", !!finalTreatmentPlan);
+    if (finalTreatmentPlan) {
+      console.log("Treatment plan teeth count:", finalTreatmentPlan.teeth?.length || 0);
+      console.log("Treatment plan stages count:", finalTreatmentPlan.stages?.length || 0);
+    }
+    console.log("===========================");
+
+    // Using axios with FormData
+    const response = await axios.post(
+      `${patientServiceBaseUrl}/api/v1/patient-service/consultation/consult-patient/${appointmentDetail._id}`,
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    const data = response.data;
+
+    if (data?.success) {
+      alert("✅ Consultation saved successfully!");
+      if (data.treatmentPlan) {
+        console.log('Treatment plan saved:', data.treatmentPlan);
+      }
+      handleBackToAppointments?.();
+    } else {
+      alert(data?.message || "Failed to save consultation");
+    }
+  } catch (err: any) {
+    console.error("❌ Error saving consultation:", err);
+    console.error("Error details:", err.response?.data);
+    alert(err.response?.data?.message || "Error saving consultation");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const addStage = () => {
     setStages((prev) => [
@@ -951,37 +1077,213 @@ const handleFinishStage = async (stageIndex: number) => {
     updatedStages[index].note = note;
     setLocalPlan({ ...localPlan, stages: updatedStages });
   };
+  const DentalDataSummary = ({ dentalData }: { dentalData: any }) => {
+  if (!dentalData.performedTeeth.length && !dentalData.plannedProcedures.length) {
+    return null;
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-        >
-          <X size={18} />
-        </button>
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Dental Treatment Summary</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {dentalData.performedTeeth.length > 0 && (
+          <div className="mb-6">
+            <h4 className="font-semibold mb-2 text-primary">
+              Performed Procedures
+            </h4>
+            <div className="space-y-3">
+              {dentalData.performedTeeth.map((tooth: any, idx: number) => (
+                <div key={idx} className="border rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline">Tooth #{tooth.toothNumber}</Badge>
+                    {tooth.conditions.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tooth.conditions.map((cond: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {cond}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {tooth.surfaceConditions.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-gray-600">Surface Conditions:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {tooth.surfaceConditions.map((sc: any, i: number) => (
+                          <div key={i} className="text-xs">
+                            <span className="font-medium">{sc.surface}:</span>{" "}
+                            {sc.conditions.join(", ")}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {tooth.procedures.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Procedures:</p>
+                      <div className="space-y-2 mt-1">
+                        {tooth.procedures.map((proc: any, i: number) => (
+                          <div key={i} className="text-sm bg-green-50 p-2 rounded">
+                            <div className="flex justify-between">
+                              <span className="font-medium">{proc.name}</span>
+                              <Badge className="bg-green-100 text-green-800">
+                                Completed
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1">
+                              Surface: {proc.surface} • Cost: ₹{proc.cost || 0}
+                              {proc.notes && ` • Notes: ${proc.notes}`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {dentalData.plannedProcedures.length > 0 && (
+          <div>
+            <h4 className="font-semibold mb-2 text-primary">
+              Planned Procedures
+            </h4>
+            <div className="space-y-2">
+              {dentalData.plannedProcedures.map((proc: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between border rounded-lg p-3">
+                  <div>
+                    <div className="font-medium">Tooth #{proc.toothNumber} - {proc.name}</div>
+                    <div className="text-sm text-gray-600">
+                      Surface: {proc.surface} • Estimated: ₹{proc.estimatedCost || 0}
+                      {proc.notes && ` • Notes: ${proc.notes}`}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
+                    Planned
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
-        <h2 className="text-xl font-semibold text-primary mb-1">
-          {localPlan.planName}
-        </h2>
-        <p className="text-sm text-gray-600 mb-4">{localPlan.description}</p>
+return (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+      >
+        <X size={18} />
+      </button>
 
-        <div className="space-y-3 text-xs text-gray-600">
-          <p>
-            <strong>Status:</strong> {localPlan.status}
-          </p>
-          <p>
-            <strong>Created:</strong> {formatDate(localPlan.createdAt)}
-          </p>
+      {/* Treatment Plan Header */}
+      <h2 className="text-xl font-semibold text-primary mb-1">
+        {localPlan?.planName || "Treatment Plan"}
+      </h2>
+      <p className="text-sm text-gray-600 mb-4">
+        {localPlan?.description || "No description provided"}
+      </p>
+
+      {/* Plan Information */}
+      <div className="space-y-3 text-xs text-gray-600 mb-4">
+        <p>
+          <strong>Status:</strong>{" "}
+          <span className={`font-medium ${
+            localPlan?.status === "completed" ? "text-green-600" :
+            localPlan?.status === "ongoing" ? "text-blue-600" :
+            "text-yellow-600"
+          }`}>
+            {localPlan?.status || "Unknown"}
+          </span>
+        </p>
+        <p>
+          <strong>Created:</strong> {formatDate(localPlan?.createdAt)}
+        </p>
+        <p>
+          <strong>Started:</strong> {localPlan?.startedAt ? formatDate(localPlan.startedAt) : "Not started"}
+        </p>
+        <p>
+          <strong>Patient:</strong> {localPlan?.patient?.name} ({localPlan?.patient?.patientUniqueId})
+        </p>
+        <p>
+          <strong>Created by Doctor ID:</strong> {localPlan?.createdByDoctor}
+        </p>
+      </div>
+
+      {/* Treatments (Dental Procedures) */}
+      <div className="mt-4">
+        <h4 className="font-medium text-sm mb-2 text-primary">
+          Dental Treatments
+        </h4>
+        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+          {(localPlan?.treatments || []).map((treatment, i) => (
+            <div
+              key={i}
+              className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-all"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <p className="font-semibold text-sm">
+                    Tooth {treatment.toothNumber}
+                  </p>
+                  <Badge className={`text-[10px] ${
+                    treatment.priority === "high" ? "bg-red-100 text-red-700" :
+                    treatment.priority === "medium" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-blue-100 text-blue-700"
+                  }`}>
+                    Priority: {treatment.priority}
+                  </Badge>
+                </div>
+                <Badge className={`text-[10px] ${
+                  treatment.isCompleted ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                }`}>
+                  {treatment.isCompleted ? "Completed" : "Pending"}
+                </Badge>
+              </div>
+
+              {/* Procedures for this tooth */}
+              <div className="space-y-1">
+                {treatment.procedures.map((procedure, procIndex) => (
+                  <div key={procIndex} className="text-xs border-l-2 border-blue-300 pl-2 ml-1">
+                    <p className="font-medium">{procedure.name}</p>
+                    <div className="flex flex-wrap gap-1 text-gray-600">
+                      <span>Surface: {procedure.surface}</span>
+                      <span>|</span>
+                      <span>Status: {procedure.status}</span>
+                      <span>|</span>
+                      <span>Cost: ₹{procedure.estimatedCost}</span>
+                    </div>
+                    {procedure.notes && (
+                      <p className="text-gray-500 italic mt-1">Notes: {procedure.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
+      </div>
 
+      {/* Treatment Stages (If you want to keep stages concept) */}
+      {localPlan?.stages && localPlan.stages.length > 0 && (
         <div className="mt-4">
           <h4 className="font-medium text-sm mb-2 text-primary">
             Treatment Stages
           </h4>
           <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
-            {(localPlan.stages || []).map((stage, i) => (
+            {localPlan.stages.map((stage, i) => (
               <div
                 key={i}
                 className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-all"
@@ -991,6 +1293,19 @@ const handleFinishStage = async (stageIndex: number) => {
                 <p className="text-xs text-gray-500 mb-2">
                   Scheduled: {formatDate(stage.scheduledDate)}
                 </p>
+
+                {stage.procedures && stage.procedures.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs font-medium text-gray-700 mb-1">Procedures:</p>
+                    <div className="space-y-1">
+                      {stage.procedures.map((proc, idx) => (
+                        <div key={idx} className="text-xs text-gray-600">
+                          • {proc.name} {proc.completed ? "(Completed)" : "(Pending)"}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <Textarea
                   placeholder="Add note..."
@@ -1024,22 +1339,33 @@ const handleFinishStage = async (stageIndex: number) => {
             ))}
           </div>
         </div>
+      )}
 
-        <div className="flex justify-between mt-5">
-          <Button variant="outline" onClick={handleAddStage} disabled={loading}>
-            <Plus size={14} className="mr-1" /> Add Stage
+      {/* Action Buttons */}
+      {/* <div className="flex justify-between mt-5">
+        {!localPlan?.conflictChecked && (
+          <Button variant="outline" onClick={handleCheckConflict} disabled={loading}>
+            <AlertTriangle size={14} className="mr-1" /> Check Conflict
           </Button>
-          <Button
-            variant="default"
-            onClick={handleCompletePlan}
-            disabled={localPlan.status === "completed" || loading}
-          >
-            Complete Plan
-          </Button>
+        )}
+        <Button
+          variant="default"
+          onClick={handleCompletePlan}
+          disabled={localPlan?.status === "completed" || loading}
+        >
+          {localPlan?.status === "ongoing" ? "Complete Plan" : "Mark as Ongoing"}
+        </Button>
+      </div> */}
+
+      {/* Display conflict check status */}
+      {localPlan?.conflictChecked && (
+        <div className="mt-3 text-xs text-green-600">
+          ✓ Conflict check completed
         </div>
-      </div>
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 
@@ -1256,30 +1582,129 @@ const handleFinishStage = async (stageIndex: number) => {
   }
 
   // Detail View Screen
-  if (selectedAppointmentId && appointmentDetail) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBackToAppointments}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Appointments
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-semibold">Appointment Details</h1>
-              <p className="text-sm text-muted-foreground">
-                OP# {appointmentDetail.opNumber} -{" "}
-                {appointmentDetail.patientId.name}
-              </p>
-            </div>
+ if (selectedAppointmentId && appointmentDetail) {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b px-6 py-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackToAppointments}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Appointments
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-semibold">Appointment Details</h1>
+            <p className="text-sm text-muted-foreground">
+              OP# {appointmentDetail.opNumber} -{" "}
+              {appointmentDetail.patientId.name}
+            </p>
           </div>
         </div>
+      </div>
 
+      {/* Full-screen Dental Chart Mode */}
+      {showDentalChart ? (
+        <div className="fixed inset-0 z-[100] bg-white">
+          {/* Dental Chart Header */}
+          <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDentalChart(false)}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Consultation
+              </Button>
+              <div className="flex-1">
+                <h1 className="text-2xl font-semibold">Dental Chart</h1>
+                <p className="text-sm text-muted-foreground">
+                  Patient: {appointmentDetail.patientId.name} • 
+                  ID: {appointmentDetail.patientId.patientUniqueId}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowDentalChart(false)}
+            >
+              Save & Close
+            </Button>
+          </div>
+
+          {/* Full-screen Dental Chart Container */}
+          <div className="h-[calc(100vh-80px)] w-full">
+         <DentalChart
+  patientId={appointmentDetail.patientId._id}
+  visitId={appointmentDetail._id}
+  mode="edit"
+  patientName={appointmentDetail.patientId.name}
+  patientUniqueId={appointmentDetail.patientId.patientUniqueId}
+  onClose={() => {
+    setShowDentalChart(false);
+  }}
+  onSave={(dentalDataFromChart) => {
+    console.log("DentalChart onSave called with:", dentalDataFromChart);
+    
+    // IMPORTANT: ALWAYS use the treatment plan from DentalChart if it exists
+    if (dentalDataFromChart.treatmentPlan) {
+      console.log("Setting treatment plan from DentalChart:", dentalDataFromChart.treatmentPlan);
+      setDentalData({
+        performedTeeth: dentalDataFromChart.performedTeeth || [],
+        plannedProcedures: dentalDataFromChart.plannedProcedures || [],
+        treatmentPlan: dentalDataFromChart.treatmentPlan
+      });
+      
+      // Update form fields to match DentalChart treatment plan
+      setShowTreatmentPlan(true);
+      setPlanName(dentalDataFromChart.treatmentPlan.planName);
+      setPlanDescription(dentalDataFromChart.treatmentPlan.description || '');
+      
+      // Type-safe transformation of stages
+      const transformedStages: Stage[] = (dentalDataFromChart.treatmentPlan.stages || []).map((stage: any) => {
+        let scheduledDate = stage.scheduledDate;
+        if (scheduledDate && scheduledDate.includes('T')) {
+          scheduledDate = scheduledDate.split('T')[0];
+        } else if (!scheduledDate) {
+          scheduledDate = new Date().toISOString().split('T')[0];
+        }
+        
+        return {
+          stageName: stage.stageName || '',
+          description: stage.description || '',
+          scheduledDate,
+          note: '',
+          procedureRefs: stage.procedureRefs || []
+        };
+      });
+      
+      setStages(transformedStages);
+    } else {
+      // If no treatment plan in DentalChart, just update the other data
+      setDentalData(prev => ({
+        ...prev,
+        performedTeeth: [...prev.performedTeeth, ...(dentalDataFromChart.performedTeeth || [])],
+        plannedProcedures: [...prev.plannedProcedures, ...(dentalDataFromChart.plannedProcedures || [])]
+      }));
+    }
+    
+    alert("Dental chart data saved successfully!");
+    setShowDentalChart(false);
+  }}
+  onProcedureAdded={(toothNumber, procedure) => {
+    console.log(`Procedure ${procedure.name} added to tooth ${toothNumber}`);
+  }}
+/>
+          </div>
+        </div>
+      ) : (
+        // Original consultation view when dental chart is not open
         <div className="flex h-[calc(100vh-80px)]">
           <div className="w-[30%] bg-primary/5 border-r p-6 overflow-y-auto">
             <div className="space-y-4">
@@ -1323,7 +1748,6 @@ const handleFinishStage = async (stageIndex: number) => {
                       </span>
                     </div>
                   )}
-
                 </div>
               </div>
 
@@ -1353,120 +1777,106 @@ const handleFinishStage = async (stageIndex: number) => {
                 </div>
               </div>
 
+              {/* ✅ Patient Treatment Plans */}
+              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20 mt-4">
+                <h4 className="font-semibold mb-3 text-primary">Patient Treatment Plans</h4>
 
-{/* ✅ Patient Treatment Plans */}
-<div className="bg-primary/10 rounded-xl p-4 border border-primary/20 mt-4">
-  <h4 className="font-semibold mb-3 text-primary">Patient Treatment Plans</h4>
-
-  {treatmentPlansLoading ? (
-    <p className="text-sm text-muted-foreground">Loading treatment plans...</p>
-  ) : patientTreatmentPlans.length === 0 ? (
-    <p className="text-sm text-muted-foreground">No treatment plans found</p>
-  ) : (
-    <ScrollArea className="h-[250px] pr-2">
-      <div className="space-y-2">
-        {patientTreatmentPlans.map((plan) => (
-          <div
-            key={plan._id}
-            className="flex items-center justify-between p-3 border border-primary/20 rounded-lg bg-white/60 hover:bg-white transition-all cursor-pointer"
-            onClick={() => setSelectedTreatmentPlan(plan)}
-          >
-            <div className="flex items-center gap-3">
-              <CalendarIcon className="h-4 w-4 text-primary flex-shrink-0" />
-              <span className="text-sm font-medium text-gray-700">
-                {formatDate(plan.startedAt || plan.createdAt)}
-              </span>
-            </div>
-            <Badge
-              className={`${
-                plan.status === "completed"
-                  ? "bg-green-100 text-green-700"
-                  : plan.status === "in-progress"
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-yellow-100 text-yellow-700"
-              } text-[10px]`}
-            >
-              {plan.status}
-            </Badge>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
-  )}
-</div>
-
-{/* ✅ Modal for Treatment Plan Details */}
-{selectedTreatmentPlan && (
-  <TreatmentPlanDetailsModal
-    plan={selectedTreatmentPlan}
-    onClose={() => setSelectedTreatmentPlan(null)}
-  />
-)}
-
-{/* ✅ Modal for Treatment Plan Details */}
-{selectedTreatmentPlan && (
-  <TreatmentPlanDetailsModal
-    plan={selectedTreatmentPlan}
-    onClose={() => setSelectedTreatmentPlan(null)}
-  />
-)}
-
-
- <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-  <h4 className="font-semibold mb-3 text-primary">Patient History</h4>
-
-  {detailLoading ? (
-    <p className="text-sm text-muted-foreground">Loading history...</p>
-  ) : patientHistory.length === 0 ? (
-    <p className="text-sm text-muted-foreground">No previous visits</p>
-  ) : (
-    <ScrollArea className="h-[300px] pr-2">
-      <div className="space-y-3">
-        {patientHistory.map((item) => {
-          // console.log(item._id, !!item.treatmentPlan, item.treatmentPlan);
-
-          const hasTreatmentPlan = !!item.treatmentPlan;
-
-          return (
-            <div
-              key={item._id}
-              className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
-            >
-              <div className="flex justify-between items-center mb-1">
-                <p className="text-xs font-medium text-primary">
-                  {formatDate(item.visitDate || item.appointmentDate || "")}
-                </p>
-
-                {hasTreatmentPlan && (
-                  <span className="bg-green-100 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                    Treatment Plan
-                  </span>
+                {treatmentPlansLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading treatment plans...</p>
+                ) : patientTreatmentPlans.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No treatment plans found</p>
+                ) : (
+                  <ScrollArea className="h-[250px] pr-2">
+                    <div className="space-y-2">
+                      {patientTreatmentPlans.map((plan) => (
+                        <div
+                          key={plan._id}
+                          className="flex items-center justify-between p-3 border border-primary/20 rounded-lg bg-white/60 hover:bg-white transition-all cursor-pointer"
+                          onClick={() => setSelectedTreatmentPlan(plan)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <CalendarIcon className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="text-sm font-medium text-gray-700">
+                              {formatDate(plan.startedAt || plan.createdAt)}
+                            </span>
+                          </div>
+                          <Badge
+                            className={`${
+                              plan.status === "completed"
+                                ? "bg-green-100 text-green-700"
+                                : plan.status === "in-progress"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            } text-[10px]`}
+                          >
+                            {plan.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 )}
               </div>
 
-              {item.doctor && (
-                <p className="text-xs text-muted-foreground mb-1">
-                  Dr. {item.doctor.name}
-                </p>
+              {/* ✅ Modal for Treatment Plan Details */}
+              {selectedTreatmentPlan && (
+                <TreatmentPlanDetailsModal
+                  plan={selectedTreatmentPlan}
+                  onClose={() => setSelectedTreatmentPlan(null)}
+                />
               )}
 
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full mt-2"
-                onClick={() => handleViewHistory(item)}
-              >
-                View Full Details
-              </Button>
-            </div>
-          );
-        })}
-      </div>
-    </ScrollArea>
-  )}
-</div>
+              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                <h4 className="font-semibold mb-3 text-primary">Patient History</h4>
 
+                {detailLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading history...</p>
+                ) : patientHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No previous visits</p>
+                ) : (
+                  <ScrollArea className="h-[300px] pr-2">
+                    <div className="space-y-3">
+                      {patientHistory.map((item) => {
+                        const hasTreatmentPlan = !!item.treatmentPlan;
 
+                        return (
+                          <div
+                            key={item._id}
+                            className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <p className="text-xs font-medium text-primary">
+                                {formatDate(item.visitDate || item.appointmentDate || "")}
+                              </p>
+
+                              {hasTreatmentPlan && (
+                                <span className="bg-green-100 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                  Treatment Plan
+                                </span>
+                              )}
+                            </div>
+
+                            {item.doctor && (
+                              <p className="text-xs text-muted-foreground mb-1">
+                                Dr. {item.doctor.name}
+                              </p>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full mt-2"
+                              onClick={() => handleViewHistory(item)}
+                            >
+                              View Full Details
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1502,8 +1912,6 @@ const handleFinishStage = async (stageIndex: number) => {
                       onChange={(e) => setDiagnosis(e.target.value)}
                     />
                   </div>
-
-                  {/* Prescription */}
 
                   {/* Prescription */}
                   <div>
@@ -1652,7 +2060,8 @@ const handleFinishStage = async (stageIndex: number) => {
                       onChange={(e) => setAdditionalNotes(e.target.value)}
                     />
                   </div>
-                     <div>
+                  
+                  <div>
                     <label className="text-sm font-medium mb-2 block">
                       Attach Files (Images, PDFs, X-rays, etc.)
                     </label>
@@ -1677,35 +2086,19 @@ const handleFinishStage = async (stageIndex: number) => {
                         </span>
                       )}
                     </div>
-{/* ✅ Dental Chart Section - Full Modal */}
-{/* ✅ Dental Chart Section */}
-<div className="mt-6">
-  <Button
-    variant="outline"
-    className="w-full"
-    onClick={() => setShowDentalChart(true)}
-  >
-    <FileText className="mr-2 h-4 w-4" />
-    Open Dental Chart
-  </Button>
-</div>
 
-{/* ✅ Dental Chart - Full Screen */}
-{/* {showDentalChart && (
-  <DentalChart
-    patientId={appointmentDetail.patientId._id}
-    visitId={appointmentDetail._id}
-    mode="edit"
-    patientName={appointmentDetail.patientId.name}
-    patientUniqueId={appointmentDetail.patientId.patientUniqueId}
-    onClose={() => setShowDentalChart(false)}
-    onProcedureAdded={() => {
-      fetchAppointmentDetails(appointmentDetail._id);
-      setShowDentalChart(false);
-      alert("Dental procedure added successfully!");
-    }}
-  />
-)} */}
+                    {/* ✅ Dental Chart Section */}
+                    <div className="mt-6">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setShowDentalChart(true)}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Open Dental Chart
+                      </Button>
+                    </div>
+
                     {/* File Previews */}
                     {filePreviews.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
@@ -1726,7 +2119,6 @@ const handleFinishStage = async (stageIndex: number) => {
                               <img
                                 src={preview.url}
                                 alt={preview.name}
-                                
                                 className="w-full h-24 object-cover rounded mb-2"
                               />
                             ) : (
@@ -1747,299 +2139,260 @@ const handleFinishStage = async (stageIndex: number) => {
                       </div>
                     )}
                   </div>
+
+                  {/* Treatment Plan Section */}
+
+                  {dentalData.treatmentPlan && dentalData.treatmentPlan.teeth && dentalData.treatmentPlan.teeth.length > 0 && (
+                    <div className="border-t border-gray-200 pt-6 mt-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-gray-800">Treatment Plan</h3>
+                      </div>
+
+                      <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <div className="mb-4">
+                          <div className="font-medium text-gray-700">{dentalData.treatmentPlan.planName}</div>
+                          {dentalData.treatmentPlan.description && (
+                            <p className="text-sm text-gray-600 mt-1">{dentalData.treatmentPlan.description}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-gray-700">Planned Procedures</h4>
+                          {dentalData.treatmentPlan.teeth.map((toothPlan: any, idx: number) => (
+                            <div key={idx} className="border border-gray-300 bg-white rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline">Tooth #{toothPlan.toothNumber}</Badge>
+                                  {/* {toothPlan.priority && (
+                                    <Badge 
+                                      className={`text-xs ${
+                                        toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                        toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                        toothPlan.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}
+                                    >
+                                      {toothPlan.priority}
+                                    </Badge>
+                                  )} */}
+                                </div>
+                                <span className="text-sm text-gray-500">
+                                  {toothPlan.procedures.length} procedure(s)
+                                </span>
+                              </div>
+
+                              <div className="space-y-2">
+                                {toothPlan.procedures.map((proc: any, procIdx: number) => (
+                                  <div key={procIdx} className="bg-blue-50 p-3 rounded-lg">
+                                    <div className="flex justify-between items-start mb-1">
+                                      <div className="flex-1">
+                                        <div className="font-medium text-gray-900">{proc.name}</div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                          Surface: <span className="font-medium capitalize">{proc.surface}</span>
+                                        </div>
+                                        {proc.notes && (
+                                          <div className="text-sm text-gray-600 mt-1 italic">
+                                            Note: {proc.notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-right ml-4">
+                                        <div className="font-semibold text-gray-900">
+                                          ₹{proc.estimatedCost || 0}
+                                        </div>
+                                        <Badge variant="outline" className="mt-1 bg-yellow-50 text-yellow-700 text-xs">
+                                          {proc.status || 'Planned'}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Total cost for this tooth */}
+                              <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">
+                                  Total for Tooth #{toothPlan.toothNumber}:
+                                </span>
+                                <span className="font-semibold text-gray-900">
+                                  ₹{toothPlan.procedures.reduce((sum: number, p: any) => sum + (p.estimatedCost || 0), 0)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Overall summary */}
+                        <div className="mt-4 pt-4 border-t-2 border-gray-300 bg-primary/5 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="font-semibold text-gray-900">Treatment Plan Summary</div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {dentalData.treatmentPlan.teeth.length} teeth • {' '}
+                                {dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => sum + t.procedures.length, 0)} total procedures
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm text-gray-600">Estimated Total</div>
+                              <div className="text-xl font-bold text-primary">
+                                ₹{dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => 
+                                  sum + t.procedures.reduce((pSum: number, p: any) => pSum + (p.estimatedCost || 0), 0), 0
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Referral Section */}
+                  <div className="border-t border-gray-200 pt-6 mt-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      Refer Patient
+                    </h3>
+
+                    {/* Department Select */}
+                    <select
+                      className="w-full p-2 border rounded"
+                      value={selectedDepartment}
+                      onChange={(e) => {
+                        const depName = e.target.value;
+                        console.log("🟦 Department selected:", depName);
+                        setSelectedDepartment(depName);
+                        fetchDoctorsByDepartment(depName);
+                      }}
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map((dep: any) => (
+                        <option key={dep._id} value={dep.departmentName}>
+                          {dep.departmentName}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Doctors Dropdown */}
+                    <div className="mb-4">
+                      <label className="text-sm font-medium block mb-1">
+                        Refer To Doctor
+                      </label>
+                      <select
+                        className="w-full p-2 border rounded"
+                        value={referralDoctorId}
+                        onChange={(e) => {
+                          const doctorId = e.target.value;
+                          console.log("🟩 Doctor selected:", doctorId);
+                          setReferralDoctorId(doctorId);
+                        }}
+                      >
+                        <option value="">Select Doctor</option>
+                        {doctors.map((doc) => (
+                          <option key={doc.doctorId} value={doc.doctorId}>
+                            {doc.doctor?.name || "Unnamed Doctor"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Referral Reason */}
+                    {referralDoctorId && (
+                      <div className="mb-4">
+                        <label className="text-sm font-medium block mb-1">
+                          Referral Reason
+                        </label>
+                        <textarea
+                          className="w-full border p-2 rounded-lg text-sm min-h-[80px]"
+                          placeholder="Explain why patient is being referred..."
+                          value={referralReason}
+                          onChange={(e) => setReferralReason(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recall/Follow-up Section */}
                   <div className="border-t border-gray-200 pt-6 mt-4">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="text-lg font-semibold text-gray-800">
-                        Treatment Plan
+                        Schedule Recall/Follow-up
                       </h3>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setShowTreatmentPlan((prev) => !prev)}
+                        onClick={() => setShowRecall((prev) => !prev)}
                       >
-                        {showTreatmentPlan ? "Hide" : "Add Treatment Plan"}
+                        {showRecall ? "Hide" : "Add Recall"}
                       </Button>
                     </div>
 
-                    {showTreatmentPlan && (
-                      <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Plan Name
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="e.g. Orthodontic Plan"
-                            value={planName}
-                            onChange={(e) => setPlanName(e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Description
-                          </label>
-                          <textarea
-                            className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]"
-                            placeholder="Describe treatment goals, key steps..."
-                            value={planDescription}
-                            onChange={(e) => setPlanDescription(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="space-y-4">
-                          <h4 className="font-medium text-gray-700 mb-2">
-                            Stages
-                          </h4>
-                          {stages.map((stage, index) => (
-                            <div
-                              key={index}
-                              className="border border-gray-300 bg-white rounded-xl p-3 space-y-3"
-                            >
-                              <div className="flex justify-between items-center">
-                                <h5 className="text-sm font-semibold text-gray-700">
-                                  Stage {index + 1}
-                                </h5>
-                                <button
-                                  type="button"
-                                  onClick={() => removeStage(index)}
-                                  className="text-xs text-red-500 hover:text-red-600"
+                    {showRecall && (
+                      <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Recall Date Picker */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Recall Date
+                            </label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
                                 >
-                                  Remove
-                                </button>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <input
-                                  type="text"
-                                  placeholder="Stage Name"
-                                  value={stage.stageName}
-                                  onChange={(e) =>
-                                    handleStageChange(
-                                      index,
-                                      "stageName",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="border rounded-lg p-2 text-sm"
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {recallDate ? (
+                                    format(recallDate, "MMM dd, yyyy")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={recallDate || undefined}
+                                  onSelect={(date) => setRecallDate(date || null)}
+                                  disabled={(date) => date < new Date()}
+                                  initialFocus
                                 />
-                                <input
-                                  type="date"
-                                  value={stage.scheduledDate || ""}
-                                  onChange={(e) =>
-                                    handleStageChange(
-                                      index,
-                                      "scheduledDate",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="border rounded-lg p-2 text-sm"
-                                />
-                              </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
 
-                              <textarea
-                                placeholder="Stage Description"
-                                value={stage.description}
-                                onChange={(e) =>
-                                  handleStageChange(
-                                    index,
-                                    "description",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          {/* Recall Time */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Recall Time
+                            </label>
+                            <div className="relative">
+                              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <Input
+                                type="time"
+                                className="pl-10"
+                                value={recallTime}
+                                onChange={(e) => setRecallTime(e.target.value)}
                               />
                             </div>
-                          ))}
-
-                          <button
-                            type="button"
-                            onClick={addStage}
-                            className="text-blue-600 text-sm hover:text-blue-700 font-medium"
-                          >
-                            + Add Stage
-                          </button>
+                          </div>
                         </div>
+
+                        {/* Preview */}
+                        {recallDate && recallTime && (
+                          <div className="bg-white p-3 rounded-lg border border-blue-200">
+                            <p className="text-sm font-medium text-gray-700">
+                              Recall Appointment Preview:
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              📅 {format(recallDate, "EEEE, MMMM dd, yyyy")} at {recallTime}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Department: {recallDepartment || appointmentDetail?.department || 'Current'}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                  {/* Referral Section */}
-<div className="border-t border-gray-200 pt-6 mt-4">
-  <h3 className="text-lg font-semibold text-gray-800 mb-3">
-    Refer Patient
-  </h3>
-
-  {/* Department Select */}
-<select
-  className="w-full p-2 border rounded"
-  value={selectedDepartment}
-  onChange={(e) => {
-    const depName = e.target.value;   // <-- this will be "ENT"
-    console.log("🟦 Department selected:", depName);
-    setSelectedDepartment(depName);
-    fetchDoctorsByDepartment(depName);
-  }}
->
-  <option value="">Select Department</option>
-
-  {departments.map((dep: any) => (
-    <option key={dep._id} value={dep.departmentName}>
-      {dep.departmentName}
-    </option>
-  ))}
-</select>
-
-
-
-
-
-  {/* Doctors Dropdown */}
-  <div className="mb-4">
-  <label className="text-sm font-medium block mb-1">
-    Refer To Doctor
-  </label>
-<select
-  className="w-full p-2 border rounded"
-  value={referralDoctorId}
-  onChange={(e) => {
-    const doctorId = e.target.value;
-    console.log("🟩 Doctor selected:", doctorId);
-    setReferralDoctorId(doctorId);
-  }}
->
-  <option value="">Select Doctor</option>
-
-  {doctors.map((doc) => (
-    <option key={doc.doctorId} value={doc.doctorId}>
-      {doc.doctor?.name || "Unnamed Doctor"}
-    </option>
-  ))}
-</select>
-
-
-
-
-
-</div>
-
-
-  {/* Referral Reason */}
-  {referralDoctorId && (
-    <div className="mb-4">
-      <label className="text-sm font-medium block mb-1">
-        Referral Reason
-      </label>
-      <textarea
-        className="w-full border p-2 rounded-lg text-sm min-h-[80px]"
-        placeholder="Explain why patient is being referred..."
-        value={referralReason}
-        onChange={(e) => setReferralReason(e.target.value)}
-      />
-    </div>
-  )}
-</div>
-{/* Recall/Follow-up Section */}
-<div className="border-t border-gray-200 pt-6 mt-4">
-  <div className="flex justify-between items-center mb-3">
-    <h3 className="text-lg font-semibold text-gray-800">
-      Schedule Recall/Follow-up
-    </h3>
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => setShowRecall((prev) => !prev)}
-    >
-      {showRecall ? "Hide" : "Add Recall"}
-    </Button>
-  </div>
-
-  {showRecall && (
-    <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Recall Date Picker */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Recall Date
-          </label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-left font-normal"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {recallDate ? (
-                  format(recallDate, "MMM dd, yyyy")
-                ) : (
-                  <span>Pick a date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={recallDate || undefined}
-                onSelect={(date) => setRecallDate(date || null)}
-                disabled={(date) => date < new Date()}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Recall Time */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Recall Time
-          </label>
-          <div className="relative">
-            <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="time"
-              className="pl-10"
-              value={recallTime}
-              onChange={(e) => setRecallTime(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Department (Optional) */}
-      {/* <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Department (Optional)
-        </label>
-        <Input
-          type="text"
-          placeholder={`Default: ${appointmentDetail?.department || 'Current Department'}`}
-          value={recallDepartment}
-          onChange={(e) => setRecallDepartment(e.target.value)}
-          className="w-full"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Leave empty to use current department
-        </p>
-      </div> */}
-
-      {/* Preview */}
-      {recallDate && recallTime && (
-        <div className="bg-white p-3 rounded-lg border border-blue-200">
-          <p className="text-sm font-medium text-gray-700">
-            Recall Appointment Preview:
-          </p>
-          <p className="text-sm text-gray-600 mt-1">
-            📅 {format(recallDate, "EEEE, MMMM dd, yyyy")} at {recallTime}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Department: {recallDepartment || appointmentDetail?.department || 'Current'}
-          </p>
-        </div>
-      )}
-    </div>
-  )}
-</div>
-
 
                   {/* Buttons */}
                   <div className="flex justify-end gap-3 pt-4">
@@ -2059,13 +2412,13 @@ const handleFinishStage = async (stageIndex: number) => {
                   </div>
                 </CardContent>
               </Card>
-              {/* Treatment Plan Section */}
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
 
   // Clinic Appointments Modal View
   if (selectedClinic) {
