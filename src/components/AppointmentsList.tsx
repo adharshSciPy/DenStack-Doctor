@@ -39,7 +39,134 @@ import axios from "axios";
 import clinicServiceBaseUrl from "../clinicServiceUrl";
 import { DashboardHeader } from "./DashboardHeader";
 import DentalChart from "./DentalChart";
-
+const DentalDataSummary = ({ dentalData }: { dentalData: any }) => {
+  if (!dentalData.performedTeeth.length && 
+      !dentalData.plannedProcedures.length && 
+      !dentalData.treatmentPlan) {
+    return null;
+  }
+  
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Dental Treatment Summary</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {/* Performed Procedures Section */}
+        {dentalData.performedTeeth.length > 0 && (
+          <div className="mb-6">
+            <h4 className="font-semibold mb-2 text-primary">
+              ✅ Performed Procedures (Today)
+            </h4>
+            <div className="space-y-3">
+              {dentalData.performedTeeth.map((tooth: any, idx: number) => (
+                <div key={idx} className="border rounded-lg p-3 bg-green-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="bg-white">
+                      Tooth #{tooth.toothNumber}
+                    </Badge>
+                    {tooth.conditions.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tooth.conditions.map((cond: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {cond}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {tooth.surfaceConditions.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-gray-600">Surface Conditions:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {tooth.surfaceConditions.map((sc: any, i: number) => (
+                          <div key={i} className="text-xs bg-white px-2 py-1 rounded">
+                            <span className="font-medium capitalize">{sc.surface}:</span>{" "}
+                            {sc.conditions.join(", ")}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {tooth.procedures.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Procedures Completed:</p>
+                      <div className="space-y-2 mt-1">
+                        {tooth.procedures.map((proc: any, i: number) => (
+                          <div key={i} className="text-sm bg-white p-2 rounded border">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <span className="font-medium">{proc.name}</span>
+                                <span className="text-xs text-gray-500 ml-2">({proc.surface})</span>
+                              </div>
+                              <Badge className="bg-green-100 text-green-800 text-xs">
+                                ✓ Completed
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1">
+                              Cost: ₹{proc.cost || 0}
+                              {proc.notes && ` • Notes: ${proc.notes}`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Treatment Plan Summary */}
+        {dentalData.treatmentPlan && (
+          <div className="border-t pt-6">
+            <h4 className="font-semibold mb-3 text-primary">
+              📋 Treatment Plan: {dentalData.treatmentPlan.planName}
+            </h4>
+            {dentalData.treatmentPlan.description && (
+              <p className="text-sm text-gray-600 mb-4">{dentalData.treatmentPlan.description}</p>
+            )}
+            
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {dentalData.treatmentPlan.teeth?.length || 0}
+                  </div>
+                  <div className="text-sm text-gray-600">Teeth</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {dentalData.treatmentPlan.teeth?.reduce((sum: number, t: any) => 
+                      sum + (t.procedures?.length || 0), 0) || 0}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Procedures</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {dentalData.treatmentPlan.stages?.length || 1}
+                  </div>
+                  <div className="text-sm text-gray-600">Stages</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    ₹{dentalData.treatmentPlan.teeth?.reduce((sum: number, t: any) => 
+                      sum + (t.procedures?.reduce((pSum: number, p: any) => 
+                        pSum + (p.estimatedCost || 0), 0) || 0), 0) || 0}
+                  </div>
+                  <div className="text-sm text-gray-600">Estimated Cost</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 interface Patient {
   _id: string;
   name: string;
@@ -200,7 +327,17 @@ interface Doctor {
   doctorId: string;   // existing
   doctor?: any;       // add only if your API actually sends this
 }
+const generateProcedureId = (): string => {
+  return `proc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
 
+const generateObjectId = (): string => {
+  const timestamp = Math.floor(new Date().getTime() / 1000).toString(16);
+  const random = Array.from({ length: 16 }, () => 
+    Math.floor(Math.random() * 16).toString(16)
+  ).join('');
+  return timestamp + random;
+};
 
 
 export function AppointmentsList() {
@@ -669,8 +806,23 @@ useEffect(() => {
     setFilePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-// Alternative using axios
+// Fixed helper function to generate ObjectId-like strings
+
+
+// In your AppointmentsList component, fix the handleSaveConsultation function:
+
 const handleSaveConsultation = async () => {
+  // Validate required fields
+  if (!chiefComplaint.trim()) {
+    alert("Please enter chief complaint");
+    return;
+  }
+
+  if (!diagnosis.trim()) {
+    alert("Please enter diagnosis");
+    return;
+  }
+
   if (!appointmentDetail?._id) {
     alert("Invalid appointment data");
     return;
@@ -686,110 +838,190 @@ const handleSaveConsultation = async () => {
 
     const formData = new FormData();
 
-    // Append all fields
+    // Append basic fields
     const symptomsArray = chiefComplaint.split(',').map(s => s.trim()).filter(Boolean);
     const diagnosisArray = diagnosis.split(',').map(d => d.trim()).filter(Boolean);
 
     formData.append('symptoms', JSON.stringify(symptomsArray));
     formData.append('diagnosis', JSON.stringify(diagnosisArray));
-    formData.append('prescriptions', JSON.stringify(prescriptions));
+    
+    // Filter out empty prescriptions
+    const validPrescriptions = prescriptions.filter(p => 
+      p.medicineName.trim() && p.dosage.trim()
+    );
+    
+    if (validPrescriptions.length === 0) {
+      alert("Please add at least one valid prescription");
+      return;
+    }
+    
+    formData.append('prescriptions', JSON.stringify(validPrescriptions));
     formData.append('notes', additionalNotes?.trim() || '');
-    formData.append('files', JSON.stringify([]));
+    
+    // Append existing files
+    const existingFiles = filePreviews.map(fp => ({
+      name: fp.name,
+      type: fp.type,
+      url: fp.url || ''
+    }));
+    formData.append('files', JSON.stringify(existingFiles));
 
-    // ✅ Transform dental data to lowercase
+    // ✅ Transform performed teeth
     if (dentalData.performedTeeth.length > 0) {
       const transformedPerformedTeeth = dentalData.performedTeeth.map(tooth => ({
-        ...tooth,
-        conditions: tooth.conditions.map((cond: string) => 
+        toothNumber: tooth.toothNumber,
+        conditions: (tooth.conditions || []).map((cond: string) => 
           cond.toLowerCase()
         ),
-        surfaceConditions: tooth.surfaceConditions.map((sc: any) => ({
-          ...sc,
-          conditions: sc.conditions.map((cond: string) => 
+        surfaceConditions: (tooth.surfaceConditions || []).map((sc: any) => ({
+          surface: sc.surface || 'occlusal',
+          conditions: (sc.conditions || []).map((cond: string) => 
             cond.toLowerCase()
           )
+        })),
+        procedures: (tooth.procedures || []).map((p: any) => ({
+          name: p.name,
+          surface: p.surface || 'occlusal',
+          status: p.status || 'completed',
+          cost: p.cost || p.estimatedCost || 0,
+          notes: p.notes || '',
+          performedAt: p.performedAt || new Date().toISOString()
         }))
       }));
       
       formData.append('performedTeeth', JSON.stringify(transformedPerformedTeeth));
     }
 
+    // ✅ Transform planned procedures
     if (dentalData.plannedProcedures.length > 0) {
       formData.append('plannedProcedures', JSON.stringify(dentalData.plannedProcedures));
     }
 
-    // ✅ FIXED: PRIORITIZE dentalData.treatmentPlan over form treatment plan
+    // ✅ FIXED: Treatment Plan Format for NEW Schema
     let finalTreatmentPlan = null;
     
-    // 1. First priority: Use treatment plan from DentalChart (which includes teeth data)
     if (dentalData.treatmentPlan) {
-      console.log("Using treatment plan from DentalChart:", dentalData.treatmentPlan);
-      finalTreatmentPlan = dentalData.treatmentPlan;
-    }
-    // 2. Second priority: If form has treatment plan AND there are teeth from dental chart
-    else if (showTreatmentPlan && planName.trim() && dentalData.plannedProcedures.length > 0) {
-      console.log("Building treatment plan from form with dental procedures");
+      console.log("📋 Processing treatment plan from DentalChart");
       
-      // Format stages properly
-      const formattedStages = stages.length > 0 
-        ? stages.map(stage => ({
-            stageName: stage.stageName,
-            description: stage.description || '',
-            procedureRefs: stage.procedureRefs || [],
-            scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
-            status: 'pending'
-          }))
-        : [{
-            stageName: "Initial Treatment",
-            description: "Primary procedures",
-            procedureRefs: dentalData.plannedProcedures.map(proc => ({
-              toothNumber: proc.toothNumber,
-              procedureName: proc.name
-            })),
-            scheduledDate: new Date().toISOString().split('T')[0],
-            status: 'pending'
-          }];
-
-      // Extract unique teeth from planned procedures
-      const uniqueTeeth = Array.from(new Set(dentalData.plannedProcedures.map(p => p.toothNumber)))
-        .map(toothNumber => {
-          const proceduresForTooth = dentalData.plannedProcedures.filter(p => p.toothNumber === toothNumber);
+      // Get teeth procedures by stage
+      const proceduresByStage: Record<number, any[]> = {};
+      
+      dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+        toothPlan.procedures.forEach((proc: any) => {
+          const stageNum = proc.stage || 1;
+          if (!proceduresByStage[stageNum]) {
+            proceduresByStage[stageNum] = [];
+          }
+          
+          proceduresByStage[stageNum].push({
+            toothNumber: toothPlan.toothNumber,
+            name: proc.name,
+            surface: proc.surface || 'occlusal',
+            estimatedCost: proc.estimatedCost || 0,
+            notes: proc.notes || '',
+            status: 'planned'
+          });
+        });
+      });
+      
+      // Build stages with toothSurfaceProcedures
+      const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
+        const stageNumber = parseInt(stageNumStr);
+        
+        // Group procedures by tooth and surface
+        const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+        
+        procs.forEach(proc => {
+          if (!toothSurfaceMap[proc.toothNumber]) {
+            toothSurfaceMap[proc.toothNumber] = {};
+          }
+          
+          if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+            toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+          }
+          
+          if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
+            toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
+          }
+        });
+        
+        // Convert to toothSurfaceProcedures format
+        const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+          const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+            surface: surface,
+            procedureNames: procedureNames
+          }));
+          
           return {
-            toothNumber: toothNumber,
-            procedures: proceduresForTooth.map(proc => ({
-              name: proc.name,
-              surface: proc.surface || "occlusal",
-              estimatedCost: proc.estimatedCost || 0,
-              notes: proc.notes || "",
-              status: "planned" as const
-            })),
-            priority: 'medium' as const
+            toothNumber: parseInt(toothNumStr),
+            surfaceProcedures: surfaceProcedures
           };
         });
-
+        
+        const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
+          (s.stageNumber || s.stage) === stageNumber
+        );
+        
+        return {
+          stageNumber: stageNumber,
+          stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+          description: stageInput?.description || '',
+          status: 'pending',
+          scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
+          toothSurfaceProcedures: toothSurfaceProcedures,
+          notes: stageInput?.notes || ''
+        };
+      });
+      
+      // Build teeth data
+      const teethData = dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
+        toothNumber: toothPlan.toothNumber,
+        priority: toothPlan.priority || 'medium',
+        isCompleted: false,
+        procedures: toothPlan.procedures.map((proc: any) => ({
+          name: proc.name,
+          surface: proc.surface || 'occlusal',
+          stage: proc.stage || 1,
+          estimatedCost: proc.estimatedCost || 0,
+          notes: proc.notes || '',
+          status: 'planned'
+        }))
+      }));
+      
       finalTreatmentPlan = {
-        planName: planName.trim(),
-        description: planDescription.trim(),
-        teeth: uniqueTeeth,
-        stages: formattedStages
+        planName: dentalData.treatmentPlan.planName.trim(),
+        description: dentalData.treatmentPlan.description?.trim() || '',
+        teeth: teethData,
+        stages: stagesData,
+        currentStage: 1,
+        status: "draft"
       };
       
-      console.log("Created combined treatment plan:", finalTreatmentPlan);
+      console.log("✅ Final treatment plan for backend:", {
+        planName: finalTreatmentPlan.planName,
+        teethCount: finalTreatmentPlan.teeth.length,
+        stagesCount: finalTreatmentPlan.stages.length,
+        totalProcedures: finalTreatmentPlan.teeth.reduce((sum: number, t: any) => 
+          sum + t.procedures.length, 0
+        )
+      });
     }
 
     // Append treatment plan if exists
     if (finalTreatmentPlan) {
-      console.log("Final treatment plan being sent:", finalTreatmentPlan);
+      console.log("📤 Appending treatment plan to form data");
       formData.append('treatmentPlan', JSON.stringify(finalTreatmentPlan));
     }
 
-    if (referralDoctorId) {
+    // Append referral if exists
+    if (referralDoctorId && referralReason.trim()) {
       formData.append('referral', JSON.stringify({
         referredToDoctorId: referralDoctorId,
-        referralReason: referralReason?.trim() || '',
+        referralReason: referralReason.trim(),
       }));
     }
 
+    // Append recall if exists
     if (recallDate && recallTime) {
       formData.append('recall', JSON.stringify({
         appointmentDate: recallDate.toISOString().split('T')[0],
@@ -798,19 +1030,15 @@ const handleSaveConsultation = async () => {
       }));
     }
 
-    // Append files
+    // Append uploaded files
     uploadFiles.forEach(file => {
       formData.append('files', file);
     });
 
-    // Debug log
-    console.log("=== FORM DATA BEING SENT ===");
+    console.log("=== FORM DATA SUMMARY ===");
     console.log("Has treatment plan:", !!finalTreatmentPlan);
-    if (finalTreatmentPlan) {
-      console.log("Treatment plan teeth count:", finalTreatmentPlan.teeth?.length || 0);
-      console.log("Treatment plan stages count:", finalTreatmentPlan.stages?.length || 0);
-    }
-    console.log("===========================");
+    console.log("Has performed teeth:", dentalData.performedTeeth.length > 0);
+    console.log("Has files:", uploadFiles.length > 0);
 
     // Using axios with FormData
     const response = await axios.post(
@@ -828,10 +1056,35 @@ const handleSaveConsultation = async () => {
 
     if (data?.success) {
       alert("✅ Consultation saved successfully!");
-      if (data.treatmentPlan) {
-        console.log('Treatment plan saved:', data.treatmentPlan);
-      }
-      handleBackToAppointments?.();
+      
+      // Refresh patient treatment plans
+      fetchPatientTreatmentPlans();
+      
+      // Reset form
+      setChiefComplaint("");
+      setDiagnosis("");
+      setPrescriptions([{
+        medicineName: "",
+        dosage: "",
+        frequency: "",
+        duration: "",
+        instructions: "",
+      }]);
+      setAdditionalNotes("");
+      setUploadFiles([]);
+      setFilePreviews([]);
+      setReferralDoctorId("");
+      setReferralReason("");
+      setRecallDate(null);
+      setRecallTime("");
+      setRecallDepartment("");
+      setDentalData({
+        performedTeeth: [],
+        plannedProcedures: []
+      });
+      
+      // Optionally close the consultation view
+      handleBackToAppointments();
     } else {
       alert(data?.message || "Failed to save consultation");
     }
@@ -843,7 +1096,6 @@ const handleSaveConsultation = async () => {
     setLoading(false);
   }
 };
-
   const addStage = () => {
     setStages((prev) => [
       ...prev,
@@ -1080,108 +1332,53 @@ const handleFinishStage = async (stageIndex: number) => {
     updatedStages[index].note = note;
     setLocalPlan({ ...localPlan, stages: updatedStages });
   };
-  const DentalDataSummary = ({ dentalData }: { dentalData: any }) => {
-  if (!dentalData.performedTeeth.length && !dentalData.plannedProcedures.length) {
-    return null;
-  }
-  
-
-  return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle>Dental Treatment Summary</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {dentalData.performedTeeth.length > 0 && (
-          <div className="mb-6">
-            <h4 className="font-semibold mb-2 text-primary">
-              Performed Procedures
-            </h4>
-            <div className="space-y-3">
-              {dentalData.performedTeeth.map((tooth: any, idx: number) => (
-                <div key={idx} className="border rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline">Tooth #{tooth.toothNumber}</Badge>
-                    {tooth.conditions.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {tooth.conditions.map((cond: string, i: number) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {cond}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {tooth.surfaceConditions.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-sm font-medium text-gray-600">Surface Conditions:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {tooth.surfaceConditions.map((sc: any, i: number) => (
-                          <div key={i} className="text-xs">
-                            <span className="font-medium">{sc.surface}:</span>{" "}
-                            {sc.conditions.join(", ")}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {tooth.procedures.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Procedures:</p>
-                      <div className="space-y-2 mt-1">
-                        {tooth.procedures.map((proc: any, i: number) => (
-                          <div key={i} className="text-sm bg-green-50 p-2 rounded">
-                            <div className="flex justify-between">
-                              <span className="font-medium">{proc.name}</span>
-                              <Badge className="bg-green-100 text-green-800">
-                                Completed
-                              </Badge>
-                            </div>
-                            <div className="text-xs text-gray-600 mt-1">
-                              Surface: {proc.surface} • Cost: ₹{proc.cost || 0}
-                              {proc.notes && ` • Notes: ${proc.notes}`}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {dentalData.plannedProcedures.length > 0 && (
-          <div>
-            <h4 className="font-semibold mb-2 text-primary">
-              Planned Procedures
-            </h4>
-            <div className="space-y-2">
-              {dentalData.plannedProcedures.map((proc: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between border rounded-lg p-3">
-                  <div>
-                    <div className="font-medium">Tooth #{proc.toothNumber} - {proc.name}</div>
-                    <div className="text-sm text-gray-600">
-                      Surface: {proc.surface} • Estimated: ₹{proc.estimatedCost || 0}
-                      {proc.notes && ` • Notes: ${proc.notes}`}
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
-                    Planned
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  // Helper to generate unique IDs for procedures
+// Fixed helper functions with proper types
+const generateProcedureId = (): string => {
+  return `proc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
+// Helper to distribute procedures across stages
+const distributeProceduresToStages = (procedures: any[], stageCount: number): any[] => {
+  return procedures.map((proc, index) => ({
+    ...proc,
+    stage: (index % stageCount) + 1,
+    procedureId: proc.procedureId || generateProcedureId()
+  }));
+};
+
+// Helper to create stage references
+const createStageReferences = (teeth: any[]): any[] => {
+  const stages: any = {};
+  
+  teeth.forEach((toothPlan: any) => {
+    toothPlan.procedures.forEach((proc: any) => {
+      const stage = proc.stage || 1;
+      if (!stages[stage]) {
+        stages[stage] = {
+          stageNumber: stage,
+          stageName: `Stage ${stage}`,
+          procedureRefs: [],
+          toothProcedures: []
+        };
+      }
+      
+      stages[stage].procedureRefs.push({
+        toothNumber: toothPlan.toothNumber,
+        procedureName: proc.name
+      });
+      
+      stages[stage].toothProcedures.push({
+        toothNumber: toothPlan.toothNumber,
+        procedureName: proc.name,
+        surface: proc.surface || 'occlusal',
+        procedureId: proc.procedureId
+      });
+    });
+  });
+  
+  return Object.values(stages);
+};
 return (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
     <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative max-h-[90vh] overflow-y-auto">
@@ -1777,7 +1974,8 @@ return (
 
           {/* Full-screen Dental Chart Container */}
           <div className="h-[calc(100vh-80px)] w-full">
-         <DentalChart
+
+<DentalChart
   patientId={appointmentDetail.patientId._id}
   visitId={appointmentDetail._id}
   mode="edit"
@@ -1789,47 +1987,18 @@ return (
   onSave={(dentalDataFromChart) => {
     console.log("DentalChart onSave called with:", dentalDataFromChart);
     
-    // IMPORTANT: ALWAYS use the treatment plan from DentalChart if it exists
-    if (dentalDataFromChart.treatmentPlan) {
-      console.log("Setting treatment plan from DentalChart:", dentalDataFromChart.treatmentPlan);
-      setDentalData({
-        performedTeeth: dentalDataFromChart.performedTeeth || [],
-        plannedProcedures: dentalDataFromChart.plannedProcedures || [],
-        treatmentPlan: dentalDataFromChart.treatmentPlan
-      });
-      
-      // Update form fields to match DentalChart treatment plan
-      setShowTreatmentPlan(true);
-      setPlanName(dentalDataFromChart.treatmentPlan.planName);
-      setPlanDescription(dentalDataFromChart.treatmentPlan.description || '');
-      
-      // Type-safe transformation of stages
-      const transformedStages: Stage[] = (dentalDataFromChart.treatmentPlan.stages || []).map((stage: any) => {
-        let scheduledDate = stage.scheduledDate;
-        if (scheduledDate && scheduledDate.includes('T')) {
-          scheduledDate = scheduledDate.split('T')[0];
-        } else if (!scheduledDate) {
-          scheduledDate = new Date().toISOString().split('T')[0];
-        }
-        
-        return {
-          stageName: stage.stageName || '',
-          description: stage.description || '',
-          scheduledDate,
-          note: '',
-          procedureRefs: stage.procedureRefs || []
-        };
-      });
-      
-      setStages(transformedStages);
-    } else {
-      // If no treatment plan in DentalChart, just update the other data
-      setDentalData(prev => ({
-        ...prev,
-        performedTeeth: [...prev.performedTeeth, ...(dentalDataFromChart.performedTeeth || [])],
-        plannedProcedures: [...prev.plannedProcedures, ...(dentalDataFromChart.plannedProcedures || [])]
-      }));
-    }
+    // ✅ UPDATED: Directly use what DentalChart sends
+    setDentalData({
+      performedTeeth: dentalDataFromChart.performedTeeth || [],
+      plannedProcedures: dentalDataFromChart.plannedProcedures || [],
+      treatmentPlan: dentalDataFromChart.treatmentPlan || null
+    });
+    
+    console.log("Updated dental data:", {
+      performedTeeth: dentalDataFromChart.performedTeeth?.length || 0,
+      plannedProcedures: dentalDataFromChart.plannedProcedures?.length || 0,
+      hasTreatmentPlan: !!dentalDataFromChart.treatmentPlan
+    });
     
     alert("Dental chart data saved successfully!");
     setShowDentalChart(false);
@@ -2223,7 +2392,26 @@ return (
                         </span>
                       )}
                     </div>
+{/* Dental Data Summary */}
+<DentalDataSummary dentalData={dentalData} />
 
+{/* Treatment Plan Preview */}
+{dentalData.treatmentPlan && (
+  <div className="mt-4">
+    <h4 className="font-semibold mb-2">Treatment Plan Ready</h4>
+    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+      <p className="text-green-700">
+        ✓ Treatment plan "{dentalData.treatmentPlan.planName}" is ready with {
+          dentalData.treatmentPlan.teeth?.reduce((sum: number, t: any) => 
+            sum + t.procedures.length, 0
+          ) || 0
+        } procedures across {
+          dentalData.treatmentPlan.teeth?.length || 0
+        } teeth.
+      </p>
+    </div>
+  </div>
+)}
                     {/* ✅ Dental Chart Section */}
                     <div className="mt-6">
                       <Button
@@ -2278,110 +2466,152 @@ return (
                   </div>
 
                   {/* Treatment Plan Section */}
+{dentalData.treatmentPlan && dentalData.treatmentPlan.teeth && dentalData.treatmentPlan.teeth.length > 0 && (
+  <div className="border-t border-gray-200 pt-6 mt-4">
+    <div className="flex justify-between items-center mb-3">
+      <h3 className="text-lg font-semibold text-gray-800">Treatment Plan</h3>
+      <Badge variant="outline" className="bg-blue-50 text-blue-700">
+        {dentalData.treatmentPlan.stages?.length || 1} Stage(s)
+      </Badge>
+    </div>
 
-                  {dentalData.treatmentPlan && dentalData.treatmentPlan.teeth && dentalData.treatmentPlan.teeth.length > 0 && (
-                    <div className="border-t border-gray-200 pt-6 mt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-lg font-semibold text-gray-800">Treatment Plan</h3>
-                      </div>
+    <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
+      <div className="mb-4">
+        <div className="font-medium text-gray-700 text-lg">{dentalData.treatmentPlan.planName}</div>
+        {dentalData.treatmentPlan.description && (
+          <p className="text-sm text-gray-600 mt-1">{dentalData.treatmentPlan.description}</p>
+        )}
+      </div>
 
-                      <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <div className="mb-4">
-                          <div className="font-medium text-gray-700">{dentalData.treatmentPlan.planName}</div>
-                          {dentalData.treatmentPlan.description && (
-                            <p className="text-sm text-gray-600 mt-1">{dentalData.treatmentPlan.description}</p>
-                          )}
-                        </div>
+      {/* Stages Overview */}
+      {dentalData.treatmentPlan.stages && dentalData.treatmentPlan.stages.length > 0 && (
+        <div className="mb-4">
+          <h4 className="font-medium text-gray-700 mb-2">Stages</h4>
+          <div className="space-y-2">
+            {dentalData.treatmentPlan.stages.map((stage: any, index: number) => (
+              <div key={index} className="bg-white p-3 rounded-lg border">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="font-medium">{stage.stageName}</span>
+                    {stage.description && (
+                      <p className="text-sm text-gray-600 mt-1">{stage.description}</p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
+                    {stage.status || 'Pending'}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-gray-700">Planned Procedures</h4>
-                          {dentalData.treatmentPlan.teeth.map((toothPlan: any, idx: number) => (
-                            <div key={idx} className="border border-gray-300 bg-white rounded-lg p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline">Tooth #{toothPlan.toothNumber}</Badge>
-                                  {/* {toothPlan.priority && (
-                                    <Badge 
-                                      className={`text-xs ${
-                                        toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                        toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                        toothPlan.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                        'bg-gray-100 text-gray-700'
-                                      }`}
-                                    >
-                                      {toothPlan.priority}
-                                    </Badge>
-                                  )} */}
-                                </div>
-                                <span className="text-sm text-gray-500">
-                                  {toothPlan.procedures.length} procedure(s)
-                                </span>
-                              </div>
+      {/* Teeth and Procedures */}
+      <div className="space-y-3">
+        <h4 className="font-medium text-gray-700">Planned Procedures by Tooth</h4>
+        {dentalData.treatmentPlan.teeth.map((toothPlan: any, idx: number) => {
+          // Group procedures by stage
+          const proceduresByStage: Record<number, any[]> = {};
+          
+          toothPlan.procedures.forEach((proc: any) => {
+            const stage = proc.stage || 1;
+            if (!proceduresByStage[stage]) {
+              proceduresByStage[stage] = [];
+            }
+            proceduresByStage[stage].push(proc);
+          });
+          
+          return (
+            <div key={idx} className="border border-gray-300 bg-white rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-gray-100">
+                    Tooth #{toothPlan.toothNumber}
+                  </Badge>
+                  {toothPlan.priority && toothPlan.priority !== 'medium' && (
+                    <Badge 
+                      className={`text-xs ${
+                        toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                        toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {toothPlan.priority}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-sm text-gray-500">
+                  {toothPlan.procedures.length} procedure(s)
+                </span>
+              </div>
 
-                              <div className="space-y-2">
-                                {toothPlan.procedures.map((proc: any, procIdx: number) => (
-                                  <div key={procIdx} className="bg-blue-50 p-3 rounded-lg">
-                                    <div className="flex justify-between items-start mb-1">
-                                      <div className="flex-1">
-                                        <div className="font-medium text-gray-900">{proc.name}</div>
-                                        <div className="text-sm text-gray-600 mt-1">
-                                          Surface: <span className="font-medium capitalize">{proc.surface}</span>
-                                        </div>
-                                        {proc.notes && (
-                                          <div className="text-sm text-gray-600 mt-1 italic">
-                                            Note: {proc.notes}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="text-right ml-4">
-                                        <div className="font-semibold text-gray-900">
-                                          ₹{proc.estimatedCost || 0}
-                                        </div>
-                                        <Badge variant="outline" className="mt-1 bg-yellow-50 text-yellow-700 text-xs">
-                                          {proc.status || 'Planned'}
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Total cost for this tooth */}
-                              <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-700">
-                                  Total for Tooth #{toothPlan.toothNumber}:
-                                </span>
-                                <span className="font-semibold text-gray-900">
-                                  ₹{toothPlan.procedures.reduce((sum: number, p: any) => sum + (p.estimatedCost || 0), 0)}
-                                </span>
-                              </div>
+              {/* Show procedures grouped by stage */}
+              {Object.entries(proceduresByStage).map(([stageNum, procs]: [string, any[]]) => (
+                <div key={stageNum} className="mb-3 last:mb-0">
+                  <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                    <span>Stage {stageNum}:</span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {procs.length} procedure(s)
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 ml-2">
+                    {procs.map((proc: any, procIdx: number) => (
+                      <div key={procIdx} className="text-sm bg-blue-50 p-2 rounded-lg border-l-2 border-blue-300">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{proc.name}</div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              Surface: <span className="font-medium capitalize">{proc.surface}</span>
                             </div>
-                          ))}
-                        </div>
-
-                        {/* Overall summary */}
-                        <div className="mt-4 pt-4 border-t-2 border-gray-300 bg-primary/5 p-3 rounded-lg">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <div className="font-semibold text-gray-900">Treatment Plan Summary</div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                {dentalData.treatmentPlan.teeth.length} teeth • {' '}
-                                {dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => sum + t.procedures.length, 0)} total procedures
+                            {proc.notes && (
+                              <div className="text-sm text-gray-600 mt-1 italic">
+                                Note: {proc.notes}
                               </div>
+                            )}
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="font-semibold text-gray-900">
+                              ₹{proc.estimatedCost || 0}
                             </div>
-                            <div className="text-right">
-                              <div className="text-sm text-gray-600">Estimated Total</div>
-                              <div className="text-xl font-bold text-primary">
-                                ₹{dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => 
-                                  sum + t.procedures.reduce((pSum: number, p: any) => pSum + (p.estimatedCost || 0), 0), 0
-                                )}
-                              </div>
-                            </div>
+                            <Badge variant="outline" className="mt-1 bg-yellow-50 text-yellow-700 text-xs">
+                              {proc.status || 'Planned'}
+                            </Badge>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Overall summary */}
+      <div className="mt-4 pt-4 border-t-2 border-gray-300 bg-white p-4 rounded-lg">
+        <div className="flex justify-between items-center">
+          <div>
+            <div className="font-semibold text-gray-900">Treatment Plan Summary</div>
+            <div className="text-sm text-gray-600 mt-1">
+              {dentalData.treatmentPlan.teeth.length} teeth • {' '}
+              {dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => sum + t.procedures.length, 0)} total procedures
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-gray-600">Estimated Total</div>
+            <div className="text-xl font-bold text-primary">
+              ₹{dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => 
+                sum + t.procedures.reduce((pSum: number, p: any) => pSum + (p.estimatedCost || 0), 0), 0
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
                   {/* Referral Section */}
                   <div className="border-t border-gray-200 pt-6 mt-4">
