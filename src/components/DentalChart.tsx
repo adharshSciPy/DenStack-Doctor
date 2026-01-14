@@ -1,5 +1,5 @@
 // DentalChart.tsx - WITH PROPER TOOTH SVG IN MODAL
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { X,Plus} from "lucide-react";
@@ -30,15 +30,22 @@ interface ToothCondition {
     date?: string;
   }[];
 }
-
 interface TreatmentPlanStage {
   stageName: string;
+  stageNumber?: number;
   description?: string;
-  procedureRefs: {
+  procedureRefs: { // This is required
     toothNumber: number;
     procedureName: string;
   }[];
-  status: 'pending' | 'completed';
+  toothSurfaceProcedures?: { // This is optional
+    toothNumber: number;
+    surfaceProcedures: {
+      surface: string;
+      procedureNames: string[];
+    }[];
+  }[];
+  status: 'pending' | 'completed' | 'in-progress';
   scheduledDate?: string;
   completedAt?: string;
   notes?: string;
@@ -52,6 +59,7 @@ interface TreatmentPlanData {
     procedures: {
       name: string;
       surface: string;
+      stage?: number; // Make stage optional with ?
       estimatedCost: number;
       notes?: string;
       status: 'planned' | 'in-progress' | 'completed';
@@ -59,6 +67,7 @@ interface TreatmentPlanData {
     priority?: 'urgent' | 'high' | 'medium' | 'low';
   }[];
   stages: TreatmentPlanStage[];
+  startToday?: boolean; // Add this for backend
 }
 
 interface DentalChartProps {
@@ -76,6 +85,7 @@ interface DentalChartProps {
   onProcedureAdded?: (toothNumber: number, procedure: any) => void;
   existingConditions?: ToothCondition[];
   onToothSelected?: (tooth: ToothData, condition: ToothCondition | null) => void;
+  existingTreatmentPlan?: TreatmentPlanData | null
 }
 
 interface ToothData {
@@ -316,6 +326,7 @@ const ToothDiagram: React.FC<{
         return { x: 0, y: 0, anchor: "middle" };
     }
   };
+  
 
   return (
     <div className="relative w-64 h-64 mx-auto">
@@ -454,6 +465,14 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
     condition?.surfaceConditions || []
   );
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [procedures, setProcedures] = useState<{
+    name: string;
+    surface: string;
+    status: "planned" | "in-progress" | "completed";
+    cost?: number;
+    notes?: string;
+    date?: string;
+  }[]>(condition?.procedures || []);
 
   // Handle condition toggle
   const handleConditionToggle = (conditionName: string) => {
@@ -505,38 +524,41 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
     });
   };
 
-  // NEW FUNCTION: Add condition to ALL selected areas
- const handleAddConditionToSelectedAreas = (conditionName: string) => {
-  if (selectedAreas.length === 0) {
-    alert("Please select one or more areas first by clicking on them in the diagram.");
-    return;
-  }
-  
-  // Add condition ONLY to the currently selected areas
-  selectedAreas.forEach(area => {
-    // Check if condition already exists on this area
-    const existingConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-    if (!existingConditions.includes(conditionName)) {
-      handleSurfaceConditionToggle(area, conditionName);
-    }
-  });
-};
+  // NEW: Add procedure
+  const handleAddProcedure = () => {
+    const procedureName = prompt("Enter procedure name:");
+    if (!procedureName) return;
+    
+    const surface = prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") || "occlusal";
+    const cost = Number(prompt("Enter estimated cost:") || 0);
+    const notes = prompt("Enter notes (optional):") || "";
+    
+    const newProcedure = {
+      name: procedureName,
+      surface,
+      status: "planned" as const,
+      cost,
+      notes
+    };
+    
+    setProcedures([...procedures, newProcedure]);
+  };
 
-  // NEW FUNCTION: Clear condition from selected areas
- const handleRemoveConditionFromSelectedAreas = (conditionName: string) => {
-  if (selectedAreas.length === 0) {
-    alert("Please select one or more areas first by clicking on them in the diagram.");
-    return;
-  }
-  
-  // Remove condition ONLY from the currently selected areas
-  selectedAreas.forEach(area => {
-    const existingConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-    if (existingConditions.includes(conditionName)) {
-      handleSurfaceConditionToggle(area, conditionName);
+  // NEW: Update procedure status
+  const handleProcedureStatusToggle = (index: number, newStatus: "planned" | "in-progress" | "completed") => {
+    const updated = [...procedures];
+    updated[index].status = newStatus;
+    if (newStatus === "completed") {
+      updated[index].date = new Date().toISOString();
     }
-  });
-};
+    setProcedures(updated);
+  };
+
+  // NEW: Remove procedure
+  const handleRemoveProcedure = (index: number) => {
+    const updated = procedures.filter((_, i) => i !== index);
+    setProcedures(updated);
+  };
 
   // Get conditions by area for the diagram
   const conditionsByArea: Record<string, string[]> = {};
@@ -551,7 +573,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
       conditions: selectedConditions,
       notes,
       surfaceConditions,
-      procedures: condition?.procedures || []
+      procedures: procedures
     };
     
     onSave(toothData);
@@ -616,217 +638,158 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
                 />
                 
                 {/* Selected Areas Display */}
-{/* {selectedAreas.length > 0 && mode === "edit" && (
-  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-    <h5 className="font-medium mb-2 text-sm">Add/Remove Conditions to Selected Areas:</h5>
-    <div className="grid grid-cols-2 gap-2">
-      {["Caries", "Filling", "Fractured", "Sensitive"].map(cond => {
-        // Check if condition exists on ANY selected area
-        const isAppliedToAny = selectedAreas.some(area => {
-          const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-          return areaConditions.includes(cond);
-        });
-        
-        // Count how many selected areas have this condition
-        const appliedCount = selectedAreas.filter(area => {
-          const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-          return areaConditions.includes(cond);
-        }).length;
-        
-        return (
-          <button
-            key={cond}
-            type="button"
-            onClick={() => {
-              if (isAppliedToAny) {
-                handleRemoveConditionFromSelectedAreas(cond);
-              } else {
-                handleAddConditionToSelectedAreas(cond);
-              }
-            }}
-            className={`px-3 py-2 text-sm border rounded-lg transition-all ${
-              isAppliedToAny
-                ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              {isAppliedToAny ? (
-                <>
-                  <span className="text-red-500">✓</span>
-                  <span>Remove {cond} ({appliedCount}/{selectedAreas.length})</span>
-                </>
-              ) : (
-                <>
-                  <span>+</span>
-                  <span>Add {cond}</span>
-                </>
-              )}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-    <div className="mt-2 text-xs text-gray-500">
-      * Conditions will be added/removed only from the currently selected areas
-    </div>
-  </div>
-)} */}
-                
-
-
-{selectedAreas.length > 0 && mode === "edit" && (
-  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-    <h5 className="font-medium mb-2 text-sm">Conditions for Selected Areas:</h5>
-    
-    {/* Show each selected area separately */}
-    <div className="space-y-3">
-      {selectedAreas.map(area => {
-        const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-        const areaColor = {
-          mesial: "#3b82f6",
-          distal: "#10b981",
-          buccal: "#f59e0b",
-          lingual: "#8b5cf6",
-          occlusal: "#ef4444"
-        }[area];
-        
-        return (
-          <div key={area} className="border rounded-lg p-3 bg-white">
-            <div className="flex items-center gap-2 mb-2">
-              <div 
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: areaColor }}
-              />
-              <span className="font-medium capitalize">{area} Surface</span>
-            </div>
-            
-            {/* Current conditions for this area */}
-            <div className="mb-3">
-              <div className="text-xs text-gray-500 mb-1">Current conditions:</div>
-              <div className="flex flex-wrap gap-1">
-                {areaConditions.length > 0 ? (
-                  areaConditions.map(cond => (
-                    <Badge 
-                      key={cond} 
-                      variant="secondary" 
-                      className="text-xs flex items-center gap-1"
-                    >
-                      {cond}
-                      <button
-                        type="button"
-                        onClick={() => handleSurfaceConditionToggle(area, cond)}
-                        className="ml-1 text-red-500 hover:text-red-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-xs text-gray-400 italic">No conditions added</span>
+                {selectedAreas.length > 0 && mode === "edit" && (
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h5 className="font-medium mb-2 text-sm">Conditions for Selected Areas:</h5>
+                    
+                    {/* Show each selected area separately */}
+                    <div className="space-y-3">
+                      {selectedAreas.map(area => {
+                        const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
+                        const areaColor = {
+                          mesial: "#3b82f6",
+                          distal: "#10b981",
+                          buccal: "#f59e0b",
+                          lingual: "#8b5cf6",
+                          occlusal: "#ef4444"
+                        }[area];
+                        
+                        return (
+                          <div key={area} className="border rounded-lg p-3 bg-white">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div 
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: areaColor }}
+                              />
+                              <span className="font-medium capitalize">{area} Surface</span>
+                            </div>
+                            
+                            {/* Current conditions for this area */}
+                            <div className="mb-3">
+                              <div className="text-xs text-gray-500 mb-1">Current conditions:</div>
+                              <div className="flex flex-wrap gap-1">
+                                {areaConditions.length > 0 ? (
+                                  areaConditions.map(cond => (
+                                    <Badge 
+                                      key={cond} 
+                                      variant="secondary" 
+                                      className="text-xs flex items-center gap-1"
+                                    >
+                                      {cond}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSurfaceConditionToggle(area, cond)}
+                                        className="ml-1 text-red-500 hover:text-red-700"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">No conditions added</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Add condition buttons for this specific area */}
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Add condition:</div>
+                              <div className="flex flex-wrap gap-1">
+                                {["Caries", "Filling", "Fractured", "Sensitive"].map(cond => {
+                                  const isApplied = areaConditions.includes(cond);
+                                  return (
+                                    <button
+                                      key={cond}
+                                      type="button"
+                                      onClick={() => handleSurfaceConditionToggle(area, cond)}
+                                      className={`px-2 py-1 text-xs border rounded transition-all ${
+                                        isApplied
+                                          ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
+                                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      {isApplied ? (
+                                        <span className="flex items-center gap-1">
+                                          <X className="h-3 w-3" />
+                                          Remove {cond}
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center gap-1">
+                                          <span>+</span>
+                                          Add {cond}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Quick actions for ALL selected areas */}
+                    <div className="mt-4 pt-4 border-t">
+                      <h6 className="text-xs font-medium mb-2 text-gray-600">Quick Actions for All Selected Areas:</h6>
+                      <div className="grid grid-cols-2 gap-2">
+                        {["Caries", "Filling", "Fractured", "Sensitive"].map(cond => {
+                          const isAppliedToAny = selectedAreas.some(area => {
+                            const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
+                            return areaConditions.includes(cond);
+                          });
+                          
+                          return (
+                            <button
+                              key={cond}
+                              type="button"
+                              onClick={() => {
+                                if (isAppliedToAny) {
+                                  // Remove from all selected areas
+                                  selectedAreas.forEach(area => {
+                                    const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
+                                    if (areaConditions.includes(cond)) {
+                                      handleSurfaceConditionToggle(area, cond);
+                                    }
+                                  });
+                                } else {
+                                  // Add to all selected areas
+                                  selectedAreas.forEach(area => {
+                                    const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
+                                    if (!areaConditions.includes(cond)) {
+                                      handleSurfaceConditionToggle(area, cond);
+                                    }
+                                  });
+                                }
+                              }}
+                              className={`px-2 py-1 text-xs border rounded transition-all ${
+                                isAppliedToAny
+                                  ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {isAppliedToAny ? (
+                                <span className="flex items-center justify-center gap-1">
+                                  <X className="h-3 w-3" />
+                                  Remove {cond} from All
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center gap-1">
+                                  <span>+</span>
+                                  Add {cond} to All
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2 text-xs text-gray-500">
+                      * Click X on individual condition badges to remove them
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
-            
-            {/* Add condition buttons for this specific area */}
-            <div>
-              <div className="text-xs text-gray-500 mb-1">Add condition:</div>
-              <div className="flex flex-wrap gap-1">
-                {["Caries", "Filling", "Fractured", "Sensitive"].map(cond => {
-                  const isApplied = areaConditions.includes(cond);
-                  return (
-                    <button
-                      key={cond}
-                      type="button"
-                      onClick={() => handleSurfaceConditionToggle(area, cond)}
-                      className={`px-2 py-1 text-xs border rounded transition-all ${
-                        isApplied
-                          ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {isApplied ? (
-                        <span className="flex items-center gap-1">
-                          <X className="h-3 w-3" />
-                          Remove {cond}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1">
-                          <span>+</span>
-                          Add {cond}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-    
-    {/* Quick actions for ALL selected areas (optional - keep if you want batch operations too) */}
-    <div className="mt-4 pt-4 border-t">
-      <h6 className="text-xs font-medium mb-2 text-gray-600">Quick Actions for All Selected Areas:</h6>
-      <div className="grid grid-cols-2 gap-2">
-        {["Caries", "Filling", "Fractured", "Sensitive"].map(cond => {
-          const isAppliedToAny = selectedAreas.some(area => {
-            const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-            return areaConditions.includes(cond);
-          });
-          
-          return (
-            <button
-              key={cond}
-              type="button"
-              onClick={() => {
-                if (isAppliedToAny) {
-                  // Remove from all selected areas
-                  selectedAreas.forEach(area => {
-                    const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-                    if (areaConditions.includes(cond)) {
-                      handleSurfaceConditionToggle(area, cond);
-                    }
-                  });
-                } else {
-                  // Add to all selected areas
-                  selectedAreas.forEach(area => {
-                    const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
-                    if (!areaConditions.includes(cond)) {
-                      handleSurfaceConditionToggle(area, cond);
-                    }
-                  });
-                }
-              }}
-              className={`px-2 py-1 text-xs border rounded transition-all ${
-                isAppliedToAny
-                  ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {isAppliedToAny ? (
-                <span className="flex items-center justify-center gap-1">
-                  <X className="h-3 w-3" />
-                  Remove {cond} from All
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-1">
-                  <span>+</span>
-                  Add {cond} to All
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-    
-    <div className="mt-2 text-xs text-gray-500">
-      * Click X on individual condition badges to remove them
-    </div>
-  </div>
-)}
               </div>
 
               {/* Area Conditions Summary */}
@@ -933,6 +896,94 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
                   readOnly={mode === "view"}
                 />
               </div>
+
+              {/* Procedures Section */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-medium">Procedures</h4>
+                  {mode === "edit" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddProcedure}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Procedure
+                    </Button>
+                  )}
+                </div>
+                
+                {procedures.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No procedures added</p>
+                ) : (
+                  <div className="space-y-2">
+                    {procedures.map((proc, index) => (
+                      <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-medium">{proc.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {proc.surface}
+                              </Badge>
+                              <Badge className={`text-xs ${
+                                proc.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                proc.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {proc.status}
+                              </Badge>
+                            </div>
+                            {proc.notes && (
+                              <p className="text-sm text-gray-600 mt-1">{proc.notes}</p>
+                            )}
+                            {proc.cost && proc.cost > 0 && (
+                              <p className="text-sm font-medium mt-1">Cost: ₹{proc.cost}</p>
+                            )}
+                          </div>
+                          
+                          {mode === "edit" && (
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleProcedureStatusToggle(index, 'planned')}
+                                className={`px-2 py-1 text-xs rounded ${
+                                  proc.status === 'planned' 
+                                    ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                                title="Mark as Planned"
+                              >
+                                P
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleProcedureStatusToggle(index, 'completed')}
+                                className={`px-2 py-1 text-xs rounded ${
+                                  proc.status === 'completed' 
+                                    ? 'bg-green-100 text-green-700 border border-green-300' 
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                                title="Mark as Completed"
+                              >
+                                C
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProcedure(index)}
+                                className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                title="Remove Procedure"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -962,7 +1013,8 @@ export default function DentalChart({
   onSave,
   onProcedureAdded,
   existingConditions = [],
-  onToothSelected
+  onToothSelected,
+  existingTreatmentPlan,
 }: DentalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null);
   const [toothConditions, setToothConditions] = useState<ToothCondition[]>(existingConditions);
@@ -970,11 +1022,26 @@ export default function DentalChart({
   const [selectedQuadrant, setSelectedQuadrant] = useState<"all" | 1 | 2 | 3 | 4>("all");
   const [showTreatmentPlanForm, setShowTreatmentPlanForm] = useState(false);
   const [selectedStage, setSelectedStage] = useState(1);
-  const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanData | null>(null);
+  const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanData | null>(
+    existingTreatmentPlan || null
+  );
   
   const toothData = chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
-  
+  useEffect(() => {
+  if (existingTreatmentPlan) {
+    console.log("🔄 Existing treatment plan detected, auto-opening form...");
+    // Auto-open treatment plan form after a short delay
+    const timer = setTimeout(() => {
+      setShowTreatmentPlanForm(true);
+      console.log("✅ Treatment plan form opened for editing");
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }
+}, [existingTreatmentPlan]);
 const formatDentalDataForAPI = () => {
+  console.log("🦷 Formatting dental data for API...");
+  
   // Format performed teeth (completed procedures)
   const performedTeeth = toothConditions
     .filter(tc => 
@@ -997,9 +1064,11 @@ const formatDentalDataForAPI = () => {
           status: p.status as "completed",
           cost: p.cost || 0,
           notes: p.notes || "",
-          performedAt: new Date().toISOString()
+          performedAt: p.date || new Date().toISOString()
         }))
     }));
+  
+  console.log("✅ Performed teeth:", performedTeeth);
   
   // Format planned procedures for treatment plan
   const plannedProcedures = toothConditions
@@ -1016,24 +1085,141 @@ const formatDentalDataForAPI = () => {
         }))
     );
 
-  // Format treatment plan if exists
+  console.log("✅ Planned procedures:", plannedProcedures);
+
+  // ✅ FIXED: Format treatment plan for backend
   let formattedTreatmentPlan = null;
   if (treatmentPlan) {
+    console.log("📋 Formatting treatment plan for backend...");
+    
+    // Check if any procedures in Stage 1 are marked as completed
+    const stage1Procedures = treatmentPlan.teeth.flatMap(t => 
+      t.procedures.filter(p => p.stage === 1)
+    );
+    const completedInStage1 = stage1Procedures.filter(p => p.status === "completed");
+    const shouldStartToday = completedInStage1.length > 0;
+    
+    console.log(`Stage 1: ${stage1Procedures.length} total, ${completedInStage1.length} completed`);
+    console.log(`Should start today: ${shouldStartToday}`);
+    
+    // Build stages with toothSurfaceProcedures and procedureRefs
+    const proceduresByStage: Record<number, any[]> = {};
+    
+    treatmentPlan.teeth.forEach(toothPlan => {
+      toothPlan.procedures.forEach((proc: any) => { 
+        const stageNum = (proc as any).stage || 1; 
+        if (!proceduresByStage[stageNum]) {
+          proceduresByStage[stageNum] = [];
+        }
+        
+        proceduresByStage[stageNum].push({
+          toothNumber: toothPlan.toothNumber,
+          name: proc.name,
+          surface: proc.surface || 'occlusal',
+          estimatedCost: proc.estimatedCost || 0,
+          notes: proc.notes || '',
+          status: proc.status || 'planned'
+        });
+      });
+    });
+    
+    // Create stages data
+    const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
+      const stageNumber = parseInt(stageNumStr);
+      
+      // Group procedures by tooth and surface for toothSurfaceProcedures
+      const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+      
+      // Create procedureRefs array
+      const procedureRefs = procs.map(proc => ({
+        toothNumber: proc.toothNumber,
+        procedureName: proc.name
+      }));
+      
+      procs.forEach(proc => {
+        if (!toothSurfaceMap[proc.toothNumber]) {
+          toothSurfaceMap[proc.toothNumber] = {};
+        }
+        
+        const surfaceKey = proc.surface || 'occlusal';
+        if (!toothSurfaceMap[proc.toothNumber][surfaceKey]) {
+          toothSurfaceMap[proc.toothNumber][surfaceKey] = [];
+        }
+        
+        if (!toothSurfaceMap[proc.toothNumber][surfaceKey].includes(proc.name)) {
+          toothSurfaceMap[proc.toothNumber][surfaceKey].push(proc.name);
+        }
+      });
+      
+      // Convert to toothSurfaceProcedures format
+      const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+        const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+          surface: surface,
+          procedureNames: procedureNames
+        }));
+        
+        return {
+          toothNumber: parseInt(toothNumStr),
+          surfaceProcedures: surfaceProcedures
+        };
+      });
+      
+      // Find matching stage from treatmentPlan.stages
+      const stageInput = treatmentPlan.stages?.find((s: any) => 
+        s.stageNumber === stageNumber || s.stage === stageNumber
+      );
+      
+      const stageStatus = (() => {
+        if (stageNumber === 1 && shouldStartToday) {
+          const allCompleted = procs.every(p => p.status === 'completed');
+          return allCompleted ? 'completed' : 'in-progress';
+        }
+        return 'pending';
+      })() as 'pending' | 'completed' | 'in-progress';
+      
+      return {
+        stageNumber: stageNumber,
+        stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+        description: stageInput?.description || '',
+        // ✅ FIXED: Add the required procedureRefs property
+        procedureRefs: procedureRefs,
+        status: stageStatus,
+        scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
+        // ✅ Keep the optional toothSurfaceProcedures
+        toothSurfaceProcedures: toothSurfaceProcedures,
+        notes: stageInput?.notes || ''
+      };
+    });
+    
     formattedTreatmentPlan = {
-      planName: treatmentPlan.planName,
-      description: treatmentPlan.description || "",
-      stages: treatmentPlan.stages.map(stage => ({
-        stageName: stage.stageName,
-        description: stage.description || "",
-        procedureRefs: stage.procedureRefs || [],
-        scheduledDate: stage.scheduledDate ? 
-          stage.scheduledDate.split('T')[0] : 
-          new Date().toISOString().split('T')[0],
-        status: stage.status as "pending" | "completed"
+      planName: treatmentPlan.planName.trim(),
+      description: treatmentPlan.description?.trim() || '',
+      teeth: treatmentPlan.teeth.map(toothPlan => ({
+        toothNumber: toothPlan.toothNumber,
+        priority: toothPlan.priority || 'medium',
+        isCompleted: false,
+        procedures: toothPlan.procedures.map(proc => ({
+          name: proc.name,
+          surface: proc.surface || 'occlusal',
+          stage: proc.stage || 1,
+          estimatedCost: proc.estimatedCost || 0,
+          notes: proc.notes || '',
+          status: proc.status || 'planned'
+        }))
       })),
-      teeth: treatmentPlan.teeth || [] // This should contain the teeth data
+      stages: stagesData,
+      startToday: shouldStartToday // ✅ CRITICAL: This tells backend to start the plan
     };
-    console.log("Formatted treatment plan teeth:", formattedTreatmentPlan.teeth);
+    
+    console.log("✅ Final treatment plan structure:", {
+      planName: formattedTreatmentPlan.planName,
+      teethCount: formattedTreatmentPlan.teeth.length,
+      stagesCount: formattedTreatmentPlan.stages.length,
+      startToday: formattedTreatmentPlan.startToday,
+      totalProcedures: formattedTreatmentPlan.teeth.reduce((sum: number, t: any) => 
+        sum + t.procedures.length, 0
+      )
+    });
   }
 
   return { 
@@ -1044,12 +1230,23 @@ const formatDentalDataForAPI = () => {
 };
   
 const handleClose = () => {
-  // Only show save message if there's actual data
-  const hasData = toothConditions.length > 0 || treatmentPlan !== null;
+  console.log("🦷 DentalChart handleClose called");
   
-  if (onSave && hasData) {
-    const dentalData = formatDentalDataForAPI();
-    console.log("📤 Sending dental data to parent:", dentalData);
+  // Always format and send data, even if empty
+  const dentalData = formatDentalDataForAPI();
+  
+  console.log("📤 Sending dental data to parent:", {
+    performedTeeth: dentalData.performedTeeth?.length || 0,
+    plannedProcedures: dentalData.plannedProcedures?.length || 0,
+    hasTreatmentPlan: !!dentalData.treatmentPlan,
+    treatmentPlan: dentalData.treatmentPlan ? {
+      planName: dentalData.treatmentPlan.planName,
+      teethCount: dentalData.treatmentPlan.teeth?.length || 0,
+      startToday: dentalData.treatmentPlan.startToday
+    } : null
+  });
+  
+  if (onSave) {
     onSave(dentalData);
   }
   
@@ -1140,7 +1337,22 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
     return;
   }
   
-  setTreatmentPlan(plan);
+  // Ensure all procedures have status field
+  const enhancedTeeth = plan.teeth.map(tooth => ({
+    ...tooth,
+    procedures: tooth.procedures.map(proc => ({
+      ...proc,
+      status: proc.status || 'planned' // Default to 'planned' if not set
+    }))
+  }));
+  
+  const enhancedPlan = {
+    ...plan,
+    teeth: enhancedTeeth
+  };
+  
+  console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
+  setTreatmentPlan(enhancedPlan);
   setShowTreatmentPlanForm(false);
 };
 
@@ -1337,8 +1549,13 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
                         />
                         {condition && (
                           <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                            <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                 style={{ backgroundColor: getToothColor(tooth.number) }} />
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {condition.procedures?.some(p => p.status === "completed") && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </button>
@@ -1382,8 +1599,13 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
                         />
                         {condition && (
                           <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                            <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                 style={{ backgroundColor: getToothColor(tooth.number) }} />
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {condition.procedures?.some(p => p.status === "completed") && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </button>
@@ -1448,8 +1670,13 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
                         />
                         {condition && (
                           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                            <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                 style={{ backgroundColor: getToothColor(tooth.number) }} />
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {condition.procedures?.some(p => p.status === "completed") && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </button>
@@ -1493,8 +1720,13 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
                         />
                         {condition && (
                           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                            <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                 style={{ backgroundColor: getToothColor(tooth.number) }} />
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {condition.procedures?.some(p => p.status === "completed") && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </button>
@@ -1632,6 +1864,7 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
           existingConditions={toothConditions}
           onClose={() => setShowTreatmentPlanForm(false)}
           onSave={handleSaveTreatmentPlan}
+             initialData={treatmentPlan} 
         />
       )}
     </div>
@@ -1645,23 +1878,54 @@ interface TreatmentPlanFormProps {
   existingConditions: ToothCondition[];
   onClose: () => void;
   onSave: (plan: TreatmentPlanData) => void;
+  initialData?: TreatmentPlanData | null; // Add this
 }
-
-const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({ patientId, existingConditions, onClose, onSave }) => {
-  const [planName, setPlanName] = useState("Treatment Plan");
-  const [description, setDescription] = useState("");
-  const [stages, setStages] = useState<TreatmentPlanStage[]>([
-    { stageName: "Initial Treatment", description: "Primary procedures", procedureRefs: [], status: "pending", scheduledDate: new Date().toISOString().split('T')[0] },
-    { stageName: "Follow-up", description: "Secondary procedures", procedureRefs: [], status: "pending", scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
-  ]);
+const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({ 
+  patientId, 
+  existingConditions, 
+  onClose, 
+  onSave,
+  initialData 
+}) => {
+  const [planName, setPlanName] = useState(initialData?.planName || "Treatment Plan");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [stages, setStages] = useState<TreatmentPlanStage[]>(
+    initialData?.stages || [
+      { stageName: "Initial Treatment", description: "Primary procedures", procedureRefs: [], status: "pending", scheduledDate: new Date().toISOString().split('T')[0] },
+      { stageName: "Follow-up", description: "Secondary procedures", procedureRefs: [], status: "pending", scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
+    ]
+  );
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedProcedure, setSelectedProcedure] = useState("");
   const [selectedSurface, setSelectedSurface] = useState("");
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [notes, setNotes] = useState("");
-  const [teethPlans, setTeethPlans] = useState<{toothNumber: number, procedures: any[], priority: 'urgent' | 'high' | 'medium' | 'low'}[]>([]);
-const [selectedPriority, setSelectedPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
+  const [teethPlans, setTeethPlans] = useState<{toothNumber: number, procedures: any[], priority: 'urgent' | 'high' | 'medium' | 'low'}[]>(
+    initialData?.teeth.map(t => ({
+      toothNumber: t.toothNumber,
+      priority: t.priority || 'medium',
+      procedures: t.procedures.map(p => ({
+        name: p.name,
+        surface: p.surface || 'occlusal',
+        stage: p.stage || 1,
+        estimatedCost: p.estimatedCost || 0,
+        notes: p.notes || '',
+        status: p.status || 'planned'
+      }))
+    })) || []
+  );
+  const [selectedPriority, setSelectedPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [selectedStage, setSelectedStage] = useState<number>(1);
+
+  // Add useEffect to log when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      console.log("📋 TreatmentPlanForm received initial data:", initialData);
+      console.log("- Teeth:", initialData.teeth?.length || 0);
+      console.log("- Stages:", initialData.stages?.length || 0);
+      console.log("- Procedures count:", initialData.teeth?.reduce((sum, t) => sum + t.procedures.length, 0) || 0);
+    }
+  }, [initialData]);
 
   const handleAddProcedure = () => {
     if (!selectedTooth || !selectedProcedure || !selectedSurface) {
@@ -1715,7 +1979,7 @@ const handleSavePlan = () => {
       stage: proc.stage || 1, // Use the stage from the procedure
       estimatedCost: proc.estimatedCost || 0,
       notes: proc.notes || "",
-      status: 'planned' as const
+      status: proc.status || 'planned'
     }))
   }));
 
@@ -2172,6 +2436,14 @@ const handleSavePlan = () => {
                                       <Badge variant="outline" className="text-xs">
                                         {proc.surface}
                                       </Badge>
+                                      {/* Status badge */}
+                                      <Badge className={`text-xs ${
+                                        proc.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        proc.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {proc.status || 'planned'}
+                                      </Badge>
                                     </div>
                                     {proc.notes && (
                                       <div className="text-sm text-gray-600 mt-1">{proc.notes}</div>
@@ -2179,16 +2451,51 @@ const handleSavePlan = () => {
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <span className="text-sm font-medium">₹{proc.estimatedCost}</span>
+                                    
+                                    {/* Status toggle buttons */}
+                                    <div className="flex gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = [...teethPlans];
+                                          updated[idx].procedures[procIdx].status = 'planned';
+                                          setTeethPlans(updated);
+                                        }}
+                                        className={`px-2 py-1 text-xs rounded ${
+                                          proc.status === 'planned' 
+                                            ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                        title="Mark as Planned"
+                                      >
+                                        P
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = [...teethPlans];
+                                          updated[idx].procedures[procIdx].status = 'completed';
+                                          updated[idx].procedures[procIdx].completedAt = new Date().toISOString();
+                                          setTeethPlans(updated);
+                                        }}
+                                        className={`px-2 py-1 text-xs rounded ${
+                                          proc.status === 'completed' 
+                                            ? 'bg-green-100 text-green-700 border border-green-300' 
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                        title="Mark as Completed"
+                                      >
+                                        C
+                                      </button>
+                                    </div>
+                                    
+                                    {/* Remove button */}
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => {
                                         const updated = [...teethPlans];
-                                        updated[idx].procedures.splice(
-                                          updated[idx].procedures.findIndex(p => 
-                                            p.name === proc.name && p.surface === proc.surface && p.stage === proc.stage
-                                          ), 1
-                                        );
+                                        updated[idx].procedures.splice(procIdx, 1);
                                         if (updated[idx].procedures.length === 0) {
                                           updated.splice(idx, 1);
                                         }

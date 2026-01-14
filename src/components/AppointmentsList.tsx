@@ -44,6 +44,7 @@ const TreatmentPlanDetailsModal = ({
   onClose,
    viewOnly = false,
   refetchTreatmentPlans, 
+  onEditPlan
 }: TreatmentPlanDetailsModalProps & { refetchTreatmentPlans?: () => void; viewOnly?: boolean; }) => {
   const [localPlan, setLocalPlan] = useState<TreatmentPlan | null>(plan);
   const [loading, setLoading] = useState(false);
@@ -519,6 +520,7 @@ const handleUpdateProcedureStatus = async (
                 {localPlan.description || "No description provided"}
               </p>
             </div>
+    
             <div className="flex items-center gap-2">
               <Badge className={`
                 ${localPlan.status === "completed" ? "bg-green-100 text-green-700" :
@@ -534,6 +536,21 @@ const handleUpdateProcedureStatus = async (
                   👁️ Preview Only
                 </Badge>
               )}
+                       {viewOnly && localPlan?._id?.startsWith('temp-') && onEditPlan && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            onClose(); // Close the modal
+            onEditPlan(localPlan); // Trigger edit in parent
+          }}
+          className="text-sm flex items-center gap-2"
+        >
+          <span>✏️</span>
+          Edit Plan
+        </Button>
+      )}
+      
             </div>
           </div>
 
@@ -668,6 +685,7 @@ const handleUpdateProcedureStatus = async (
                                   </div>
                                 </div>
                                 {/* Only show action buttons if NOT viewOnly */}
+
 {!viewOnly && (
   <div className="flex gap-2">
     <Button
@@ -953,17 +971,31 @@ const handleUpdateProcedureStatus = async (
         )}
 
         {/* If viewOnly, show only Close button */}
-        {viewOnly && (
-          <div className="flex justify-end items-center pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="text-sm"
-            >
-              Close Preview
-            </Button>
-          </div>
-        )}
+     {/* If viewOnly, show only Close button */}
+{viewOnly && (
+  <div className="flex justify-end items-center pt-4 border-t">
+    {/* Show Edit Plan button for temporary plans in preview mode */}
+    {localPlan?._id?.startsWith('temp-') && onEditPlan && (
+      <Button
+        variant="outline"
+        onClick={() => {
+          onClose();
+          onEditPlan(localPlan);
+        }}
+        className="text-sm mr-3"
+      >
+        ✏️ Edit Plan
+      </Button>
+    )}
+    <Button
+      variant="outline"
+      onClick={onClose}
+      className="text-sm"
+    >
+      Close Preview
+    </Button>
+  </div>
+)}
       </div>
     </div>
   );
@@ -1151,10 +1183,49 @@ interface Procedure {
   referralNotes: string;
   completed: boolean;
 }
-
+interface TreatmentPlanData {
+  planName: string;
+  description?: string;
+  teeth: {
+    toothNumber: number;
+    procedures: {
+      name: string;
+      surface: string;
+      stage?: number;
+      estimatedCost: number;
+      notes?: string;
+      status: 'planned' | 'in-progress' | 'completed';
+    }[];
+    priority?: 'urgent' | 'high' | 'medium' | 'low';
+  }[];
+  stages: {
+    stageName: string;
+    stageNumber?: number;
+    description?: string;
+    procedureRefs: { // This is required
+      toothNumber: number;
+      procedureName: string;
+    }[];
+    toothSurfaceProcedures?: { // This is optional
+      toothNumber: number;
+      surfaceProcedures: {
+        surface: string;
+        procedureNames: string[];
+      }[];
+    }[];
+    status: 'pending' | 'completed' | 'in-progress';
+    scheduledDate?: string;
+    completedAt?: string;
+    notes?: string;
+  }[];
+  startToday?: boolean;
+}
 interface TreatmentPlanDetailsModalProps {
   plan: TreatmentPlan | null;
   onClose: () => void;
+  refetchTreatmentPlans?: () => void;
+  viewOnly?: boolean;
+  onEditPlan?: (plan: TreatmentPlan) => void; 
 }
 interface Department {
   _id: string;
@@ -1247,6 +1318,8 @@ const [dentalData, setDentalData] = useState<{
   performedTeeth: [],
   plannedProcedures: []
 });
+const [editingTreatmentPlan, setEditingTreatmentPlan] = useState<TreatmentPlan | null>(null)
+const [isTransitioningToEdit, setIsTransitioningToEdit] = useState(false);
 // const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
 
   const formatTime = (time: string) => {
@@ -1735,120 +1808,170 @@ const handleSaveConsultation = async () => {
       formData.append('plannedProcedures', JSON.stringify(dentalData.plannedProcedures));
     }
 
-    // ✅ FIXED: Treatment Plan Format for NEW Schema
-    let finalTreatmentPlan = null;
+    // ✅ TREATMENT PLAN HANDLING - UPDATED LOGIC
+    let treatmentPlanInput = null;
+    let treatmentPlanStatusUpdate = null;
     
     if (dentalData.treatmentPlan) {
-      console.log("📋 Processing treatment plan from DentalChart");
+      console.log("📋 Processing treatment plan data");
       
-      // Get teeth procedures by stage
-      const proceduresByStage: Record<number, any[]> = {};
-      
-      dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
-        toothPlan.procedures.forEach((proc: any) => {
-          const stageNum = proc.stage || 1;
-          if (!proceduresByStage[stageNum]) {
-            proceduresByStage[stageNum] = [];
-          }
-          
-          proceduresByStage[stageNum].push({
-            toothNumber: toothPlan.toothNumber,
-            name: proc.name,
-            surface: proc.surface || 'occlusal',
-            estimatedCost: proc.estimatedCost || 0,
-            notes: proc.notes || '',
-            status: 'planned'
+      // Check if we're editing an existing plan (not temporary)
+      if (editingTreatmentPlan && !editingTreatmentPlan._id.startsWith('temp-')) {
+        console.log("🔄 Updating existing treatment plan:", editingTreatmentPlan._id);
+        
+        // 🔄 CASE 1: EDITING EXISTING PLAN
+        // Find completed procedures in Stage 1
+        const completedProcedures: any[] = [];
+        
+        dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+          toothPlan.procedures.forEach((proc: any) => {
+            // If procedure is marked as completed in Stage 1
+            if (proc.status === 'completed' && proc.stage === 1) {
+              completedProcedures.push({
+                toothNumber: toothPlan.toothNumber,
+                procedureName: proc.name,
+                surface: proc.surface || 'occlusal',
+                stageNumber: 1,
+                estimatedCost: proc.estimatedCost || 0,
+                notes: proc.notes || ''
+              });
+            }
           });
         });
-      });
-      
-      // Build stages with toothSurfaceProcedures
-      const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
-        const stageNumber = parseInt(stageNumStr);
         
-        // Group procedures by tooth and surface
-        const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+        // Check if Stage 1 is fully completed
+        const stage1Procedures = dentalData.treatmentPlan.teeth.flatMap((t: any) =>
+          t.procedures.filter((p: any) => p.stage === 1)
+        );
+        const allStage1Completed = stage1Procedures.length > 0 && 
+          stage1Procedures.every((p: any) => p.status === 'completed');
         
-        procs.forEach(proc => {
-          if (!toothSurfaceMap[proc.toothNumber]) {
-            toothSurfaceMap[proc.toothNumber] = {};
-          }
-          
-          if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
-            toothSurfaceMap[proc.toothNumber][proc.surface] = [];
-          }
-          
-          if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
-            toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
-          }
+        treatmentPlanStatusUpdate = {
+          planId: editingTreatmentPlan._id,
+          completedStageNumber: allStage1Completed ? 1 : null,
+          completedProcedures: completedProcedures
+        };
+        
+        console.log("📊 Treatment plan status update:", treatmentPlanStatusUpdate);
+        formData.append('treatmentPlanStatus', JSON.stringify(treatmentPlanStatusUpdate));
+        
+      } else {
+        // 🆕 CASE 2: CREATING NEW TREATMENT PLAN
+        console.log("🆕 Creating new treatment plan");
+        
+        // Get teeth procedures by stage
+        const proceduresByStage: Record<number, any[]> = {};
+        
+        dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+          toothPlan.procedures.forEach((proc: any) => {
+            const stageNum = proc.stage || 1;
+            if (!proceduresByStage[stageNum]) {
+              proceduresByStage[stageNum] = [];
+            }
+            
+            proceduresByStage[stageNum].push({
+              toothNumber: toothPlan.toothNumber,
+              name: proc.name,
+              surface: proc.surface || 'occlusal',
+              estimatedCost: proc.estimatedCost || 0,
+              notes: proc.notes || '',
+              status: proc.status || 'planned'
+            });
+          });
         });
         
-        // Convert to toothSurfaceProcedures format
-        const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
-          const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
-            surface: surface,
-            procedureNames: procedureNames
-          }));
+        // Check if any procedures were performed today (Stage 1)
+        const stage1Procedures = proceduresByStage[1] || [];
+        const completedInStage1 = stage1Procedures.filter(p => p.status === 'completed');
+        const shouldStartToday = completedInStage1.length > 0;
+        
+        console.log(`Stage 1: ${stage1Procedures.length} procedures, ${completedInStage1.length} completed`);
+        console.log(`Should start today: ${shouldStartToday}`);
+        
+        // Build stages with toothSurfaceProcedures
+        const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
+          const stageNumber = parseInt(stageNumStr);
+          
+          // Group procedures by tooth and surface
+          const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+          
+          procs.forEach(proc => {
+            if (!toothSurfaceMap[proc.toothNumber]) {
+              toothSurfaceMap[proc.toothNumber] = {};
+            }
+            
+            if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+              toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+            }
+            
+            if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
+              toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
+            }
+          });
+          
+          // Convert to toothSurfaceProcedures format
+          const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+            const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+              surface: surface,
+              procedureNames: procedureNames
+            }));
+            
+            return {
+              toothNumber: parseInt(toothNumStr),
+              surfaceProcedures: surfaceProcedures
+            };
+          });
+          
+          const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
+            (s.stageNumber || s.stage) === stageNumber
+          );
           
           return {
-            toothNumber: parseInt(toothNumStr),
-            surfaceProcedures: surfaceProcedures
+            stageNumber: stageNumber,
+            stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+            description: stageInput?.description || '',
+            status: shouldStartToday && stageNumber === 1 ? 'in-progress' : 'pending',
+            scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
+            toothSurfaceProcedures: toothSurfaceProcedures,
+            notes: stageInput?.notes || ''
           };
         });
         
-        const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
-          (s.stageNumber || s.stage) === stageNumber
-        );
+        // Build teeth data
+        const teethData = dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
+          toothNumber: toothPlan.toothNumber,
+          priority: toothPlan.priority || 'medium',
+          isCompleted: false,
+          procedures: toothPlan.procedures.map((proc: any) => ({
+            name: proc.name,
+            surface: proc.surface || 'occlusal',
+            stage: proc.stage || 1,
+            estimatedCost: proc.estimatedCost || 0,
+            notes: proc.notes || '',
+            status: proc.status || 'planned'
+          }))
+        }));
         
-        return {
-          stageNumber: stageNumber,
-          stageName: stageInput?.stageName || `Stage ${stageNumber}`,
-          description: stageInput?.description || '',
-          status: 'pending',
-          scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
-          toothSurfaceProcedures: toothSurfaceProcedures,
-          notes: stageInput?.notes || ''
+        treatmentPlanInput = {
+          planName: dentalData.treatmentPlan.planName.trim(),
+          description: dentalData.treatmentPlan.description?.trim() || '',
+          teeth: teethData,
+          stages: stagesData,
+          startToday: shouldStartToday // ✅ CRITICAL: Tell backend to start plan if procedures completed
         };
-      });
-      
-      // Build teeth data
-      const teethData = dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
-        toothNumber: toothPlan.toothNumber,
-        priority: toothPlan.priority || 'medium',
-        isCompleted: false,
-        procedures: toothPlan.procedures.map((proc: any) => ({
-          name: proc.name,
-          surface: proc.surface || 'occlusal',
-          stage: proc.stage || 1,
-          estimatedCost: proc.estimatedCost || 0,
-          notes: proc.notes || '',
-          status: 'planned'
-        }))
-      }));
-      
-      finalTreatmentPlan = {
-        planName: dentalData.treatmentPlan.planName.trim(),
-        description: dentalData.treatmentPlan.description?.trim() || '',
-        teeth: teethData,
-        stages: stagesData,
-        currentStage: 1,
-        status: "draft"
-      };
-      
-      console.log("✅ Final treatment plan for backend:", {
-        planName: finalTreatmentPlan.planName,
-        teethCount: finalTreatmentPlan.teeth.length,
-        stagesCount: finalTreatmentPlan.stages.length,
-        totalProcedures: finalTreatmentPlan.teeth.reduce((sum: number, t: any) => 
-          sum + t.procedures.length, 0
-        )
-      });
-    }
-
-    // Append treatment plan if exists
-    if (finalTreatmentPlan) {
-      console.log("📤 Appending treatment plan to form data");
-      formData.append('treatmentPlan', JSON.stringify(finalTreatmentPlan));
+        
+        console.log("✅ New treatment plan data:", {
+          planName: treatmentPlanInput.planName,
+          teethCount: treatmentPlanInput.teeth.length,
+          stagesCount: treatmentPlanInput.stages.length,
+          startToday: treatmentPlanInput.startToday,
+          totalProcedures: treatmentPlanInput.teeth.reduce((sum: number, t: any) => 
+            sum + t.procedures.length, 0
+          )
+        });
+        
+        formData.append('treatmentPlan', JSON.stringify(treatmentPlanInput));
+      }
     }
 
     // Append referral if exists
@@ -1874,7 +1997,10 @@ const handleSaveConsultation = async () => {
     });
 
     console.log("=== FORM DATA SUMMARY ===");
-    console.log("Has treatment plan:", !!finalTreatmentPlan);
+    console.log("Has treatment plan:", !!dentalData.treatmentPlan);
+    console.log("Is editing existing:", !!editingTreatmentPlan);
+    console.log("Treatment plan input:", treatmentPlanInput);
+    console.log("Treatment plan status update:", treatmentPlanStatusUpdate);
     console.log("Has performed teeth:", dentalData.performedTeeth.length > 0);
     console.log("Has files:", uploadFiles.length > 0);
 
@@ -1893,10 +2019,14 @@ const handleSaveConsultation = async () => {
     const data = response.data;
 
     if (data?.success) {
-      alert("✅ Consultation saved successfully!");
+      console.log("✅ Consultation saved successfully!");
+      console.log("Response data:", data);
       
       // Refresh patient treatment plans
-      fetchPatientTreatmentPlans();
+      await fetchPatientTreatmentPlans();
+      
+      // Clear editing state
+      setEditingTreatmentPlan(null);
       
       // Reset form
       setChiefComplaint("");
@@ -1918,8 +2048,14 @@ const handleSaveConsultation = async () => {
       setRecallDepartment("");
       setDentalData({
         performedTeeth: [],
-        plannedProcedures: []
+        plannedProcedures: [],
+        treatmentPlan: null
       });
+      
+      // Close dental chart if open
+      setShowDentalChart(false);
+      
+      alert("✅ Consultation saved successfully!");
       
       // Optionally close the consultation view
       handleBackToAppointments();
@@ -1928,11 +2064,149 @@ const handleSaveConsultation = async () => {
     }
   } catch (err: any) {
     console.error("❌ Error saving consultation:", err);
-    console.error("Error details:", err.response?.data);
-    alert(err.response?.data?.message || "Error saving consultation");
+    console.error("Error response:", err.response?.data);
+    console.error("Error details:", err.response?.config?.data);
+    
+    if (err.response?.data?.errors) {
+      const errorMessages = Object.entries(err.response.data.errors)
+        .map(([field, message]) => `${field}: ${message}`)
+        .join('\n');
+      alert(`Validation errors:\n${errorMessages}`);
+    } else {
+      alert(err.response?.data?.message || "Error saving consultation");
+    }
   } finally {
     setLoading(false);
   }
+};
+const handleEditTreatmentPlan = (plan: TreatmentPlan) => {
+  console.log("✏️ Editing treatment plan:", plan.planName);
+  console.log("📊 Plan stages:", plan.stages?.length || 0);
+  
+  // Show loading
+  setIsTransitioningToEdit(true);
+  
+  // Convert to dental chart format
+  const dentalChartPlan = convertToDentalChartFormat(plan);
+  
+  console.log("🔄 Converted dental chart plan:", {
+    planName: dentalChartPlan?.planName,
+    teethCount: dentalChartPlan?.teeth?.length || 0,
+    stagesCount: dentalChartPlan?.stages?.length || 0
+  });
+  
+  // Close current modal
+  setSelectedTreatmentPlan(null);
+  
+  // Set editing mode
+  setEditingTreatmentPlan(plan);
+  
+  // Open dental chart with the plan data
+  setShowDentalChart(true);
+  
+  // Pre-fill dental data
+  setDentalData(prev => ({
+    ...prev,
+    treatmentPlan: dentalChartPlan
+  }));
+  
+  // Set the treatment plan state in DentalChart component
+  // This will auto-open the treatment plan form
+  setTimeout(() => {
+    setIsTransitioningToEdit(false);
+  }, 1000);
+};
+
+
+{isTransitioningToEdit && (
+  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl shadow-lg">
+      <div className="flex items-center gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div>
+          <p className="font-medium">Opening treatment plan editor...</p>
+          <p className="text-sm text-gray-500">Please wait</p>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+const convertToDentalChartFormat = (treatmentPlan: TreatmentPlan): TreatmentPlanData | null => {
+  if (!treatmentPlan) return null;
+  
+  console.log("🔄 Converting treatment plan to dental chart format:", treatmentPlan);
+  
+  // Create teeth data from the treatment plan with proper typing
+  const teeth = treatmentPlan.teeth.map(tooth => ({
+    toothNumber: tooth.toothNumber,
+    priority: (tooth.priority as 'urgent' | 'high' | 'medium' | 'low') || 'medium', // Cast to correct type
+    procedures: tooth.procedures.map(proc => ({
+      name: proc.name,
+      surface: proc.surface || 'occlusal',
+      stage: proc.stage || 1,
+      estimatedCost: proc.estimatedCost || 0,
+      notes: proc.notes || '',
+      status: (proc.status as 'planned' | 'in-progress' | 'completed') || 'planned'
+    }))
+  }));
+  
+  // Create stages data with proper procedureRefs
+  const stages = treatmentPlan.stages.map(stage => {
+    // Extract procedureRefs from toothSurfaceProcedures
+    const procedureRefs: { toothNumber: number; procedureName: string; }[] = [];
+    
+    if (stage.toothSurfaceProcedures && stage.toothSurfaceProcedures.length > 0) {
+      stage.toothSurfaceProcedures.forEach(tsp => {
+        tsp.surfaceProcedures.forEach(sp => {
+          sp.procedureNames.forEach(procName => {
+            procedureRefs.push({
+              toothNumber: tsp.toothNumber,
+              procedureName: procName
+            });
+          });
+        });
+      });
+    } else {
+      // Fallback: get procedures from teeth for this stage
+      const stageNum = stage.stageNumber;
+      teeth.forEach(tooth => {
+        tooth.procedures.forEach(proc => {
+          if (proc.stage === stageNum) {
+            procedureRefs.push({
+              toothNumber: tooth.toothNumber,
+              procedureName: proc.name
+            });
+          }
+        });
+      });
+    }
+    
+    return {
+      stageName: stage.stageName || `Stage ${stage.stageNumber}`,
+      stageNumber: stage.stageNumber,
+      description: stage.description || '',
+      procedureRefs: procedureRefs,
+      status: stage.status as 'pending' | 'completed' | 'in-progress',
+      scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
+      notes: stage.notes || ''
+    };
+  });
+  
+  const formattedPlan: TreatmentPlanData = {
+    planName: treatmentPlan.planName,
+    description: treatmentPlan.description || '',
+    teeth: teeth,
+    stages: stages
+  };
+  
+  console.log("✅ Converted plan data:", {
+    planName: formattedPlan.planName,
+    teethCount: formattedPlan.teeth.length,
+    stagesCount: formattedPlan.stages.length,
+    totalProcedures: formattedPlan.teeth.reduce((sum: number, tooth: any) => sum + tooth.procedures.length, 0)
+  });
+  
+  return formattedPlan;
 };
   const addStage = () => {
     setStages((prev) => [
@@ -2276,14 +2550,21 @@ useEffect(() => {
       hasTreatmentPlan: !!dentalDataFromChart.treatmentPlan
     });
     
+    // Clear editing state if we were editing
+    if (editingTreatmentPlan) {
+      setEditingTreatmentPlan(null);
+    }
+    
     alert("Dental chart data saved successfully!");
     setShowDentalChart(false);
   }}
   onProcedureAdded={(toothNumber, procedure) => {
     console.log(`Procedure ${procedure.name} added to tooth ${toothNumber}`);
   }}
+  existingTreatmentPlan={editingTreatmentPlan ? convertToDentalChartFormat(editingTreatmentPlan) : null}
+  existingConditions={dentalData.performedTeeth} // Pass existing conditions
 />
-          </div>
+     </div>
         </div>
       ) : (
         // Original consultation view when dental chart is not open
@@ -2989,6 +3270,7 @@ useEffect(() => {
     onClose={() => setSelectedTreatmentPlan(null)}
     refetchTreatmentPlans={fetchPatientTreatmentPlans}
     viewOnly={selectedTreatmentPlan._id.startsWith('temp-')}
+      onEditPlan={handleEditTreatmentPlan} 
   />
 )}
 
