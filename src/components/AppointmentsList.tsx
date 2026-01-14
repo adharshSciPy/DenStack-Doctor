@@ -42,11 +42,342 @@ import DentalChart from "./DentalChart";
 const TreatmentPlanDetailsModal = ({
   plan,
   onClose,
-}: TreatmentPlanDetailsModalProps) => {
+   viewOnly = false,
+  refetchTreatmentPlans, 
+}: TreatmentPlanDetailsModalProps & { refetchTreatmentPlans?: () => void; viewOnly?: boolean; }) => {
   const [localPlan, setLocalPlan] = useState<TreatmentPlan | null>(plan);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'teeth' | 'stages'>('teeth');
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
+useEffect(() => {
+  console.log("TreatmentPlanDetailsModal viewOnly:", viewOnly);
+}, [viewOnly]);
+  // Get auth token
+  const getAuthToken = () => {
+    return localStorage.getItem('authToken');
+  };
 
+  // Show toast notification
+
+const showToast = (message: string, type: 'success' | 'error') => {
+  setToast({ show: true, message, type });
+  setTimeout(() => {
+    setToast(prev => ({ ...prev, show: false }));
+  }, 3000);
+};
+  // API BASE URL
+  const API_BASE = "/api/v1/patient-service/consultation";
+
+  // Fetch updated plan data
+  const fetchPlanDetails = async () => {
+    if (!plan?._id) return;
+    
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(
+        `${patientServiceBaseUrl}${API_BASE}/treatment-plan/${plan._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        setLocalPlan(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching plan details:", error);
+    }
+  };
+
+  // 1️⃣ Start Treatment Plan (Draft → Ongoing)
+  const handleStartPlan = async () => {
+    if(viewOnly)return;
+    if (!localPlan?._id) return;
+    
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const response = await axios.post(
+        `${patientServiceBaseUrl}${API_BASE}/start-treatment/${localPlan._id}`,
+        {}, // Empty body since clinicId is already in plan
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        setLocalPlan(response.data.data);
+        showToast("Treatment plan started successfully!", 'success');
+        refetchTreatmentPlans?.();
+      }
+    } catch (error: any) {
+      console.error("Error starting plan:", error);
+      showToast(error.response?.data?.message || "Failed to start plan", 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2️⃣ Complete Treatment Plan
+  const handleFinishPlan = async () => {
+    if(viewOnly)return;
+    if (!localPlan?._id) return;
+    
+    if (!confirm("Are you sure you want to complete this treatment plan?")) return;
+    
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const response = await axios.patch(
+        `${patientServiceBaseUrl}${API_BASE}/finish-treatment/${localPlan._id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        setLocalPlan(response.data.data);
+        showToast("Treatment plan completed successfully!", 'success');
+        refetchTreatmentPlans?.();
+      }
+    } catch (error: any) {
+      console.error("Error completing plan:", error);
+      showToast(error.response?.data?.message || "Failed to complete plan", 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3️⃣ Complete Stage
+const handleCompleteStage = async (stageNumber: number) => {
+    if(viewOnly)return
+  if (!localPlan?._id) return;
+  
+  setLoading(true);
+  try {
+    const token = getAuthToken();
+    const response = await axios.patch(
+      `${patientServiceBaseUrl}${API_BASE}/complete-stage/${localPlan._id}/${stageNumber}`, // Use stageNumber, not array index
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    if (response.data.success) {
+      // Update the local plan with the response data
+      setLocalPlan(response.data.treatmentPlan);
+      
+      // Get the completed stage number from the response
+      const completedStageNumber = response.data.stage?.stageNumber || stageNumber;
+      showToast(`Stage ${completedStageNumber} completed successfully!`, 'success');
+      refetchTreatmentPlans?.();
+      
+      // Force a refresh of the plan details
+      await fetchPlanDetails();
+    }
+  } catch (error: any) {
+    console.error("Error completing stage:", error);
+    showToast(error.response?.data?.message || "Failed to complete stage", 'error');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // 4️⃣ Add New Stage
+  const handleAddStage = async () => {
+    if(viewOnly)return
+    if (!localPlan?._id) return;
+    
+    const stageName = prompt("Enter stage name:");
+    if (!stageName) return;
+    
+    const description = prompt("Enter stage description (optional):") || "";
+    const scheduledDate = prompt("Enter scheduled date (YYYY-MM-DD, optional):") || new Date().toISOString().split('T')[0];
+    
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const response = await axios.patch(
+        `${patientServiceBaseUrl}${API_BASE}/add-stage/${localPlan._id}`,
+        {
+          stageName,
+          description,
+          scheduledDate,
+          toothSurfaceProcedures: [] // Can be populated from UI
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        setLocalPlan(response.data.data);
+        showToast("Stage added successfully!", 'success');
+        refetchTreatmentPlans?.();
+      }
+    } catch (error: any) {
+      console.error("Error adding stage:", error);
+      showToast(error.response?.data?.message || "Failed to add stage", 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 5️⃣ Remove Stage
+  const handleRemoveStage = async (stageNumber: number) => {
+    if(viewOnly)return
+
+    if (!localPlan?._id) return;
+    
+    if (!confirm(`Are you sure you want to remove Stage ${stageNumber}?`)) return;
+    
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const response = await axios.delete(
+        `${patientServiceBaseUrl}${API_BASE}/remove-stage/${localPlan._id}/${stageNumber}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        setLocalPlan(response.data.data);
+        showToast(`Stage ${stageNumber} removed successfully!`, 'success');
+        refetchTreatmentPlans?.();
+      }
+    } catch (error: any) {
+      console.error("Error removing stage:", error);
+      showToast(error.response?.data?.message || "Failed to remove stage", 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6️⃣ Remove Procedure
+const handleRemoveProcedure = async (toothNumber: number, procedureName: string, surface: string) => {
+  if (!localPlan?._id) return;
+    if(viewOnly) return; 
+  
+  if (!confirm(`Remove procedure "${procedureName}" from tooth ${toothNumber}?`)) return;
+  
+  setLoading(true);
+  try {
+    const token = getAuthToken();
+    const response = await axios.delete(
+      `${patientServiceBaseUrl}${API_BASE}/remove-procedure/${localPlan._id}/${toothNumber}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { 
+          procedureName, 
+          surface 
+        }
+      }
+    );
+    
+    if (response.data.success) {
+      // Update local plan with response data
+      setLocalPlan(response.data.treatmentPlan);
+      showToast("Procedure removed successfully!", 'success');
+      refetchTreatmentPlans?.();
+      await fetchPlanDetails(); // Refresh data
+    }
+  } catch (error: any) {
+    console.error("Error removing procedure:", error);
+    showToast(error.response?.data?.message || "Failed to remove procedure", 'error');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // 7️⃣ Remove/Cancel Treatment Plan
+  const handleRemovePlan = async () => {
+    if(viewOnly)return
+
+    if (!localPlan?._id) return;
+    
+    const action = localPlan.status === 'draft' ? 'remove' : 'cancel';
+    const message = action === 'remove' 
+      ? "Are you sure you want to remove this treatment plan?" 
+      : "Are you sure you want to cancel this treatment plan?";
+    
+    if (!confirm(message)) return;
+    
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      
+      let response;
+      if (action === 'remove') {
+        response = await axios.delete(
+          `${patientServiceBaseUrl}${API_BASE}/remove-plan/${localPlan._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        const cancellationReason = prompt("Please provide a cancellation reason:") || "No reason provided";
+        response = await axios.patch(
+          `${patientServiceBaseUrl}${API_BASE}/cancel-plan/${localPlan._id}`,
+          { cancellationReason },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+      
+      if (response.data.success) {
+        showToast(`Treatment plan ${action === 'remove' ? 'removed' : 'cancelled'} successfully!`, 'success');
+        refetchTreatmentPlans?.();
+        onClose();
+      }
+    } catch (error: any) {
+      console.error(`Error ${action}ing plan:`, error);
+      showToast(error.response?.data?.message || `Failed to ${action} plan`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 8️⃣ Update Procedure Status
+const handleUpdateProcedureStatus = async (
+  toothIndex: number,
+  procedureIndex: number,
+  completed: boolean
+) => {
+    if(viewOnly)return
+
+  if (!localPlan?._id) return;
+  
+  setLoading(true);
+  try {
+    // Get the procedure to find its stage
+    const procedure = localPlan.teeth[toothIndex]?.procedures[procedureIndex];
+    if (!procedure) {
+      showToast("Procedure not found", 'error');
+      return;
+    }
+    
+    // Find the stage index by stage number
+    const stageIndex = localPlan.stages?.findIndex(
+      stage => stage.stageNumber == procedure.stage
+    );
+    
+    if (stageIndex === -1) {
+      showToast("Stage not found for this procedure", 'error');
+      return;
+    }
+    
+    const token = getAuthToken();
+    const response = await axios.patch(
+      `${patientServiceBaseUrl}${API_BASE}/update-procedure-status/${localPlan._id}/${stageIndex}/${procedureIndex}`,
+      { completed },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    if (response.data.success) {
+      setLocalPlan(response.data.treatmentPlan);
+      showToast("Procedure status updated!", 'success');
+      refetchTreatmentPlans?.();
+      await fetchPlanDetails(); // Refresh data
+    }
+  } catch (error: any) {
+    console.error("Error updating procedure:", error);
+    showToast(error.response?.data?.message || "Failed to update procedure", 'error');
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => {
     if (plan) {
       console.log("🚀 Treatment Plan Details Modal Opened");
@@ -69,9 +400,7 @@ const TreatmentPlanDetailsModal = ({
 
   if (!localPlan) return null;
 
-  const API_BASE = "/api/v1/patient-service/consultation";
-
-  // Helper function to format dates
+  // Helper functions (keep existing ones)
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -81,7 +410,6 @@ const TreatmentPlanDetailsModal = ({
     });
   };
 
-  // Get procedures for a specific tooth in a stage
   const getProceduresForToothInStage = (toothNumber: number, stage: any) => {
     if (!stage.toothSurfaceProcedures) return [];
     
@@ -91,7 +419,6 @@ const TreatmentPlanDetailsModal = ({
     
     if (!toothData || !toothData.surfaceProcedures) return [];
     
-    // Flatten surface procedures into a list
     const procedures = [];
     for (const sp of toothData.surfaceProcedures) {
       for (const procName of sp.procedureNames) {
@@ -106,7 +433,6 @@ const TreatmentPlanDetailsModal = ({
     return procedures;
   };
 
-  // Get all teeth numbers from stages
   const getAllTeethFromStages = () => {
     const teethSet = new Set<number>();
     if (localPlan.stages) {
@@ -121,7 +447,6 @@ const TreatmentPlanDetailsModal = ({
     return Array.from(teethSet).sort((a, b) => a - b);
   };
 
-  // Calculate summary statistics
   const calculateStats = () => {
     const teeth = localPlan.teeth || localPlan.treatments || [];
     const stages = localPlan.stages || [];
@@ -154,7 +479,6 @@ const TreatmentPlanDetailsModal = ({
 
   const stats = calculateStats();
 
-  // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'completed': return 'bg-green-100 text-green-700';
@@ -166,10 +490,20 @@ const TreatmentPlanDetailsModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      {/* Toast Notification - hide if viewOnly */}
+      {!viewOnly && toast.show && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg ${
+          toast.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+      
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 z-10"
+          disabled={!viewOnly && loading}
         >
           <X size={20} />
         </button>
@@ -185,14 +519,22 @@ const TreatmentPlanDetailsModal = ({
                 {localPlan.description || "No description provided"}
               </p>
             </div>
-            <Badge className={`
-              ${localPlan.status === "completed" ? "bg-green-100 text-green-700" :
-                localPlan.status === "ongoing" ? "bg-blue-100 text-blue-700" :
-                "bg-yellow-100 text-yellow-700"
-              } font-medium
-            `}>
-              {localPlan.status?.toUpperCase() || "DRAFT"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={`
+                ${localPlan.status === "completed" ? "bg-green-100 text-green-700" :
+                  localPlan.status === "ongoing" ? "bg-blue-100 text-blue-700" :
+                  localPlan.status === "cancelled" ? "bg-red-100 text-red-700" :
+                  "bg-yellow-100 text-yellow-700"
+                } font-medium
+              `}>
+                {localPlan.status?.toUpperCase() || "DRAFT"}
+              </Badge>
+              {viewOnly && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                  👁️ Preview Only
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Plan Information */}
@@ -245,7 +587,7 @@ const TreatmentPlanDetailsModal = ({
 
         {/* Content based on active tab */}
         {activeTab === 'teeth' ? (
-          /* TEETH VIEW */
+          /* TEETH VIEW - Read Only */
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
@@ -254,19 +596,19 @@ const TreatmentPlanDetailsModal = ({
                   {stats.totalProcedures} procedures across {stats.totalTeeth} teeth
                 </p>
               </div>
-              {!localPlan.conflictChecked && (
+              {/* {!localPlan.conflictChecked && !viewOnly && (
                 <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
                   ⚠️ Needs Conflict Check
                 </Badge>
-              )}
+              )} */}
             </div>
 
             {/* Teeth List */}
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
               {(localPlan.teeth || localPlan.treatments || []).length > 0 ? (
-                (localPlan.teeth || localPlan.treatments || []).map((tooth, index) => (
+                (localPlan.teeth || localPlan.treatments || []).map((tooth, toothIndex) => (
                   <div
-                    key={tooth._id || `tooth-${index}`}
+                    key={tooth._id || `tooth-${toothIndex}`}
                     className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow"
                   >
                     <div className="flex justify-between items-start mb-3">
@@ -294,9 +636,9 @@ const TreatmentPlanDetailsModal = ({
                       <h5 className="text-sm font-medium text-gray-700 mb-2">Procedures:</h5>
                       <div className="space-y-2">
                         {tooth.procedures && tooth.procedures.length > 0 ? (
-                          tooth.procedures.map((procedure, procIndex) => (
+                          tooth.procedures.map((procedure, procedureIndex) => (
                             <div
-                              key={procedure.procedureId || `proc-${procIndex}`}
+                              key={procedure.procedureId || `proc-${procedureIndex}`}
                               className="p-3 border border-gray-200 rounded-lg bg-gray-50/50"
                             >
                               <div className="flex justify-between items-start">
@@ -325,6 +667,28 @@ const TreatmentPlanDetailsModal = ({
                                     )}
                                   </div>
                                 </div>
+                                {/* Only show action buttons if NOT viewOnly */}
+{!viewOnly && (
+  <div className="flex gap-2">
+    <Button
+      size="sm"
+      variant="ghost"
+      onClick={() => handleUpdateProcedureStatus(toothIndex, procedureIndex, true)}
+      disabled={procedure.status === 'completed' || loading}
+    >
+      ✓ Complete
+    </Button>
+    <Button
+      size="sm"
+      variant="ghost"
+      className="text-red-500 hover:text-red-600"
+      onClick={() => handleRemoveProcedure(tooth.toothNumber, procedure.name, procedure.surface)}
+      disabled={loading}
+    >
+      <Trash2 size={14} />
+    </Button>
+  </div>
+)}
                               </div>
                             </div>
                           ))
@@ -345,7 +709,7 @@ const TreatmentPlanDetailsModal = ({
             </div>
           </div>
         ) : (
-          /* STAGES VIEW */
+          /* STAGES VIEW - Read Only */
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
@@ -354,6 +718,18 @@ const TreatmentPlanDetailsModal = ({
                   {stats.completedStages} of {stats.stagesCount} stages completed
                 </p>
               </div>
+              {/* Only show Add Stage button if NOT viewOnly */}
+              {!viewOnly && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddStage}
+                  disabled={localPlan.status === 'completed' || localPlan.status === 'cancelled' || loading}
+                >
+                  <Plus size={14} className="mr-1" />
+                  Add Stage
+                </Button>
+              )}
             </div>
 
             {/* Stages List */}
@@ -361,7 +737,7 @@ const TreatmentPlanDetailsModal = ({
               {localPlan.stages && localPlan.stages.length > 0 ? (
                 localPlan.stages.map((stage, index) => (
                   <div
-                    key={stage._id || `stage-${index}`}
+                    key={stage._id || `stage-${stage.stageNumber}`}
                     className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow"
                   >
                     {/* Stage Header */}
@@ -369,11 +745,11 @@ const TreatmentPlanDetailsModal = ({
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100">
                           <span className="font-bold text-blue-700 text-lg">
-                            {stage.stageNumber || index + 1}
+                            {stage.stageNumber}
                           </span>
                         </div>
                         <div>
-                          <h4 className="font-semibold">{stage.stageName || `Stage ${stage.stageNumber || index + 1}`}</h4>
+                          <h4 className="font-semibold">{stage.stageName || `Stage ${stage.stageNumber}`}</h4>
                           <div className="flex gap-2 mt-1">
                             <Badge className={`text-xs ${getStatusColor(stage.status)}`}>
                               {stage.status?.toUpperCase() || "PENDING"}
@@ -384,6 +760,18 @@ const TreatmentPlanDetailsModal = ({
                           </div>
                         </div>
                       </div>
+                      {/* Only show delete button if NOT viewOnly */}
+                      {!viewOnly && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-600"
+                          onClick={() => handleRemoveStage(stage.stageNumber)}
+                          disabled={stage.status === 'completed' || loading}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </div>
 
                     {/* Stage Description */}
@@ -440,25 +828,27 @@ const TreatmentPlanDetailsModal = ({
                       </div>
                     </div>
 
-                    {/* Stage Actions */}
-                    <div className="mt-4 pt-3 border-t">
-                      <div className="flex justify-between items-center">
-                        <div className="text-xs text-gray-500">
-                          {stage.toothSurfaceProcedures?.reduce((total, tsp) => 
-                            total + (tsp.surfaceProcedures?.reduce((spTotal, sp) => 
-                              spTotal + (sp.procedureNames?.length || 0), 0) || 0), 0
-                          ) || 0} procedures in this stage
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs"
-                          disabled={stage.status === "completed"}
-                        >
-                          {stage.status === "completed" ? "✓ Stage Completed" : "Mark as Completed"}
-                        </Button>
-                      </div>
-                    </div>
+{!viewOnly && (
+  <div className="mt-4 pt-3 border-t">
+    <div className="flex justify-between items-center">
+      <div className="text-xs text-gray-500">
+        {stage.toothSurfaceProcedures?.reduce((total, tsp) => 
+          total + (tsp.surfaceProcedures?.reduce((spTotal, sp) => 
+            spTotal + (sp.procedureNames?.length || 0), 0) || 0), 0
+        ) || 0} procedures in this stage
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="text-xs"
+        disabled={stage.status === "completed" || loading}
+        onClick={() => handleCompleteStage(stage.stageNumber)} 
+      >
+        {stage.status === "completed" ? "✓ Stage Completed" : "Mark as Completed"}
+      </Button>
+    </div>
+  </div>
+)}
                   </div>
                 ))
               ) : (
@@ -505,41 +895,75 @@ const TreatmentPlanDetailsModal = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-between items-center pt-4 border-t">
-          <div className="text-sm text-gray-500">
-            {localPlan.conflictChecked && (
-              <span className="text-green-600">✓ Conflict check completed</span>
-            )}
+        {/* Action Buttons - Hide if viewOnly */}
+        {!viewOnly && (
+          <div className="flex justify-between items-center pt-4 border-t">
+            <div className="text-sm text-gray-500 flex gap-4">
+              {localPlan.conflictChecked && (
+                <span className="text-green-600">✓ Conflict check completed</span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-600"
+                onClick={handleRemovePlan}
+                disabled={loading}
+              >
+                {localPlan.status === 'draft' ? 'Delete Plan' : 'Cancel Plan'}
+              </Button>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="text-sm"
+                disabled={loading}
+              >
+                Close
+              </Button>
+              <Button
+                className="text-sm bg-primary hover:bg-primary/90"
+                disabled={loading || localPlan.status === "completed" || localPlan.status === "cancelled"}
+                onClick={() => {
+                  if (localPlan.status === "draft") {
+                    handleStartPlan();
+                  } else if (localPlan.status === "ongoing") {
+                    handleFinishPlan();
+                  }
+                }}
+              >
+                {loading ? (
+                  "Processing..."
+                ) : localPlan.status === "draft" ? (
+                  <>
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                    Start Plan
+                  </>
+                ) : localPlan.status === "ongoing" ? (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Complete Plan
+                  </>
+                ) : (
+                  "Plan Completed"
+                )}
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-3">
+        )}
+
+        {/* If viewOnly, show only Close button */}
+        {viewOnly && (
+          <div className="flex justify-end items-center pt-4 border-t">
             <Button
               variant="outline"
               onClick={onClose}
               className="text-sm"
             >
-              Close
-            </Button>
-            <Button
-              className="text-sm bg-primary hover:bg-primary/90"
-              disabled={loading || localPlan.status === "completed"}
-            >
-              {localPlan.status === "draft" ? (
-                <>
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Start Plan
-                </>
-              ) : localPlan.status === "ongoing" ? (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Complete Plan
-                </>
-              ) : (
-                "Plan Completed"
-              )}
+              Close Preview
             </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -630,7 +1054,7 @@ interface TreatmentPlan {
   _id: string;
   planName: string;
   description?: string;
-  status: "draft" | "pending" | "in-progress" | "completed" | "ongoing";
+  status: "draft" | "pending" | "in-progress" | "completed" | "ongoing"|"cancelled";
   conflictChecked: boolean;
   currentStage?: number;
   totalEstimatedCost: number;
@@ -2025,12 +2449,13 @@ useEffect(() => {
   )}
 </div>
               {/* ✅ Modal for Treatment Plan Details */}
-              {selectedTreatmentPlan && (
+              ithu
+              {/* {selectedTreatmentPlan && (
                 <TreatmentPlanDetailsModal
                   plan={selectedTreatmentPlan}
                   onClose={() => setSelectedTreatmentPlan(null)}
                 />
-              )}
+              )} */}
 
               <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
                 <h4 className="font-semibold mb-3 text-primary">Patient History</h4>
@@ -2346,18 +2771,153 @@ useEffect(() => {
                     )}
                   </div>
 
-                  {/* Treatment Plan Section */}
+             
 
-
+{/* Treatment Plan Section */}
 {dentalData.treatmentPlan && dentalData.treatmentPlan.teeth && dentalData.treatmentPlan.teeth.length > 0 && (
   <div className="border-t border-gray-200 pt-6 mt-4">
     <div className="flex justify-between items-center mb-3">
       <h3 className="text-lg font-semibold text-gray-800">Treatment Plan</h3>
-      <Badge variant="outline" className="bg-blue-50 text-blue-700">
-        {dentalData.treatmentPlan.stages?.length || 1} Stage(s)
-      </Badge>
-    </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="bg-blue-50 text-blue-700">
+          {dentalData.treatmentPlan.stages?.length || 1} Stage(s)
+        </Badge>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            // Convert the dentalData treatment plan format to TreatmentPlan format
+            const treatmentPlanData: TreatmentPlan = {
+              _id: `temp-${Date.now()}`,
+              planName: dentalData.treatmentPlan.planName,
+              description: dentalData.treatmentPlan.description || '',
+              status: "draft",
+              conflictChecked: false,
+              totalEstimatedCost: dentalData.treatmentPlan.teeth.reduce(
+                (sum: number, t: any) => 
+                  sum + t.procedures.reduce(
+                    (pSum: number, p: any) => pSum + (p.estimatedCost || 0), 0
+                  ), 0
+              ),
+              completedCost: 0,
+              patient: appointmentDetail.patientId,
+              clinic: {
+                _id: appointmentDetail.clinicId,
+                name: selectedClinic?.clinicName || '',
+                phone: selectedClinic?.clinicPhone || 0,
+                address: ''
+              },
+              createdByDoctor: {
+                _id: appointmentDetail.doctorId,
+                name: 'Current Doctor',
+                specialization: '',
+                phoneNumber: 0
+              },
+              teeth: dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
+                toothNumber: toothPlan.toothNumber,
+                priority: toothPlan.priority || 'medium',
+                isCompleted: false,
+                procedures: toothPlan.procedures.map((proc: any) => ({
+                  procedureId: generateProcedureId(),
+                  name: proc.name,
+                  surface: proc.surface || 'occlusal',
+                  status: proc.status || 'planned',
+                  estimatedCost: proc.estimatedCost || 0,
+                  notes: proc.notes || '',
+                  stage: proc.stage || 1
+                }))
+              })),
+              treatments: [],
+              stages: [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              __v: 0
+            };
 
+            // Build stages with toothSurfaceProcedures
+            const proceduresByStage: Record<number, any[]> = {};
+            
+            dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+              toothPlan.procedures.forEach((proc: any) => {
+                const stageNum = proc.stage || 1;
+                if (!proceduresByStage[stageNum]) {
+                  proceduresByStage[stageNum] = [];
+                }
+                
+                proceduresByStage[stageNum].push({
+                  toothNumber: toothPlan.toothNumber,
+                  name: proc.name,
+                  surface: proc.surface || 'occlusal',
+                  estimatedCost: proc.estimatedCost || 0,
+                  notes: proc.notes || '',
+                  status: 'planned'
+                });
+              });
+            });
+            
+            // Create stages from proceduresByStage
+            const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
+              const stageNumber = parseInt(stageNumStr);
+              
+              // Group procedures by tooth and surface
+              const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+              
+              procs.forEach(proc => {
+                if (!toothSurfaceMap[proc.toothNumber]) {
+                  toothSurfaceMap[proc.toothNumber] = {};
+                }
+                
+                if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+                  toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+                }
+                
+                if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
+                  toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
+                }
+              });
+              
+              // Convert to toothSurfaceProcedures format
+              const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+                const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+                  surface: surface,
+                  procedureNames: procedureNames
+                }));
+                
+                return {
+                  toothNumber: parseInt(toothNumStr),
+                  surfaceProcedures: surfaceProcedures
+                };
+              });
+              
+              // Find stage from dentalData.treatmentPlan.stages if available
+              const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
+                (s.stageNumber || s.stage) === stageNumber
+              );
+              
+              return {
+                _id: `stage-temp-${stageNumber}`,
+                stageNumber: stageNumber,
+                stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+                description: stageInput?.description || '',
+                status: 'pending',
+                scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
+                toothSurfaceProcedures: toothSurfaceProcedures,
+                notes: stageInput?.notes || ''
+              };
+            });
+            
+            // Update the stages in treatmentPlanData
+            treatmentPlanData.stages = stagesData;
+            
+            setSelectedTreatmentPlan(treatmentPlanData);
+          }}
+        >
+          View Full Details
+        </Button>
+      </div>
+    </div>
+    
+    {/* Show a preview of the treatment plan */}
     <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
       <div className="mb-4">
         <div className="font-medium text-gray-700 text-lg">{dentalData.treatmentPlan.planName}</div>
@@ -2365,135 +2925,71 @@ useEffect(() => {
           <p className="text-sm text-gray-600 mt-1">{dentalData.treatmentPlan.description}</p>
         )}
       </div>
-
-      {/* Stages Overview */}
+      
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="bg-white p-3 rounded-lg border">
+          <div className="font-medium text-gray-500">Teeth</div>
+          <div className="text-lg font-semibold">{dentalData.treatmentPlan.teeth.length}</div>
+        </div>
+        <div className="bg-white p-3 rounded-lg border">
+          <div className="font-medium text-gray-500">Procedures</div>
+          <div className="text-lg font-semibold">
+            {dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => sum + t.procedures.length, 0)}
+          </div>
+        </div>
+        <div className="bg-white p-3 rounded-lg border">
+          <div className="font-medium text-gray-500">Stages</div>
+          <div className="text-lg font-semibold">
+            {dentalData.treatmentPlan.stages?.length || 
+              new Set(dentalData.treatmentPlan.teeth.flatMap((t: any) => 
+                t.procedures.map((p: any) => p.stage || 1)
+              )).size}
+          </div>
+        </div>
+      </div>
+      
+      {/* Show stages preview */}
       {dentalData.treatmentPlan.stages && dentalData.treatmentPlan.stages.length > 0 && (
-        <div className="mb-4">
-          <h4 className="font-medium text-gray-700 mb-2">Stages</h4>
+        <div className="mt-4">
+          <h4 className="font-medium text-gray-700 mb-2">Stages Preview</h4>
           <div className="space-y-2">
             {dentalData.treatmentPlan.stages.map((stage: any, index: number) => (
-              <div key={index} className="bg-white p-3 rounded-lg border">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="font-medium">{stage.stageName}</span>
-                    {stage.description && (
-                      <p className="text-sm text-gray-600 mt-1">{stage.description}</p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
-                    {stage.status || 'Pending'}
-                  </Badge>
+              <div key={index} className="bg-white p-3 rounded-lg border flex justify-between items-center">
+                <div>
+                  <span className="font-medium">{stage.stageName}</span>
+                  {stage.description && (
+                    <p className="text-sm text-gray-600 mt-1">{stage.description}</p>
+                  )}
                 </div>
+                <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
+                  {stage.status || 'Pending'}
+                </Badge>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* Teeth and Procedures */}
-      <div className="space-y-3">
-        <h4 className="font-medium text-gray-700">Planned Procedures by Tooth</h4>
-        {dentalData.treatmentPlan.teeth.map((toothPlan: any, idx: number) => {
-          // Group procedures by stage
-          const proceduresByStage: Record<number, any[]> = {};
-          
-          toothPlan.procedures.forEach((proc: any) => {
-            const stage = proc.stage || 1;
-            if (!proceduresByStage[stage]) {
-              proceduresByStage[stage] = [];
-            }
-            proceduresByStage[stage].push(proc);
-          });
-          
-          return (
-            <div key={idx} className="border border-gray-300 bg-white rounded-lg p-3">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-gray-100">
-                    Tooth #{toothPlan.toothNumber}
-                  </Badge>
-                  {toothPlan.priority && toothPlan.priority !== 'medium' && (
-                    <Badge 
-                      className={`text-xs ${
-                        toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                        toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {toothPlan.priority}
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-sm text-gray-500">
-                  {toothPlan.procedures.length} procedure(s)
-                </span>
-              </div>
-
-              {/* Show procedures grouped by stage */}
-              {Object.entries(proceduresByStage).map(([stageNum, procs]: [string, any[]]) => (
-                <div key={stageNum} className="mb-3 last:mb-0">
-                  <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                    <span>Stage {stageNum}:</span>
-                    <Badge variant="outline" className="text-[10px]">
-                      {procs.length} procedure(s)
-                    </Badge>
-                  </div>
-                  <div className="space-y-2 ml-2">
-                    {procs.map((proc: any, procIdx: number) => (
-                      <div key={procIdx} className="text-sm bg-blue-50 p-2 rounded-lg border-l-2 border-blue-300">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{proc.name}</div>
-                            <div className="text-sm text-gray-600 mt-1">
-                              Surface: <span className="font-medium capitalize">{proc.surface}</span>
-                            </div>
-                            {proc.notes && (
-                              <div className="text-sm text-gray-600 mt-1 italic">
-                                Note: {proc.notes}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right ml-4">
-                            <div className="font-semibold text-gray-900">
-                              ₹{proc.estimatedCost || 0}
-                            </div>
-                            <Badge variant="outline" className="mt-1 bg-yellow-50 text-yellow-700 text-xs">
-                              {proc.status || 'Planned'}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Overall summary */}
-      <div className="mt-4 pt-4 border-t-2 border-gray-300 bg-white p-4 rounded-lg">
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="font-semibold text-gray-900">Treatment Plan Summary</div>
-            <div className="text-sm text-gray-600 mt-1">
-              {dentalData.treatmentPlan.teeth.length} teeth • {' '}
-              {dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => sum + t.procedures.length, 0)} total procedures
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-600">Estimated Total</div>
-            <div className="text-xl font-bold text-primary">
-              ₹{dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => 
-                sum + t.procedures.reduce((pSum: number, p: any) => pSum + (p.estimatedCost || 0), 0), 0
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
+)}
+
+{/* Treatment Plan Details Modal */}
+{/* {selectedTreatmentPlan && (
+  <TreatmentPlanDetailsModal
+    plan={selectedTreatmentPlan}
+    onClose={() => setSelectedTreatmentPlan(null)}
+    refetchTreatmentPlans={fetchPatientTreatmentPlans}
+  />
+)} */}
+
+{/* Treatment Plan Details Modal */}
+{selectedTreatmentPlan && (
+  <TreatmentPlanDetailsModal
+    plan={selectedTreatmentPlan}
+    onClose={() => setSelectedTreatmentPlan(null)}
+    refetchTreatmentPlans={fetchPatientTreatmentPlans}
+    viewOnly={selectedTreatmentPlan._id.startsWith('temp-')}
+  />
 )}
 
                   {/* Referral Section */}
