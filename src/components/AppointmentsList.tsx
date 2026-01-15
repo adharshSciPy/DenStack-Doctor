@@ -148,7 +148,8 @@ const showToast = (message: string, type: 'success' | 'error') => {
     }
   };
 
-  // 3️⃣ Complete Stage
+  // 3️⃣ Complete Stage(passing array index as stageNumber from the button)
+
 const handleCompleteStage = async (stageNumber: number) => {
     if(viewOnly)return
   if (!localPlan?._id) return;
@@ -156,8 +157,18 @@ const handleCompleteStage = async (stageNumber: number) => {
   setLoading(true);
   try {
     const token = getAuthToken();
+    
+    // Find the array index for this stageNumber
+    const stageIndex = localPlan.stages?.findIndex(s => s.stageNumber === stageNumber);
+    
+    if (stageIndex === -1 || stageIndex === undefined) {
+      showToast("Stage not found", 'error');
+      setLoading(false);
+      return;
+    }
+    
     const response = await axios.patch(
-      `${patientServiceBaseUrl}${API_BASE}/complete-stage/${localPlan._id}/${stageNumber}`, // Use stageNumber, not array index
+      `${patientServiceBaseUrl}${API_BASE}/complete-stage/${localPlan._id}/${stageIndex}`, // Use array index
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -181,7 +192,6 @@ const handleCompleteStage = async (stageNumber: number) => {
     setLoading(false);
   }
 };
-
   // 4️⃣ Add New Stage
   const handleAddStage = async () => {
     if(viewOnly)return
@@ -447,37 +457,40 @@ const handleUpdateProcedureStatus = async (
     }
     return Array.from(teethSet).sort((a, b) => a - b);
   };
+const calculateStats = () => {
+  const teeth = localPlan.teeth || localPlan.treatments || [];
+  const stages = localPlan.stages || [];
+  
+  const totalTeeth = teeth.length;
+  const totalProcedures = teeth.reduce((sum, tooth) => 
+    sum + (tooth.procedures?.length || 0), 0
+  );
+  const completedProcedures = teeth.reduce((sum, tooth) => 
+    sum + (tooth.procedures?.filter(p => p.status === "completed").length || 0), 0
+  );
+  const totalCost = teeth.reduce((sum, tooth) => 
+    sum + (tooth.procedures?.reduce((procSum, proc) => 
+      procSum + (proc.estimatedCost || 0), 0) || 0), 0
+  );
+  const completedStages = stages.filter(s => s.status === "completed").length;
+  
+  // ✅ CRITICAL FIX: Progress should be based on STAGES, not procedures
+  // If you have 2 stages and 1 is completed, progress is 50%
+  // If you have 3 stages and 2 are completed, progress is 66.7%
+  const progressPercentage = stages.length > 0 
+    ? Math.round((completedStages / stages.length) * 100) 
+    : 0;
 
-  const calculateStats = () => {
-    const teeth = localPlan.teeth || localPlan.treatments || [];
-    const stages = localPlan.stages || [];
-    
-    const totalTeeth = teeth.length;
-    const totalProcedures = teeth.reduce((sum, tooth) => 
-      sum + (tooth.procedures?.length || 0), 0
-    );
-    const completedProcedures = teeth.reduce((sum, tooth) => 
-      sum + (tooth.procedures?.filter(p => p.status === "completed").length || 0), 0
-    );
-    const totalCost = teeth.reduce((sum, tooth) => 
-      sum + (tooth.procedures?.reduce((procSum, proc) => 
-        procSum + (proc.estimatedCost || 0), 0) || 0), 0
-    );
-    const completedStages = stages.filter(s => s.status === "completed").length;
-
-    return {
-      totalTeeth,
-      totalProcedures,
-      completedProcedures,
-      totalCost,
-      stagesCount: stages.length,
-      completedStages,
-      progressPercentage: totalProcedures > 0 
-        ? Math.round((completedProcedures / totalProcedures) * 100) 
-        : 0
-    };
+  return {
+    totalTeeth,
+    totalProcedures,
+    completedProcedures,
+    totalCost,
+    stagesCount: stages.length,
+    completedStages,
+    progressPercentage // ← Now based on stage completion
   };
-
+};
   const stats = calculateStats();
 
   const getStatusColor = (status: string) => {
@@ -686,7 +699,7 @@ const handleUpdateProcedureStatus = async (
                                 </div>
                                 {/* Only show action buttons if NOT viewOnly */}
 
-{!viewOnly && (
+{/* {!viewOnly && (
   <div className="flex gap-2">
     <Button
       size="sm"
@@ -706,7 +719,7 @@ const handleUpdateProcedureStatus = async (
       <Trash2 size={14} />
     </Button>
   </div>
-)}
+)} */}
                               </div>
                             </div>
                           ))
@@ -900,16 +913,24 @@ const handleUpdateProcedureStatus = async (
                 <div className="text-xs text-gray-600">Overall Progress</div>
               </div>
             </div>
-            {stats.totalProcedures > 0 && (
-              <div className="mt-3">
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${stats.progressPercentage}%` }}
-                  />
-                </div>
-              </div>
-            )}
+       {stats.totalProcedures > 0 && (
+  <div className="mt-3">
+    <div className="flex justify-between text-xs text-gray-600 mb-1">
+      <span>Stage Progress</span>
+      <span>{stats.completedStages}/{stats.stagesCount} stages completed</span>
+    </div>
+    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div 
+        className="h-full bg-primary transition-all duration-300"
+        style={{ width: `${stats.progressPercentage}%` }}
+      />
+    </div>
+    {/* Optional: Show procedure completion separately */}
+    <div className="text-xs text-gray-500 mt-1">
+      ({stats.completedProcedures}/{stats.totalProcedures} procedures completed)
+    </div>
+  </div>
+)}
           </div>
         </div>
 
@@ -1889,53 +1910,85 @@ const handleSaveConsultation = async () => {
         console.log(`Should start today: ${shouldStartToday}`);
         
         // Build stages with toothSurfaceProcedures
-        const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
-          const stageNumber = parseInt(stageNumStr);
-          
-          // Group procedures by tooth and surface
-          const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
-          
-          procs.forEach(proc => {
-            if (!toothSurfaceMap[proc.toothNumber]) {
-              toothSurfaceMap[proc.toothNumber] = {};
-            }
-            
-            if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
-              toothSurfaceMap[proc.toothNumber][proc.surface] = [];
-            }
-            
-            if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
-              toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
-            }
-          });
-          
-          // Convert to toothSurfaceProcedures format
-          const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
-            const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
-              surface: surface,
-              procedureNames: procedureNames
-            }));
-            
-            return {
-              toothNumber: parseInt(toothNumStr),
-              surfaceProcedures: surfaceProcedures
-            };
-          });
-          
-          const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
-            (s.stageNumber || s.stage) === stageNumber
-          );
-          
-          return {
-            stageNumber: stageNumber,
-            stageName: stageInput?.stageName || `Stage ${stageNumber}`,
-            description: stageInput?.description || '',
-            status: shouldStartToday && stageNumber === 1 ? 'in-progress' : 'pending',
-            scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
-            toothSurfaceProcedures: toothSurfaceProcedures,
-            notes: stageInput?.notes || ''
-          };
-        });
+        // Build stages with toothSurfaceProcedures
+const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
+  const stageNumber = parseInt(stageNumStr);
+  
+  // Group procedures by tooth and surface
+  const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+  
+  procs.forEach(proc => {
+    if (!toothSurfaceMap[proc.toothNumber]) {
+      toothSurfaceMap[proc.toothNumber] = {};
+    }
+    
+    if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+      toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+    }
+    
+    if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
+      toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
+    }
+  });
+  
+  // Convert to toothSurfaceProcedures format
+  const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+    const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+      surface: surface,
+      procedureNames: procedureNames
+    }));
+    
+    return {
+      toothNumber: parseInt(toothNumStr),
+      surfaceProcedures: surfaceProcedures
+    };
+  });
+  
+
+const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
+  (s.stageNumber || s.stage) === stageNumber
+);
+
+// Use the status from the form if available, otherwise calculate it
+let stageStatus;
+if (stageInput?.status) {
+  // Use the user-selected status from the form
+  stageStatus = stageInput.status;
+  console.log(`📝 Stage ${stageNumber}: Using user-selected status: ${stageStatus}`);
+} else {
+  // Fallback: Calculate based on procedures
+  const proceduresInStage = procs;
+  const totalProcedures = proceduresInStage.length;
+  const completedProcedures = proceduresInStage.filter(p => p.status === 'completed').length;
+  
+  console.log(`📊 Stage ${stageNumber}: ${completedProcedures}/${totalProcedures} procedures completed`);
+  
+  if (totalProcedures === 0) {
+    stageStatus = 'pending';
+  } else if (completedProcedures === totalProcedures) {
+    stageStatus = 'completed';
+  } else if (completedProcedures > 0) {
+    stageStatus = 'in-progress';
+  } else {
+    stageStatus = 'pending';
+  }
+}
+  
+  console.log(`Stage ${stageNumber} status being sent:`, stageStatus);
+  
+  return {
+    stageNumber: stageNumber,
+    stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+    description: stageInput?.description || '',
+    status: stageStatus, // ← Calculated dynamically
+    scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
+    toothSurfaceProcedures: toothSurfaceProcedures,
+    notes: stageInput?.notes || '',
+    // Add timestamps based on status
+    ...(stageStatus === 'in-progress' && { startedAt: new Date().toISOString() }),
+    ...(stageStatus === 'completed' && { completedAt: new Date().toISOString() })
+  };
+});
         
         // Build teeth data
         const teethData = dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
@@ -2730,13 +2783,17 @@ useEffect(() => {
   )}
 </div>
               {/* ✅ Modal for Treatment Plan Details */}
-              ithu
-              {/* {selectedTreatmentPlan && (
-                <TreatmentPlanDetailsModal
-                  plan={selectedTreatmentPlan}
-                  onClose={() => setSelectedTreatmentPlan(null)}
-                />
-              )} */}
+            {/* ✅ Modal for Treatment Plan Details */}
+{selectedTreatmentPlan && (
+  <TreatmentPlanDetailsModal
+    plan={selectedTreatmentPlan}
+    onClose={() => setSelectedTreatmentPlan(null)}
+    refetchTreatmentPlans={fetchPatientTreatmentPlans}
+    viewOnly={selectedTreatmentPlan._id.startsWith('temp-')}
+    onEditPlan={handleEditTreatmentPlan}
+    key={selectedTreatmentPlan._id} // Add key prop here
+  />
+)}
 
               <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
                 <h4 className="font-semibold mb-3 text-primary">Patient History</h4>

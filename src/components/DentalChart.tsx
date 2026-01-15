@@ -24,11 +24,10 @@ interface ToothCondition {
   procedures: {
     name: string;
     surface: string;
-    status: "planned" | "in-progress" | "completed"; // Add this specific type
     cost?: number;
     notes?: string;
     date?: string;
-  }[];
+  }[]; 
 }
 interface TreatmentPlanStage {
   stageName: string;
@@ -59,17 +58,16 @@ interface TreatmentPlanData {
     procedures: {
       name: string;
       surface: string;
-      stage?: number; // Make stage optional with ?
+      stage?: number;
       estimatedCost: number;
       notes?: string;
-      status: 'planned' | 'in-progress' | 'completed';
+    
     }[];
     priority?: 'urgent' | 'high' | 'medium' | 'low';
   }[];
   stages: TreatmentPlanStage[];
-  startToday?: boolean; // Add this for backend
+  startToday?: boolean;
 }
-
 interface DentalChartProps {
   patientId: string;
   visitId?: string;
@@ -468,7 +466,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
   const [procedures, setProcedures] = useState<{
     name: string;
     surface: string;
-    status: "planned" | "in-progress" | "completed";
+    // status: "planned" | "in-progress" | "completed";
     cost?: number;
     notes?: string;
     date?: string;
@@ -525,34 +523,33 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
   };
 
   // NEW: Add procedure
-  const handleAddProcedure = () => {
-    const procedureName = prompt("Enter procedure name:");
-    if (!procedureName) return;
-    
-    const surface = prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") || "occlusal";
-    const cost = Number(prompt("Enter estimated cost:") || 0);
-    const notes = prompt("Enter notes (optional):") || "";
-    
-    const newProcedure = {
-      name: procedureName,
-      surface,
-      status: "planned" as const,
-      cost,
-      notes
-    };
-    
-    setProcedures([...procedures, newProcedure]);
+const handleAddProcedure = () => {
+  const procedureName = prompt("Enter procedure name:");
+  if (!procedureName) return;
+  
+  const surface = prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") || "occlusal";
+  const cost = Number(prompt("Enter estimated cost:") || 0);
+  const notes = prompt("Enter notes (optional):") || "";
+  
+  const newProcedure = {
+    name: procedureName,
+    surface,
+    cost,
+    notes
   };
+  
+  setProcedures([...procedures, newProcedure]);
+};
 
   // NEW: Update procedure status
-  const handleProcedureStatusToggle = (index: number, newStatus: "planned" | "in-progress" | "completed") => {
-    const updated = [...procedures];
-    updated[index].status = newStatus;
-    if (newStatus === "completed") {
-      updated[index].date = new Date().toISOString();
-    }
-    setProcedures(updated);
-  };
+  // const handleProcedureStatusToggle = (index: number, newStatus: "planned" | "in-progress" | "completed") => {
+  //   const updated = [...procedures];
+  //   updated[index].status = newStatus;
+  //   if (newStatus === "completed") {
+  //     updated[index].date = new Date().toISOString();
+  //   }
+  //   setProcedures(updated);
+  // };
 
   // NEW: Remove procedure
   const handleRemoveProcedure = (index: number) => {
@@ -899,7 +896,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
 
               {/* Procedures Section */}
               <div>
-                <div className="flex justify-between items-center mb-2">
+                {/* <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium">Procedures</h4>
                   {mode === "edit" && (
                     <Button
@@ -912,7 +909,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
                     </Button>
                   )}
                 </div>
-                
+                 */}
                 {procedures.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic">No procedures added</p>
                 ) : (
@@ -926,13 +923,13 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
                               <Badge variant="outline" className="text-xs">
                                 {proc.surface}
                               </Badge>
-                              <Badge className={`text-xs ${
+                              {/* <Badge className={`text-xs ${
                                 proc.status === 'completed' ? 'bg-green-100 text-green-700' :
                                 proc.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
                                 'bg-gray-100 text-gray-700'
                               }`}>
                                 {proc.status}
-                              </Badge>
+                              </Badge> */}
                             </div>
                             {proc.notes && (
                               <p className="text-sm text-gray-600 mt-1">{proc.notes}</p>
@@ -942,7 +939,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
                             )}
                           </div>
                           
-                          {mode === "edit" && (
+                          {/* {mode === "edit" && (
                             <div className="flex gap-1">
                               <button
                                 type="button"
@@ -977,7 +974,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
                                 <X className="h-3 w-3" />
                               </button>
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     ))}
@@ -1042,12 +1039,12 @@ export default function DentalChart({
 const formatDentalDataForAPI = () => {
   console.log("🦷 Formatting dental data for API...");
   
-  // Format performed teeth (completed procedures)
+  // Format performed teeth (NO status filter)
   const performedTeeth = toothConditions
     .filter(tc => 
       tc.conditions.length > 0 || 
       tc.surfaceConditions?.length > 0 || 
-      tc.procedures?.some(p => p.status === "completed")
+      tc.procedures?.length > 0  // No status filter
     )
     .map(tc => ({
       toothNumber: tc.toothNumber,
@@ -1056,12 +1053,10 @@ const formatDentalDataForAPI = () => {
         surface: sc.surface,
         conditions: sc.conditions || []
       })),
-      procedures: (tc.procedures || [])
-        .filter(p => p.status === "completed")
+      procedures: (tc.procedures || []) // No status filter
         .map(p => ({
           name: p.name,
           surface: p.surface || "occlusal",
-          status: p.status as "completed",
           cost: p.cost || 0,
           notes: p.notes || "",
           performedAt: p.date || new Date().toISOString()
@@ -1070,36 +1065,34 @@ const formatDentalDataForAPI = () => {
   
   console.log("✅ Performed teeth:", performedTeeth);
   
-  // Format planned procedures for treatment plan
+  // Format planned procedures for treatment plan (NO status)
   const plannedProcedures = toothConditions
     .flatMap(tc => 
-      (tc.procedures || [])
-        .filter(p => p.status === "planned" || p.status === "in-progress")
+      (tc.procedures || []) // No status filter
         .map(p => ({
           toothNumber: tc.toothNumber,
           name: p.name,
           surface: p.surface || "occlusal",
           estimatedCost: p.cost || 0,
           notes: p.notes || "",
-          status: p.status as "planned" | "in-progress"
+          // NO status field
         }))
     );
 
   console.log("✅ Planned procedures:", plannedProcedures);
 
-  // ✅ FIXED: Format treatment plan for backend
+  // ✅ Format treatment plan for backend
   let formattedTreatmentPlan = null;
   if (treatmentPlan) {
     console.log("📋 Formatting treatment plan for backend...");
     
-    // Check if any procedures in Stage 1 are marked as completed
+    // Check if any procedures are in Stage 1 (for startToday logic)
     const stage1Procedures = treatmentPlan.teeth.flatMap(t => 
       t.procedures.filter(p => p.stage === 1)
     );
-    const completedInStage1 = stage1Procedures.filter(p => p.status === "completed");
-    const shouldStartToday = completedInStage1.length > 0;
+    const shouldStartToday = stage1Procedures.length > 0; // Simple logic
     
-    console.log(`Stage 1: ${stage1Procedures.length} total, ${completedInStage1.length} completed`);
+    console.log(`Stage 1: ${stage1Procedures.length} procedures`);
     console.log(`Should start today: ${shouldStartToday}`);
     
     // Build stages with toothSurfaceProcedures and procedureRefs
@@ -1118,25 +1111,26 @@ const formatDentalDataForAPI = () => {
           surface: proc.surface || 'occlusal',
           estimatedCost: proc.estimatedCost || 0,
           notes: proc.notes || '',
-          status: proc.status || 'planned'
+          // NO status field
         });
       });
     });
     
     // Create stages data
-    const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
-      const stageNumber = parseInt(stageNumStr);
+const stagesData = treatmentPlan.stages.map((stage, index) => {
+  const stageNumber = index + 1;
+  const proceduresInThisStage = proceduresByStage[stageNumber] || [];
       
       // Group procedures by tooth and surface for toothSurfaceProcedures
       const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
       
       // Create procedureRefs array
-      const procedureRefs = procs.map(proc => ({
+      const procedureRefs = proceduresInThisStage.map(proc => ({
         toothNumber: proc.toothNumber,
         procedureName: proc.name
       }));
       
-      procs.forEach(proc => {
+      proceduresInThisStage.forEach(proc => {
         if (!toothSurfaceMap[proc.toothNumber]) {
           toothSurfaceMap[proc.toothNumber] = {};
         }
@@ -1164,30 +1158,19 @@ const formatDentalDataForAPI = () => {
         };
       });
       
-      // Find matching stage from treatmentPlan.stages
-      const stageInput = treatmentPlan.stages?.find((s: any) => 
-        s.stageNumber === stageNumber || s.stage === stageNumber
-      );
-      
-      const stageStatus = (() => {
-        if (stageNumber === 1 && shouldStartToday) {
-          const allCompleted = procs.every(p => p.status === 'completed');
-          return allCompleted ? 'completed' : 'in-progress';
-        }
-        return 'pending';
-      })() as 'pending' | 'completed' | 'in-progress';
-      
       return {
         stageNumber: stageNumber,
-        stageName: stageInput?.stageName || `Stage ${stageNumber}`,
-        description: stageInput?.description || '',
-        // ✅ FIXED: Add the required procedureRefs property
+        stageName: stage.stageName || `Stage ${stageNumber}`,
+        description: stage.description || '',
+        // ✅ Required procedureRefs property
         procedureRefs: procedureRefs,
-        status: stageStatus,
-        scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
-        // ✅ Keep the optional toothSurfaceProcedures
-        toothSurfaceProcedures: toothSurfaceProcedures,
-        notes: stageInput?.notes || ''
+     status: stage.status || 'pending',
+    scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
+        // ✅ Optional toothSurfaceProcedures
+      toothSurfaceProcedures: toothSurfaceProcedures,
+    notes: stage.notes || '',
+     ...(stage.status === 'in-progress' && { startedAt: new Date().toISOString() }),
+    ...(stage.status === 'completed' && { completedAt: new Date().toISOString() })
       };
     });
     
@@ -1204,11 +1187,11 @@ const formatDentalDataForAPI = () => {
           stage: proc.stage || 1,
           estimatedCost: proc.estimatedCost || 0,
           notes: proc.notes || '',
-          status: proc.status || 'planned'
+          // NO status field
         }))
       })),
       stages: stagesData,
-      startToday: shouldStartToday // ✅ CRITICAL: This tells backend to start the plan
+      startToday: shouldStartToday
     };
     
     console.log("✅ Final treatment plan structure:", {
@@ -1219,6 +1202,12 @@ const formatDentalDataForAPI = () => {
       totalProcedures: formattedTreatmentPlan.teeth.reduce((sum: number, t: any) => 
         sum + t.procedures.length, 0
       )
+    });
+    
+    // Log each stage status
+    console.log("📊 Stage Statuses being sent:");
+    formattedTreatmentPlan.stages.forEach((stage: any, index: number) => {
+      console.log(`  Stage ${stage.stageNumber}: ${stage.stageName} - Status: ${stage.status}`);
     });
   }
 
@@ -1337,21 +1326,27 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
     return;
   }
   
-  // Ensure all procedures have status field
-  const enhancedTeeth = plan.teeth.map(tooth => ({
-    ...tooth,
-    procedures: tooth.procedures.map(proc => ({
-      ...proc,
-      status: proc.status || 'planned' // Default to 'planned' if not set
-    }))
-  }));
-  
+  // CRITICAL FIX: Ensure stages have proper status from the plan
   const enhancedPlan = {
     ...plan,
-    teeth: enhancedTeeth
+    stages: plan.stages.map((stage, index) => {
+      // Preserve the status from the form (which comes from the stage status toggle buttons)
+      const stageFromPlan = plan.stages[index];
+      return {
+        ...stage,
+        status: stageFromPlan?.status || 'pending', // Use the status from the form
+        stageNumber: index + 1 // Ensure stage numbers are sequential
+      };
+    }),
+    teeth: plan.teeth
   };
   
   console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
+  console.log("📊 Stage Statuses:");
+  enhancedPlan.stages.forEach((stage, index) => {
+    console.log(`  Stage ${index + 1}: ${stage.stageName} - Status: ${stage.status}`);
+  });
+  
   setTreatmentPlan(enhancedPlan);
   setShowTreatmentPlanForm(false);
 };
@@ -1517,335 +1512,376 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-auto">
-          <div className="relative border border-border rounded-xl bg-white p-6">
-            {/* Only show Maxillary label if we have upper teeth to display */}
-            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
-              <div className="text-center mb-6">
-                <Badge variant="outline">Maxillary (Upper Arch)</Badge>
-              </div>
-            )}
+      <CardContent className="flex-1 overflow-auto">
+  <div className="relative border border-border rounded-xl bg-white p-6">
+    {/* Only show Maxillary label if we have upper teeth to display */}
+    {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
+      <div className="text-center mb-6">
+        <Badge variant="outline">Maxillary (Upper Arch)</Badge>
+      </div>
+    )}
 
-            {/* Upper Arch - Only show if we have upper teeth */}
-            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
-              <div className="flex justify-center items-center gap-2 mb-12">
-                {/* Quadrant 1 - Upper Right */}
-                {upperRightTeeth.map(tooth => {
-                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-                  return (
-                    <div key={tooth.number} className="relative group flex flex-col items-center">
-                      <button
-                        type="button"
-                        onClick={() => handleToothClick(tooth)}
-                        className="relative transition-transform hover:scale-110"
-                        disabled={mode === "view"}
-                      >
-                        <ToothSVG
-                          type={tooth.svgName}
-                          color={getToothColor(tooth.number)}
-                          width={chartType === "adult" ? 44 : 40}
-                          height={chartType === "adult" ? 44 : 40}
-                          rotation={tooth.rotation}
-                        />
-                        {condition && (
-                          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
-                              {condition.procedures?.some(p => p.status === "completed") && (
-                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                      <div className="mt-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                        {tooth.number}
-                      </div>
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        Tooth #{tooth.number} (FDI): {tooth.name}
-                        {condition && condition.conditions.length > 0 && (
-                          <div className="mt-1">
-                            {condition.conditions.slice(0, 2).map(c => (
-                              <div key={c} className="text-[10px]">• {c}</div>
-                            ))}
-                            {condition.conditions.length > 2 && (
-                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Quadrant 2 - Upper Left */}
-                {upperLeftTeeth.map(tooth => {
-                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-                  return (
-                    <div key={tooth.number} className="relative group flex flex-col items-center">
-                      <button
-                        type="button"
-                        onClick={() => handleToothClick(tooth)}
-                        className="relative transition-transform hover:scale-110"
-                        disabled={mode === "view"}
-                      >
-                        <ToothSVG
-                          type={tooth.svgName}
-                          color={getToothColor(tooth.number)}
-                          width={chartType === "adult" ? 44 : 40}
-                          height={chartType === "adult" ? 44 : 40}
-                          rotation={tooth.rotation}
-                        />
-                        {condition && (
-                          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
-                              {condition.procedures?.some(p => p.status === "completed") && (
-                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                      <div className="mt-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                        {tooth.number}
-                      </div>
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        Tooth #{tooth.number} (FDI): {tooth.name}
-                        {condition && condition.conditions.length > 0 && (
-                          <div className="mt-1">
-                            {condition.conditions.slice(0, 2).map(c => (
-                              <div key={c} className="text-[10px]">• {c}</div>
-                            ))}
-                            {condition.conditions.length > 2 && (
-                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Only show midline if we have both upper and lower teeth */}
-            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && 
-             (lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-              <div className="absolute left-1/2 transform -translate-x-1/2 top-0 h-full w-px bg-gray-300"></div>
-            )}
-
-            {/* Only show Mandibular label if we have lower teeth to display */}
-            {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-              <div className="text-center mt-12">
-                <Badge variant="outline">Mandibular (Lower Arch)</Badge>
-              </div>
-            )}
-
-            {/* Lower Arch - Only show if we have lower teeth */}
-            {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-              <div className="flex justify-center items-center gap-2 mt-12">
-                {/* Quadrant 4 - Lower Right */}
-                {lowerRightTeeth.map(tooth => {
-                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-                  return (
-                    <div key={tooth.number} className="relative group flex flex-col items-center">
-                      <div className="mb-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                        {tooth.number}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToothClick(tooth)}
-                        className="relative transition-transform hover:scale-110"
-                        disabled={mode === "view"}
-                      >
-                        <ToothSVG
-                          type={tooth.svgName}
-                          color={getToothColor(tooth.number)}
-                          width={chartType === "adult" ? 44 : 40}
-                          height={chartType === "adult" ? 44 : 40}
-                          rotation={tooth.rotation}
-                        />
-                        {condition && (
-                          <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
-                              {condition.procedures?.some(p => p.status === "completed") && (
-                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        Tooth #{tooth.number} (FDI): {tooth.name}
-                        {condition && condition.conditions.length > 0 && (
-                          <div className="mt-1">
-                            {condition.conditions.slice(0, 2).map(c => (
-                              <div key={c} className="text-[10px]">• {c}</div>
-                            ))}
-                            {condition.conditions.length > 2 && (
-                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Quadrant 3 - Lower Left */}
-                {lowerLeftTeeth.map(tooth => {
-                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-                  return (
-                    <div key={tooth.number} className="relative group flex flex-col items-center">
-                      <div className="mb-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                        {tooth.number}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToothClick(tooth)}
-                        className="relative transition-transform hover:scale-110"
-                        disabled={mode === "view"}
-                      >
-                        <ToothSVG
-                          type={tooth.svgName}
-                          color={getToothColor(tooth.number)}
-                          width={chartType === "adult" ? 44 : 40}
-                          height={chartType === "adult" ? 44 : 40}
-                          rotation={tooth.rotation}
-                        />
-                        {condition && (
-                          <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                                   style={{ backgroundColor: getToothColor(tooth.number) }} />
-                              {condition.procedures?.some(p => p.status === "completed") && (
-                                <div className="mt-1 w-2 h-2 rounded-full bg-green-500"></div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        Tooth #{tooth.number} (FDI): {tooth.name}
-                        {condition && condition.conditions.length > 0 && (
-                          <div className="mt-1">
-                            {condition.conditions.slice(0, 2).map(c => (
-                              <div key={c} className="text-[10px]">• {c}</div>
-                            ))}
-                            {condition.conditions.length > 2 && (
-                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Only show quadrant labels when showing all quadrants */}
-            {selectedQuadrant === "all" && (
-              <>
-                <div className="absolute top-4 left-4">
-                  <Badge className="bg-blue-100 text-blue-800">Quadrant 1 (UR)</Badge>
-                </div>
-                <div className="absolute top-4 right-4">
-                  <Badge className="bg-green-100 text-green-800">Quadrant 2 (UL)</Badge>
-                </div>
-                <div className="absolute bottom-4 right-4">
-                  <Badge className="bg-yellow-100 text-yellow-800">Quadrant 3 (LL)</Badge>
-                </div>
-                <div className="absolute bottom-4 left-4">
-                  <Badge className="bg-red-100 text-red-800">Quadrant 4 (LR)</Badge>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Common Conditions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {toothConditions.slice(0, 5).map((tc, idx) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <span className="text-sm">Tooth #{tc.toothNumber}</span>
-                      <div className="flex gap-1">
-                        {tc.conditions.slice(0, 2).map(cond => (
-                          <Badge key={cond} variant="outline" className="text-xs">
-                            {cond}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Treatment Plan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {treatmentPlan ? (
-                  <div className="space-y-2">
-                    <div className="font-medium">{treatmentPlan.planName}</div>
-                    {treatmentPlan.description && (
-                      <p className="text-sm text-muted-foreground">{treatmentPlan.description}</p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {treatmentPlan.stages.length} stages
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {treatmentPlan.teeth.reduce((sum, tooth) => sum + tooth.procedures.length, 0)} procedures
-                      </Badge>
+    {/* Upper Arch - Only show if we have upper teeth */}
+    {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
+      <div className="flex justify-center items-center gap-2 mb-12">
+        {/* Quadrant 1 - Upper Right */}
+        {upperRightTeeth.map(tooth => {
+          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+          return (
+            <div key={tooth.number} className="relative group flex flex-col items-center">
+              <button
+                type="button"
+                onClick={() => handleToothClick(tooth)}
+                className="relative transition-transform hover:scale-110"
+                disabled={mode === "view"}
+              >
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={getToothColor(tooth.number)}
+                  width={chartType === "adult" ? 44 : 40}
+                  height={chartType === "adult" ? 44 : 40}
+                  rotation={tooth.rotation}
+                />
+                {condition && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                           style={{ backgroundColor: getToothColor(tooth.number) }} />
+                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
+                      {/* Show indicator if tooth has any procedures */}
+                      {condition.procedures?.length > 0 && (
+                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">No treatment plan created</p>
-                    {mode === "edit" && (
-                      <Button variant="outline" size="sm" className="w-full" onClick={handleCreateTreatmentPlan}>
-                        Create Treatment Plan
-                      </Button>
+                )}
+              </button>
+              <div className="mt-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
+                {tooth.number}
+              </div>
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                Tooth #{tooth.number} (FDI): {tooth.name}
+                {condition && condition.conditions.length > 0 && (
+                  <div className="mt-1">
+                    {condition.conditions.slice(0, 2).map(c => (
+                      <div key={c} className="text-[10px]">• {c}</div>
+                    ))}
+                    {condition.conditions.length > 2 && (
+                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+                {condition && condition.procedures?.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-[10px] text-green-300">
+                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start">
-                    Print Chart
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    Export as PDF
-                  </Button>
-                  {mode === "edit" && !treatmentPlan && (
-                    <Button variant="outline" className="w-full justify-start" onClick={handleCreateTreatmentPlan}>
-                      Generate Treatment Plan
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+        {/* Quadrant 2 - Upper Left */}
+        {upperLeftTeeth.map(tooth => {
+          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+          return (
+            <div key={tooth.number} className="relative group flex flex-col items-center">
+              <button
+                type="button"
+                onClick={() => handleToothClick(tooth)}
+                className="relative transition-transform hover:scale-110"
+                disabled={mode === "view"}
+              >
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={getToothColor(tooth.number)}
+                  width={chartType === "adult" ? 44 : 40}
+                  height={chartType === "adult" ? 44 : 40}
+                  rotation={tooth.rotation}
+                />
+                {condition && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                           style={{ backgroundColor: getToothColor(tooth.number) }} />
+                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
+                      {/* Show indicator if tooth has any procedures */}
+                      {condition.procedures?.length > 0 && (
+                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </button>
+              <div className="mt-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
+                {tooth.number}
+              </div>
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                Tooth #{tooth.number} (FDI): {tooth.name}
+                {condition && condition.conditions.length > 0 && (
+                  <div className="mt-1">
+                    {condition.conditions.slice(0, 2).map(c => (
+                      <div key={c} className="text-[10px]">• {c}</div>
+                    ))}
+                    {condition.conditions.length > 2 && (
+                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                    )}
+                  </div>
+                )}
+                {condition && condition.procedures?.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-[10px] text-green-300">
+                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* Only show midline if we have both upper and lower teeth */}
+    {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && 
+     (lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+      <div className="absolute left-1/2 transform -translate-x-1/2 top-0 h-full w-px bg-gray-300"></div>
+    )}
+
+    {/* Only show Mandibular label if we have lower teeth to display */}
+    {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+      <div className="text-center mt-12">
+        <Badge variant="outline">Mandibular (Lower Arch)</Badge>
+      </div>
+    )}
+
+    {/* Lower Arch - Only show if we have lower teeth */}
+    {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+      <div className="flex justify-center items-center gap-2 mt-12">
+        {/* Quadrant 4 - Lower Right */}
+        {lowerRightTeeth.map(tooth => {
+          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+          return (
+            <div key={tooth.number} className="relative group flex flex-col items-center">
+              <div className="mb-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
+                {tooth.number}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToothClick(tooth)}
+                className="relative transition-transform hover:scale-110"
+                disabled={mode === "view"}
+              >
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={getToothColor(tooth.number)}
+                  width={chartType === "adult" ? 44 : 40}
+                  height={chartType === "adult" ? 44 : 40}
+                  rotation={tooth.rotation}
+                />
+                {condition && (
+                  <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                           style={{ backgroundColor: getToothColor(tooth.number) }} />
+                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
+                      {/* Show indicator if tooth has any procedures */}
+                      {condition.procedures?.length > 0 && (
+                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </button>
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                Tooth #{tooth.number} (FDI): {tooth.name}
+                {condition && condition.conditions.length > 0 && (
+                  <div className="mt-1">
+                    {condition.conditions.slice(0, 2).map(c => (
+                      <div key={c} className="text-[10px]">• {c}</div>
+                    ))}
+                    {condition.conditions.length > 2 && (
+                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                    )}
+                  </div>
+                )}
+                {condition && condition.procedures?.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-[10px] text-green-300">
+                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Quadrant 3 - Lower Left */}
+        {lowerLeftTeeth.map(tooth => {
+          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+          return (
+            <div key={tooth.number} className="relative group flex flex-col items-center">
+              <div className="mb-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
+                {tooth.number}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToothClick(tooth)}
+                className="relative transition-transform hover:scale-110"
+                disabled={mode === "view"}
+              >
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={getToothColor(tooth.number)}
+                  width={chartType === "adult" ? 44 : 40}
+                  height={chartType === "adult" ? 44 : 40}
+                  rotation={tooth.rotation}
+                />
+                {condition && (
+                  <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                           style={{ backgroundColor: getToothColor(tooth.number) }} />
+                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
+                      {/* Show indicator if tooth has any procedures */}
+                      {condition.procedures?.length > 0 && (
+                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </button>
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                Tooth #{tooth.number} (FDI): {tooth.name}
+                {condition && condition.conditions.length > 0 && (
+                  <div className="mt-1">
+                    {condition.conditions.slice(0, 2).map(c => (
+                      <div key={c} className="text-[10px]">• {c}</div>
+                    ))}
+                    {condition.conditions.length > 2 && (
+                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                    )}
+                  </div>
+                )}
+                {condition && condition.procedures?.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-[10px] text-green-300">
+                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* Only show quadrant labels when showing all quadrants */}
+    {selectedQuadrant === "all" && (
+      <>
+        <div className="absolute top-4 left-4">
+          <Badge className="bg-blue-100 text-blue-800">Quadrant 1 (UR)</Badge>
+        </div>
+        <div className="absolute top-4 right-4">
+          <Badge className="bg-green-100 text-green-800">Quadrant 2 (UL)</Badge>
+        </div>
+        <div className="absolute bottom-4 right-4">
+          <Badge className="bg-yellow-100 text-yellow-800">Quadrant 3 (LL)</Badge>
+        </div>
+        <div className="absolute bottom-4 left-4">
+          <Badge className="bg-red-100 text-red-800">Quadrant 4 (LR)</Badge>
+        </div>
+      </>
+    )}
+  </div>
+
+  <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Common Conditions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {toothConditions.slice(0, 5).map((tc, idx) => (
+            <div key={idx} className="flex items-center justify-between">
+              <span className="text-sm">Tooth #{tc.toothNumber}</span>
+              <div className="flex gap-1">
+                {tc.conditions.slice(0, 2).map(cond => (
+                  <Badge key={cond} variant="outline" className="text-xs">
+                    {cond}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Treatment Plan</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {treatmentPlan ? (
+          <div className="space-y-2">
+            <div className="font-medium">{treatmentPlan.planName}</div>
+            {treatmentPlan.description && (
+              <p className="text-sm text-muted-foreground">{treatmentPlan.description}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {treatmentPlan.stages.length} stages
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {treatmentPlan.teeth.reduce((sum, tooth) => sum + tooth.procedures.length, 0)} procedures
+              </Badge>
+              {/* Add stage status summary */}
+              <div className="text-xs text-gray-500">
+                {treatmentPlan.stages.filter(s => s.status === 'completed').length} completed, 
+                {treatmentPlan.stages.filter(s => s.status === 'in-progress').length} in-progress
+              </div>
+            </div>
           </div>
-        </CardContent>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">No treatment plan created</p>
+            {mode === "edit" && (
+              <Button variant="outline" size="sm" className="w-full" onClick={handleCreateTreatmentPlan}>
+                Create Treatment Plan
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <Button variant="outline" className="w-full justify-start">
+            Print Chart
+          </Button>
+          <Button variant="outline" className="w-full justify-start">
+            Export as PDF
+          </Button>
+          {mode === "edit" && !treatmentPlan && (
+            <Button variant="outline" className="w-full justify-start" onClick={handleCreateTreatmentPlan}>
+              Generate Treatment Plan
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+</CardContent>
       </Card>
 
       {selectedTooth && (
@@ -1910,7 +1946,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         stage: p.stage || 1,
         estimatedCost: p.estimatedCost || 0,
         notes: p.notes || '',
-        status: p.status || 'planned'
+        // REMOVED: status: p.status || 'planned'
       }))
     })) || []
   );
@@ -1940,7 +1976,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
       stage: selectedStage, // Add stage number
       estimatedCost: estimatedCost || 0,
       notes,
-      status: "planned" as const
+      // REMOVED: status: "planned" as const
     };
     
     if (toothIndex === -1) {
@@ -1962,6 +1998,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     setNotes("");
   };
 
+// In TreatmentPlanForm component, update handleSavePlan function:
 const handleSavePlan = () => {
   // ✅ CRITICAL: Ensure teeth data is included
   if (teethPlans.length === 0) {
@@ -1976,14 +2013,14 @@ const handleSavePlan = () => {
     procedures: toothPlan.procedures.map(proc => ({
       name: proc.name,
       surface: proc.surface || "occlusal",
-      stage: proc.stage || 1, // Use the stage from the procedure
+      stage: proc.stage || 1,
       estimatedCost: proc.estimatedCost || 0,
       notes: proc.notes || "",
-      status: proc.status || 'planned'
+      // REMOVED: status: proc.status || 'planned'
     }))
   }));
 
-  // Format stages with procedureRefs
+  // Format stages with procedureRefs - CRITICAL FIX: Include status from the form
   const formattedStages = stages.map((stage, index) => {
     const stageNumber = index + 1;
     
@@ -2000,8 +2037,8 @@ const handleSavePlan = () => {
     return {
       stageName: stage.stageName || `Stage ${stageNumber}`,
       description: stage.description || '',
-      procedureRefs: proceduresInStage, // <-- Add this!
-      status: 'pending' as const,
+      procedureRefs: proceduresInStage,
+      status: stage.status || 'pending', // ✅ Use status from the form state
       scheduledDate: stage.scheduledDate || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       notes: stage.notes || ''
     };
@@ -2020,9 +2057,9 @@ const handleSavePlan = () => {
   console.log("- Teeth count:", formattedTeeth.length);
   console.log("- Total procedures:", formattedTeeth.reduce((sum, t) => sum + t.procedures.length, 0));
   console.log("- Stages count:", formattedStages.length);
-  console.log("- Procedure refs by stage:");
+  console.log("- Stage Statuses being sent:");
   formattedStages.forEach((stage, idx) => {
-    console.log(`  Stage ${idx + 1}:`, stage.procedureRefs.length, "procedures");
+    console.log(`  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`);
   });
   
   onSave(plan);
@@ -2077,6 +2114,13 @@ const handleSavePlan = () => {
     if (selectedStage > updatedStages.length) {
       setSelectedStage(updatedStages.length);
     }
+  };
+
+  // Function to update stage status
+  const handleUpdateStageStatus = (stageIndex: number, newStatus: 'pending' | 'completed' | 'in-progress') => {
+    const updatedStages = [...stages];
+    updatedStages[stageIndex].status = newStatus;
+    setStages(updatedStages);
   };
 
   const getProceduresByStage = (stageNumber: number) => {
@@ -2155,16 +2199,18 @@ const handleSavePlan = () => {
                             {proceduresInStage.length} procedure(s)
                           </Badge>
                         </div>
-                        {stages.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveStage(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                
+                      </div>
+                      
+                      {/* Stage Status Badge */}
+                      <div className="mb-3">
+                        <Badge className={`text-xs ${
+                          stage.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          stage.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          Status: {stage.status}
+                        </Badge>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2243,6 +2289,13 @@ const handleSavePlan = () => {
                         <span>Stage {stageNumber}</span>
                         <Badge variant="secondary" className="text-xs">
                           {proceduresInStage}
+                        </Badge>
+                        <Badge className={`text-[10px] ${
+                          stage.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          stage.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {stage.status}
                         </Badge>
                       </button>
                     );
@@ -2359,164 +2412,209 @@ const handleSavePlan = () => {
 
             {/* Added Procedures */}
             {teethPlans.length > 0 && (
-              <div className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-medium">Added Procedures</h4>
-                  <div className="text-sm text-gray-500">
-                    Total: {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)} procedures
-                  </div>
+  <div className="border rounded-lg p-4">
+    <div className="flex justify-between items-center mb-4">
+      <h4 className="font-medium">Added Procedures</h4>
+      <div className="text-sm text-gray-500">
+        Total: {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)} procedures
+      </div>
+    </div>
+    
+    {/* Summary by Stage WITH STATUS TOGGLE BUTTONS */}
+    <div className="mb-6">
+      <h5 className="text-sm font-medium mb-3 text-gray-700">Stage Status Management</h5>
+      <div className="space-y-3">
+        {stages.map((stage, index) => {
+          const stageNumber = index + 1;
+          const proceduresInStage = getProceduresByStage(stageNumber);
+          if (proceduresInStage.length === 0) return null;
+          
+          return (
+            <div key={index} className="border rounded-lg p-4 bg-white">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                    Stage {stageNumber}
+                  </Badge>
+                  <span className="font-medium">{stage.stageName}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {proceduresInStage.length} procedure(s)
+                  </Badge>
                 </div>
                 
-                {/* Summary by Stage */}
-                <div className="mb-4">
-                  <h5 className="text-sm font-medium mb-2 text-gray-700">Summary by Stage</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {stages.map((stage, index) => {
-                      const stageNumber = index + 1;
-                      const proceduresInStage = getProceduresByStage(stageNumber);
-                      if (proceduresInStage.length === 0) return null;
-                      
-                      return (
-                        <Badge key={index} variant="outline" className="bg-blue-50 text-blue-700">
-                          Stage {stageNumber}: {proceduresInStage.length} procedure(s)
-                        </Badge>
-                      );
-                    })}
+                {/* Current Status Badge */}
+                <Badge className={`text-xs ${
+                  stage.status === 'completed' ? 'bg-green-100 text-green-700' :
+                  stage.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {stage.status}
+                </Badge>
+              </div>
+              
+              {/* Stage Status Toggle Buttons */}
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-gray-500">Update Status:</span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStageStatus(index, 'pending')}
+                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                      stage.status === 'pending' 
+                        ? 'bg-gray-100 text-gray-700 border-gray-300' 
+                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                    }`}
+                    title="Mark as Pending"
+                  >
+                    Pending
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStageStatus(index, 'in-progress')}
+                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                      stage.status === 'in-progress' 
+                        ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                    }`}
+                    title="Mark as In Progress"
+                  >
+                    In Progress
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStageStatus(index, 'completed')}
+                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                      stage.status === 'completed' 
+                        ? 'bg-green-100 text-green-700 border-green-300' 
+                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                    }`}
+                    title="Mark as Completed"
+                  >
+                    Completed
+                  </button>
+                </div>
+              </div>
+              
+              {/* Optional: Show procedures in this stage */}
+              {proceduresInStage.length > 0 && (
+                <div className="mt-3 pt-3 border-t">
+                  <p className="text-xs text-gray-500 mb-1">Procedures in this stage:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {proceduresInStage.slice(0, 3).map((proc, procIdx) => (
+                      <Badge key={procIdx} variant="outline" className="text-[10px]">
+                        T{proc.toothNumber}: {proc.name}
+                      </Badge>
+                    ))}
+                    {proceduresInStage.length > 3 && (
+                      <Badge variant="outline" className="text-[10px]">
+                        +{proceduresInStage.length - 3} more
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                
-                <div className="space-y-3">
-                  {teethPlans.map((toothPlan, idx) => (
-                    <div key={idx} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-3">
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+    
+    <div className="space-y-3">
+      {teethPlans.map((toothPlan, idx) => (
+        <div key={idx} className="border rounded-lg p-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-gray-100">
+                Tooth #{toothPlan.toothNumber}
+              </Badge>
+              {toothPlan.priority && toothPlan.priority !== 'medium' && (
+                <Badge className={`text-xs ${
+                  toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                  toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                  'bg-green-100 text-green-700'
+                }`}>
+                  {toothPlan.priority}
+                </Badge>
+              )}
+            </div>
+            <span className="text-sm text-gray-500">
+              {toothPlan.procedures.length} procedure(s)
+            </span>
+          </div>
+          
+          {/* Group procedures by stage */}
+          {(() => {
+            const proceduresByStage: Record<number, any[]> = {};
+            toothPlan.procedures.forEach(proc => {
+              const stage = proc.stage || 1;
+              if (!proceduresByStage[stage]) {
+                proceduresByStage[stage] = [];
+              }
+              proceduresByStage[stage].push(proc);
+            });
+            
+            return Object.entries(proceduresByStage).map(([stageNum, procs]) => (
+              <div key={stageNum} className="mb-3 last:mb-0">
+                <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                  <span>Stage {stageNum}</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {procs.length} procedure(s)
+                  </Badge>
+                  {/* Show stage status */}
+                  <Badge className={`text-[10px] ${
+                    stages[parseInt(stageNum) - 1]?.status === 'completed' ? 'bg-green-100 text-green-700' :
+                    stages[parseInt(stageNum) - 1]?.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {stages[parseInt(stageNum) - 1]?.status || 'pending'}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {procs.map((proc, procIdx) => (
+                    <div key={procIdx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+                      <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-gray-100">
-                            Tooth #{toothPlan.toothNumber}
+                          <span className="font-medium">{proc.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {proc.surface}
                           </Badge>
-                          {toothPlan.priority && toothPlan.priority !== 'medium' && (
-                            <Badge className={`text-xs ${
-                              toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                              toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                              'bg-green-100 text-green-700'
-                            }`}>
-                              {toothPlan.priority}
-                            </Badge>
-                          )}
+                          {/* NO STATUS BADGE FOR PROCEDURES */}
                         </div>
-                        <span className="text-sm text-gray-500">
-                          {toothPlan.procedures.length} procedure(s)
-                        </span>
+                        {proc.notes && (
+                          <div className="text-sm text-gray-600 mt-1">{proc.notes}</div>
+                        )}
                       </div>
-                      
-                      {/* Group procedures by stage */}
-                      {(() => {
-                        const proceduresByStage: Record<number, any[]> = {};
-                        toothPlan.procedures.forEach(proc => {
-                          const stage = proc.stage || 1;
-                          if (!proceduresByStage[stage]) {
-                            proceduresByStage[stage] = [];
-                          }
-                          proceduresByStage[stage].push(proc);
-                        });
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium">₹{proc.estimatedCost}</span>
                         
-                        return Object.entries(proceduresByStage).map(([stageNum, procs]) => (
-                          <div key={stageNum} className="mb-3 last:mb-0">
-                            <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                              <span>Stage {stageNum}</span>
-                              <Badge variant="outline" className="text-[10px]">
-                                {procs.length} procedure(s)
-                              </Badge>
-                            </div>
-                            <div className="space-y-2">
-                              {procs.map((proc, procIdx) => (
-                                <div key={procIdx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">{proc.name}</span>
-                                      <Badge variant="outline" className="text-xs">
-                                        {proc.surface}
-                                      </Badge>
-                                      {/* Status badge */}
-                                      <Badge className={`text-xs ${
-                                        proc.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                        proc.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {proc.status || 'planned'}
-                                      </Badge>
-                                    </div>
-                                    {proc.notes && (
-                                      <div className="text-sm text-gray-600 mt-1">{proc.notes}</div>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-sm font-medium">₹{proc.estimatedCost}</span>
-                                    
-                                    {/* Status toggle buttons */}
-                                    <div className="flex gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const updated = [...teethPlans];
-                                          updated[idx].procedures[procIdx].status = 'planned';
-                                          setTeethPlans(updated);
-                                        }}
-                                        className={`px-2 py-1 text-xs rounded ${
-                                          proc.status === 'planned' 
-                                            ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                        title="Mark as Planned"
-                                      >
-                                        P
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const updated = [...teethPlans];
-                                          updated[idx].procedures[procIdx].status = 'completed';
-                                          updated[idx].procedures[procIdx].completedAt = new Date().toISOString();
-                                          setTeethPlans(updated);
-                                        }}
-                                        className={`px-2 py-1 text-xs rounded ${
-                                          proc.status === 'completed' 
-                                            ? 'bg-green-100 text-green-700 border border-green-300' 
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                        title="Mark as Completed"
-                                      >
-                                        C
-                                      </button>
-                                    </div>
-                                    
-                                    {/* Remove button */}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        const updated = [...teethPlans];
-                                        updated[idx].procedures.splice(procIdx, 1);
-                                        if (updated[idx].procedures.length === 0) {
-                                          updated.splice(idx, 1);
-                                        }
-                                        setTeethPlans(updated);
-                                      }}
-                                      className="text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ));
-                      })()}
+                        {/* Remove button for procedure */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const updated = [...teethPlans];
+                            updated[idx].procedures.splice(procIdx, 1);
+                            if (updated[idx].procedures.length === 0) {
+                              updated.splice(idx, 1);
+                            }
+                            setTeethPlans(updated);
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
+            ));
+          })()}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
           </div>
         </div>
 
@@ -2525,6 +2623,11 @@ const handleSavePlan = () => {
             {teethPlans.length > 0 ? (
               <>
                 {teethPlans.length} teeth, {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)} procedures
+                <div className="mt-1">
+                  Stages: {stages.filter(s => s.status === 'completed').length} completed, 
+                  {stages.filter(s => s.status === 'in-progress').length} in-progress, 
+                  {stages.filter(s => s.status === 'pending').length} pending
+                </div>
               </>
             ) : (
               "No procedures added yet"
