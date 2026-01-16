@@ -2664,11 +2664,11 @@ useEffect(() => {
                       {appointmentDetail.department}
                     </Badge>
                   </div>
-                  <div className="mt-2">
+                  {/* <div className="mt-2">
                     <Badge className={getStatusColor(appointmentDetail.status)}>
                       {getStatusLabel(appointmentDetail.status)}
                     </Badge>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 

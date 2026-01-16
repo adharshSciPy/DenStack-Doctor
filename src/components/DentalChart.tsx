@@ -1,8 +1,8 @@
-// DentalChart.tsx - WITH PROPER TOOTH SVG IN MODAL
-import React, { useState,useEffect } from "react";
+// DentalChart.tsx - COMPLETE CODE WITH MULTI-TOOTH SUPPORT
+import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { X,Plus} from "lucide-react";
+import { X, Plus, CheckSquare, Square, ArrowRight,Trash2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 
 // Import SVG components
@@ -27,8 +27,9 @@ interface ToothCondition {
     cost?: number;
     notes?: string;
     date?: string;
-  }[]; 
+  }[];
 }
+
 interface TreatmentPlanStage {
   stageName: string;
   stageNumber?: number;
@@ -68,6 +69,7 @@ interface TreatmentPlanData {
   stages: TreatmentPlanStage[];
   startToday?: boolean;
 }
+
 interface DentalChartProps {
   patientId: string;
   visitId?: string;
@@ -219,11 +221,12 @@ const TOOTH_SVGS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   wisdom: WisdomSVG || MolarSVG,
 };
 
+// Tooth SVG Component - INCREASED SIZE
 const ToothSVG = ({ 
   type, 
   color = "#4b5563", 
-  width = 48,
-  height = 48,
+  width = 60, // Increased from 48
+  height = 60, // Increased from 48
   rotation = 0
 }: { 
   type: string; 
@@ -466,7 +469,6 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
   const [procedures, setProcedures] = useState<{
     name: string;
     surface: string;
-    // status: "planned" | "in-progress" | "completed";
     cost?: number;
     notes?: string;
     date?: string;
@@ -522,36 +524,26 @@ const ToothPopup: React.FC<ToothPopupProps> = ({ tooth, condition, mode, onClose
     });
   };
 
-  // NEW: Add procedure
-const handleAddProcedure = () => {
-  const procedureName = prompt("Enter procedure name:");
-  if (!procedureName) return;
-  
-  const surface = prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") || "occlusal";
-  const cost = Number(prompt("Enter estimated cost:") || 0);
-  const notes = prompt("Enter notes (optional):") || "";
-  
-  const newProcedure = {
-    name: procedureName,
-    surface,
-    cost,
-    notes
+  // Add procedure
+  const handleAddProcedure = () => {
+    const procedureName = prompt("Enter procedure name:");
+    if (!procedureName) return;
+    
+    const surface = prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") || "occlusal";
+    const cost = Number(prompt("Enter estimated cost:") || 0);
+    const notes = prompt("Enter notes (optional):") || "";
+    
+    const newProcedure = {
+      name: procedureName,
+      surface,
+      cost,
+      notes
+    };
+    
+    setProcedures([...procedures, newProcedure]);
   };
-  
-  setProcedures([...procedures, newProcedure]);
-};
 
-  // NEW: Update procedure status
-  // const handleProcedureStatusToggle = (index: number, newStatus: "planned" | "in-progress" | "completed") => {
-  //   const updated = [...procedures];
-  //   updated[index].status = newStatus;
-  //   if (newStatus === "completed") {
-  //     updated[index].date = new Date().toISOString();
-  //   }
-  //   setProcedures(updated);
-  // };
-
-  // NEW: Remove procedure
+  // Remove procedure
   const handleRemoveProcedure = (index: number) => {
     const updated = procedures.filter((_, i) => i !== index);
     setProcedures(updated);
@@ -896,7 +888,7 @@ const handleAddProcedure = () => {
 
               {/* Procedures Section */}
               <div>
-                {/* <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium">Procedures</h4>
                   {mode === "edit" && (
                     <Button
@@ -909,7 +901,7 @@ const handleAddProcedure = () => {
                     </Button>
                   )}
                 </div>
-                 */}
+                
                 {procedures.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic">No procedures added</p>
                 ) : (
@@ -923,13 +915,6 @@ const handleAddProcedure = () => {
                               <Badge variant="outline" className="text-xs">
                                 {proc.surface}
                               </Badge>
-                              {/* <Badge className={`text-xs ${
-                                proc.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                proc.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
-                                {proc.status}
-                              </Badge> */}
                             </div>
                             {proc.notes && (
                               <p className="text-sm text-gray-600 mt-1">{proc.notes}</p>
@@ -939,42 +924,16 @@ const handleAddProcedure = () => {
                             )}
                           </div>
                           
-                          {/* {mode === "edit" && (
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleProcedureStatusToggle(index, 'planned')}
-                                className={`px-2 py-1 text-xs rounded ${
-                                  proc.status === 'planned' 
-                                    ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                                title="Mark as Planned"
-                              >
-                                P
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleProcedureStatusToggle(index, 'completed')}
-                                className={`px-2 py-1 text-xs rounded ${
-                                  proc.status === 'completed' 
-                                    ? 'bg-green-100 text-green-700 border border-green-300' 
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                                title="Mark as Completed"
-                              >
-                                C
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveProcedure(index)}
-                                className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                                title="Remove Procedure"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          )} */}
+                          {mode === "edit" && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProcedure(index)}
+                              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                              title="Remove Procedure"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1000,10 +959,399 @@ const handleAddProcedure = () => {
   );
 };
 
+// NEW: Multi-Tooth Popup Component
+interface MultiToothPopupProps {
+  selectedTeeth: number[];
+  toothData: ToothData[];
+  mode: "view" | "edit";
+  onClose: () => void;
+  onSave: (data: {
+    teethNumbers: number[];
+    conditions: string[];
+    procedures: any[];
+    surfaceConditions: {surface: string, conditions: string[]}[];
+    notes?: string;
+  }) => void;
+}
+
+const MultiToothPopup: React.FC<MultiToothPopupProps> = ({ 
+  selectedTeeth, 
+  toothData,
+  mode, 
+  onClose, 
+  onSave 
+}) => {
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [surfaceConditions, setSurfaceConditions] = useState<{surface: string, conditions: string[]}[]>([]);
+  const [procedures, setProcedures] = useState<any[]>([]);
+  const [notes, setNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<'conditions' | 'procedures'>('conditions');
+
+  // Get tooth names for display
+  const selectedToothObjects = toothData.filter(t => selectedTeeth.includes(t.number));
+  
+  const handleAreaClick = (area: string) => {
+    setSelectedAreas(prev => {
+      if (prev.includes(area)) {
+        return prev.filter(a => a !== area);
+      } else {
+        return [...prev, area];
+      }
+    });
+  };
+
+  const handleConditionToggle = (conditionName: string) => {
+    setSelectedConditions(prev => 
+      prev.includes(conditionName)
+        ? prev.filter(c => c !== conditionName)
+        : [...prev, conditionName]
+    );
+  };
+
+  const handleSurfaceConditionToggle = (surface: string, conditionName: string) => {
+    setSurfaceConditions(prev => {
+      const surfaceIndex = prev.findIndex(sc => sc.surface === surface);
+      
+      if (surfaceIndex === -1) {
+        return [...prev, { surface, conditions: [conditionName] }];
+      } else {
+        const updated = [...prev];
+        const currentConditions = updated[surfaceIndex].conditions;
+        
+        if (currentConditions.includes(conditionName)) {
+          updated[surfaceIndex].conditions = currentConditions.filter(c => c !== conditionName);
+          if (updated[surfaceIndex].conditions.length === 0) {
+            return prev.filter((_, i) => i !== surfaceIndex);
+          }
+        } else {
+          updated[surfaceIndex].conditions = [...currentConditions, conditionName];
+        }
+        return updated;
+      }
+    });
+  };
+
+  const handleAddProcedure = () => {
+    const procedureName = prompt("Enter procedure name:");
+    if (!procedureName) return;
+    
+    const surface = prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") || "occlusal";
+    const cost = Number(prompt("Enter estimated cost:") || 0);
+    const notes = prompt("Enter notes (optional):") || "";
+    
+    const newProcedure = {
+      name: procedureName,
+      surface,
+      cost,
+      notes,
+      date: new Date().toISOString()
+    };
+    
+    setProcedures([...procedures, newProcedure]);
+  };
+
+  const handleSave = () => {
+    onSave({
+      teethNumbers: selectedTeeth,
+      conditions: selectedConditions,
+      procedures,
+      surfaceConditions,
+      notes
+    });
+  };
+
+  const conditionsByArea: Record<string, string[]> = {};
+  surfaceConditions.forEach(sc => {
+    conditionsByArea[sc.surface] = sc.conditions;
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
+        <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">
+              Bulk Edit - {selectedTeeth.length} Teeth Selected
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Teeth: {selectedTeeth.sort((a, b) => a - b).join(", ")}
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Selected Teeth Preview */}
+          <div className="mb-6">
+            <h4 className="font-medium mb-3">Selected Teeth</h4>
+            <div className="flex flex-wrap gap-3">
+              {selectedToothObjects.map(tooth => (
+                <div key={tooth.number} className="flex flex-col items-center">
+                  <ToothSVG
+                    type={tooth.svgName}
+                    width={50}
+                    height={50}
+                    rotation={tooth.rotation}
+                    color="#4b5563"
+                  />
+                  <div className="mt-1 text-xs font-bold bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center">
+                    {tooth.number}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="border-b mb-6">
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setActiveTab('conditions')}
+                className={`px-4 py-2 font-medium ${activeTab === 'conditions' ? 'border-b-2 border-primary text-primary' : 'text-gray-500'}`}
+              >
+                Conditions
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('procedures')}
+                className={`px-4 py-2 font-medium ${activeTab === 'procedures' ? 'border-b-2 border-primary text-primary' : 'text-gray-500'}`}
+              >
+                Procedures
+              </button>
+            </div>
+          </div>
+
+          {activeTab === 'conditions' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column: Surface Selection */}
+              <div className="space-y-6">
+                <div className="border rounded-xl p-4 bg-gray-50">
+                  <h4 className="font-medium mb-3">Surface Selection</h4>
+                  
+                  <ToothDiagram
+                    toothType="molar"
+                    rotation={0}
+                    selectedAreas={selectedAreas}
+                    onAreaClick={handleAreaClick}
+                    mode={mode}
+                    conditionsByArea={conditionsByArea}
+                  />
+                  
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Selected surfaces will apply to all {selectedTeeth.length} teeth
+                    </p>
+                    {selectedAreas.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedAreas.map(area => (
+                          <Badge key={area} variant="secondary" className="capitalize">
+                            {area}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Surface Conditions */}
+                {selectedAreas.length > 0 && (
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-3">Surface Conditions</h4>
+                    <div className="space-y-3">
+                      {selectedAreas.map(area => {
+                        const areaConditions = surfaceConditions.find(sc => sc.surface === area)?.conditions || [];
+                        
+                        return (
+                          <div key={area} className="border rounded p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="capitalize">
+                                {area}
+                              </Badge>
+                              <span className="text-sm text-gray-500">
+                                {areaConditions.length} condition(s)
+                              </span>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {areaConditions.map(cond => (
+                                <Badge key={cond} variant="secondary" className="text-xs flex items-center gap-1">
+                                  {cond}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSurfaceConditionToggle(area, cond)}
+                                    className="ml-1 text-red-500 hover:text-red-700"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              {["Caries", "Filling", "Fractured", "Sensitive"].map(cond => {
+                                const isApplied = areaConditions.includes(cond);
+                                return (
+                                  <button
+                                    key={cond}
+                                    type="button"
+                                    onClick={() => handleSurfaceConditionToggle(area, cond)}
+                                    className={`px-2 py-1 text-xs border rounded ${
+                                      isApplied
+                                        ? 'bg-red-100 text-red-700 border-red-200'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {isApplied ? `Remove ${cond}` : `Add ${cond}`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: General Conditions */}
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-medium mb-3">General Tooth Conditions</h4>
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {selectedConditions.map(cond => (
+                        <Badge key={cond} variant="secondary">
+                          {cond}
+                          <button
+                            type="button"
+                            onClick={() => handleConditionToggle(cond)}
+                            className="ml-1 text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-medium">Common Conditions:</h5>
+                      <div className="grid grid-cols-2 gap-2">
+                        {["Caries", "Missing", "Filling", "Crown", "Root Canal", "Extraction Needed"].map(cond => (
+                          <button
+                            key={cond}
+                            type="button"
+                            onClick={() => handleConditionToggle(cond)}
+                            className={`px-3 py-2 border rounded text-sm ${
+                              selectedConditions.includes(cond)
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-white border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {selectedConditions.includes(cond) ? '✓ ' : '+ '}{cond}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Notes</h4>
+                  <textarea
+                    className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add notes for all selected teeth..."
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Procedures Tab */
+            <div className="space-y-6">
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-medium">Procedures</h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddProcedure}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Procedure
+                  </Button>
+                </div>
+                
+                {procedures.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    No procedures added. Click "Add Procedure" to add one.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {procedures.map((proc, index) => (
+                      <div key={index} className="border rounded-lg p-4 bg-white">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium">{proc.name}</div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge variant="outline" className="text-xs">
+                                Surface: {proc.surface}
+                              </Badge>
+                              {proc.cost > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  Cost: ₹{proc.cost}
+                                </Badge>
+                              )}
+                            </div>
+                            {proc.notes && (
+                              <p className="text-sm text-gray-600 mt-2">{proc.notes}</p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = procedures.filter((_, i) => i !== index);
+                              setProcedures(updated);
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-500">
+                          Will apply to all {selectedTeeth.length} selected teeth
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t px-6 py-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} className="bg-primary text-primary-foreground">
+            Apply to All {selectedTeeth.length} Teeth
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function DentalChart({
   patientId,
   visitId,
-  mode = "edit", // Default to edit for consultation
+  mode = "edit",
   patientName,
   patientUniqueId,
   onClose,
@@ -1023,224 +1371,364 @@ export default function DentalChart({
     existingTreatmentPlan || null
   );
   
+  // Multiple Teeth Selection States
+  const [selectionMode, setSelectionMode] = useState<"single" | "multiple">("single");
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const [multipleSelectionType, setMultipleSelectionType] = useState<
+    "full-mouth" | "upper" | "lower" | "upper-right" | "upper-left" | "lower-right" | "lower-left" | "custom"
+  >("full-mouth");
+  
+  // NEW: Multi-tooth modal state
+  const [showMultiToothModal, setShowMultiToothModal] = useState(false);
+  
   const toothData = chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
+  
   useEffect(() => {
-  if (existingTreatmentPlan) {
-    console.log("🔄 Existing treatment plan detected, auto-opening form...");
-    // Auto-open treatment plan form after a short delay
-    const timer = setTimeout(() => {
-      setShowTreatmentPlanForm(true);
-      console.log("✅ Treatment plan form opened for editing");
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }
-}, [existingTreatmentPlan]);
-const formatDentalDataForAPI = () => {
-  console.log("🦷 Formatting dental data for API...");
-  
-  // Format performed teeth (NO status filter)
-  const performedTeeth = toothConditions
-    .filter(tc => 
-      tc.conditions.length > 0 || 
-      tc.surfaceConditions?.length > 0 || 
-      tc.procedures?.length > 0  // No status filter
-    )
-    .map(tc => ({
-      toothNumber: tc.toothNumber,
-      conditions: tc.conditions || [],
-      surfaceConditions: (tc.surfaceConditions || []).map(sc => ({
-        surface: sc.surface,
-        conditions: sc.conditions || []
-      })),
-      procedures: (tc.procedures || []) // No status filter
-        .map(p => ({
-          name: p.name,
-          surface: p.surface || "occlusal",
-          cost: p.cost || 0,
-          notes: p.notes || "",
-          performedAt: p.date || new Date().toISOString()
-        }))
-    }));
-  
-  console.log("✅ Performed teeth:", performedTeeth);
-  
-  // Format planned procedures for treatment plan (NO status)
-  const plannedProcedures = toothConditions
-    .flatMap(tc => 
-      (tc.procedures || []) // No status filter
-        .map(p => ({
-          toothNumber: tc.toothNumber,
-          name: p.name,
-          surface: p.surface || "occlusal",
-          estimatedCost: p.cost || 0,
-          notes: p.notes || "",
-          // NO status field
-        }))
-    );
+    if (existingTreatmentPlan) {
+      console.log("🔄 Existing treatment plan detected, auto-opening form...");
+      // Auto-open treatment plan form after a short delay
+      const timer = setTimeout(() => {
+        setShowTreatmentPlanForm(true);
+        console.log("✅ Treatment plan form opened for editing");
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [existingTreatmentPlan]);
 
-  console.log("✅ Planned procedures:", plannedProcedures);
+  // Function to get tooth numbers based on selection type
+  const getTeethNumbersBySelectionType = (type: string): number[] => {
+    const allTeeth = chartType === "adult" 
+      ? ADULT_TOOTH_DATA.map(t => t.number)
+      : PEDIATRIC_TOOTH_DATA.map(t => t.number);
+    
+    switch(type) {
+      case "full-mouth":
+        return allTeeth;
+      case "upper":
+        return allTeeth.filter(num => num >= 11 && num <= 28);
+      case "lower":
+        return allTeeth.filter(num => num >= 31 && num <= 48);
+      case "upper-right":
+        return allTeeth.filter(num => num >= 11 && num <= 18);
+      case "upper-left":
+        return allTeeth.filter(num => num >= 21 && num <= 28);
+      case "lower-right":
+        return allTeeth.filter(num => num >= 41 && num <= 48);
+      case "lower-left":
+        return allTeeth.filter(num => num >= 31 && num <= 38);
+      default:
+        return [];
+    }
+  };
 
-  // ✅ Format treatment plan for backend
-  let formattedTreatmentPlan = null;
-  if (treatmentPlan) {
-    console.log("📋 Formatting treatment plan for backend...");
+  // Handle multiple teeth selection
+  const handleMultipleSelection = (type: string) => {
+    const teethNumbers = getTeethNumbersBySelectionType(type);
+    setSelectedTeeth(teethNumbers);
+    setMultipleSelectionType(type as any);
+  };
+
+  // Clear selection
+  const handleClearSelection = () => {
+    setSelectedTeeth([]);
+    setMultipleSelectionType("full-mouth");
+  };
+
+  // Toggle individual tooth selection in custom mode
+  const handleToothToggle = (toothNumber: number) => {
+    if (selectionMode === "multiple" && multipleSelectionType === "custom") {
+      setSelectedTeeth(prev => 
+        prev.includes(toothNumber)
+          ? prev.filter(num => num !== toothNumber)
+          : [...prev, toothNumber]
+      );
+    }
+  };
+
+  // NEW: Open multi-tooth modal
+  const handleOpenMultiToothModal = () => {
+    if (selectedTeeth.length === 0) {
+      alert("Please select teeth first");
+      return;
+    }
+    setShowMultiToothModal(true);
+  };
+
+  // NEW: Save multi-tooth data
+  const handleSaveMultiToothData = (data: {
+    teethNumbers: number[];
+    conditions: string[];
+    procedures: any[];
+    surfaceConditions: {surface: string, conditions: string[]}[];
+    notes?: string;
+  }) => {
+    const updatedConditions = [...toothConditions];
     
-    // Check if any procedures are in Stage 1 (for startToday logic)
-    const stage1Procedures = treatmentPlan.teeth.flatMap(t => 
-      t.procedures.filter(p => p.stage === 1)
-    );
-    const shouldStartToday = stage1Procedures.length > 0; // Simple logic
-    
-    console.log(`Stage 1: ${stage1Procedures.length} procedures`);
-    console.log(`Should start today: ${shouldStartToday}`);
-    
-    // Build stages with toothSurfaceProcedures and procedureRefs
-    const proceduresByStage: Record<number, any[]> = {};
-    
-    treatmentPlan.teeth.forEach(toothPlan => {
-      toothPlan.procedures.forEach((proc: any) => { 
-        const stageNum = (proc as any).stage || 1; 
-        if (!proceduresByStage[stageNum]) {
-          proceduresByStage[stageNum] = [];
-        }
-        
-        proceduresByStage[stageNum].push({
-          toothNumber: toothPlan.toothNumber,
-          name: proc.name,
-          surface: proc.surface || 'occlusal',
-          estimatedCost: proc.estimatedCost || 0,
-          notes: proc.notes || '',
-          // NO status field
+    data.teethNumbers.forEach(toothNumber => {
+      const existingIndex = updatedConditions.findIndex(tc => tc.toothNumber === toothNumber);
+      
+      if (existingIndex >= 0) {
+        // Update existing condition
+        const existing = updatedConditions[existingIndex];
+        updatedConditions[existingIndex] = {
+          ...existing,
+          conditions: [...new Set([...existing.conditions, ...data.conditions])],
+          notes: data.notes || existing.notes,
+          surfaceConditions: [
+            ...existing.surfaceConditions,
+            ...data.surfaceConditions.map(sc => ({
+              surface: sc.surface,
+              conditions: sc.conditions
+            }))
+          ],
+          procedures: [
+            ...existing.procedures,
+            ...data.procedures.map(p => ({
+              ...p,
+              date: p.date || new Date().toISOString()
+            }))
+          ]
+        };
+      } else {
+        // Create new condition
+        const tooth = toothData.find(t => t.number === toothNumber);
+        updatedConditions.push({
+          toothNumber,
+          conditions: data.conditions,
+          notes: data.notes || "",
+          procedures: data.procedures.map(p => ({
+            ...p,
+            date: p.date || new Date().toISOString()
+          })),
+          surfaceConditions: data.surfaceConditions.map(sc => ({
+            surface: sc.surface,
+            conditions: sc.conditions
+          })),
+          color: "#4b5563"
         });
-      });
+      }
     });
     
-    // Create stages data
-const stagesData = treatmentPlan.stages.map((stage, index) => {
-  const stageNumber = index + 1;
-  const proceduresInThisStage = proceduresByStage[stageNumber] || [];
-      
-      // Group procedures by tooth and surface for toothSurfaceProcedures
-      const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
-      
-      // Create procedureRefs array
-      const procedureRefs = proceduresInThisStage.map(proc => ({
-        toothNumber: proc.toothNumber,
-        procedureName: proc.name
+    setToothConditions(updatedConditions);
+    setSelectedTeeth([]);
+    setShowMultiToothModal(false);
+    
+    // Trigger any procedure added callbacks
+    if (onProcedureAdded && data.procedures.length > 0) {
+      data.teethNumbers.forEach(toothNumber => {
+        data.procedures.forEach(proc => {
+          onProcedureAdded(toothNumber, proc);
+        });
+      });
+    }
+  };
+
+  const formatDentalDataForAPI = () => {
+    console.log("🦷 Formatting dental data for API...");
+    
+    // Format performed teeth (NO status filter)
+    const performedTeeth = toothConditions
+      .filter(tc => 
+        tc.conditions.length > 0 || 
+        tc.surfaceConditions?.length > 0 || 
+        tc.procedures?.length > 0  // No status filter
+      )
+      .map(tc => ({
+        toothNumber: tc.toothNumber,
+        conditions: tc.conditions || [],
+        surfaceConditions: (tc.surfaceConditions || []).map(sc => ({
+          surface: sc.surface,
+          conditions: sc.conditions || []
+        })),
+        procedures: (tc.procedures || []) // No status filter
+          .map(p => ({
+            name: p.name,
+            surface: p.surface || "occlusal",
+            cost: p.cost || 0,
+            notes: p.notes || "",
+            performedAt: p.date || new Date().toISOString()
+          }))
       }));
+    
+    console.log("✅ Performed teeth:", performedTeeth);
+    
+    // Format planned procedures for treatment plan (NO status)
+    const plannedProcedures = toothConditions
+      .flatMap(tc => 
+        (tc.procedures || []) // No status filter
+          .map(p => ({
+            toothNumber: tc.toothNumber,
+            name: p.name,
+            surface: p.surface || "occlusal",
+            estimatedCost: p.cost || 0,
+            notes: p.notes || "",
+            // NO status field
+          }))
+      );
+
+    console.log("✅ Planned procedures:", plannedProcedures);
+
+    // ✅ Format treatment plan for backend
+    let formattedTreatmentPlan = null;
+    if (treatmentPlan) {
+      console.log("📋 Formatting treatment plan for backend...");
       
-      proceduresInThisStage.forEach(proc => {
-        if (!toothSurfaceMap[proc.toothNumber]) {
-          toothSurfaceMap[proc.toothNumber] = {};
-        }
-        
-        const surfaceKey = proc.surface || 'occlusal';
-        if (!toothSurfaceMap[proc.toothNumber][surfaceKey]) {
-          toothSurfaceMap[proc.toothNumber][surfaceKey] = [];
-        }
-        
-        if (!toothSurfaceMap[proc.toothNumber][surfaceKey].includes(proc.name)) {
-          toothSurfaceMap[proc.toothNumber][surfaceKey].push(proc.name);
-        }
+      // Check if any procedures are in Stage 1 (for startToday logic)
+      const stage1Procedures = treatmentPlan.teeth.flatMap(t => 
+        t.procedures.filter(p => p.stage === 1)
+      );
+      const shouldStartToday = stage1Procedures.length > 0; // Simple logic
+      
+      console.log(`Stage 1: ${stage1Procedures.length} procedures`);
+      console.log(`Should start today: ${shouldStartToday}`);
+      
+      // Build stages with toothSurfaceProcedures and procedureRefs
+      const proceduresByStage: Record<number, any[]> = {};
+      
+      treatmentPlan.teeth.forEach(toothPlan => {
+        toothPlan.procedures.forEach((proc: any) => { 
+          const stageNum = (proc as any).stage || 1; 
+          if (!proceduresByStage[stageNum]) {
+            proceduresByStage[stageNum] = [];
+          }
+          
+          proceduresByStage[stageNum].push({
+            toothNumber: toothPlan.toothNumber,
+            name: proc.name,
+            surface: proc.surface || 'occlusal',
+            estimatedCost: proc.estimatedCost || 0,
+            notes: proc.notes || '',
+            // NO status field
+          });
+        });
       });
       
-      // Convert to toothSurfaceProcedures format
-      const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
-        const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
-          surface: surface,
-          procedureNames: procedureNames
+      // Create stages data
+      const stagesData = treatmentPlan.stages.map((stage, index) => {
+        const stageNumber = index + 1;
+        const proceduresInThisStage = proceduresByStage[stageNumber] || [];
+            
+        // Group procedures by tooth and surface for toothSurfaceProcedures
+        const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+        
+        // Create procedureRefs array
+        const procedureRefs = proceduresInThisStage.map(proc => ({
+          toothNumber: proc.toothNumber,
+          procedureName: proc.name
         }));
         
+        proceduresInThisStage.forEach(proc => {
+          if (!toothSurfaceMap[proc.toothNumber]) {
+            toothSurfaceMap[proc.toothNumber] = {};
+          }
+          
+          const surfaceKey = proc.surface || 'occlusal';
+          if (!toothSurfaceMap[proc.toothNumber][surfaceKey]) {
+            toothSurfaceMap[proc.toothNumber][surfaceKey] = [];
+          }
+          
+          if (!toothSurfaceMap[proc.toothNumber][surfaceKey].includes(proc.name)) {
+            toothSurfaceMap[proc.toothNumber][surfaceKey].push(proc.name);
+          }
+        });
+        
+        // Convert to toothSurfaceProcedures format
+        const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+          const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+            surface: surface,
+            procedureNames: procedureNames
+          }));
+          
+          return {
+            toothNumber: parseInt(toothNumStr),
+            surfaceProcedures: surfaceProcedures
+          };
+        });
+        
         return {
-          toothNumber: parseInt(toothNumStr),
-          surfaceProcedures: surfaceProcedures
+          stageNumber: stageNumber,
+          stageName: stage.stageName || `Stage ${stageNumber}`,
+          description: stage.description || '',
+          // ✅ Required procedureRefs property
+          procedureRefs: procedureRefs,
+          status: stage.status || 'pending',
+          scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
+          // ✅ Optional toothSurfaceProcedures
+          toothSurfaceProcedures: toothSurfaceProcedures,
+          notes: stage.notes || '',
+          ...(stage.status === 'in-progress' && { startedAt: new Date().toISOString() }),
+          ...(stage.status === 'completed' && { completedAt: new Date().toISOString() })
         };
       });
       
-      return {
-        stageNumber: stageNumber,
-        stageName: stage.stageName || `Stage ${stageNumber}`,
-        description: stage.description || '',
-        // ✅ Required procedureRefs property
-        procedureRefs: procedureRefs,
-     status: stage.status || 'pending',
-    scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
-        // ✅ Optional toothSurfaceProcedures
-      toothSurfaceProcedures: toothSurfaceProcedures,
-    notes: stage.notes || '',
-     ...(stage.status === 'in-progress' && { startedAt: new Date().toISOString() }),
-    ...(stage.status === 'completed' && { completedAt: new Date().toISOString() })
+      formattedTreatmentPlan = {
+        planName: treatmentPlan.planName.trim(),
+        description: treatmentPlan.description?.trim() || '',
+        teeth: treatmentPlan.teeth.map(toothPlan => ({
+          toothNumber: toothPlan.toothNumber,
+          priority: toothPlan.priority || 'medium',
+          isCompleted: false,
+          procedures: toothPlan.procedures.map(proc => ({
+            name: proc.name,
+            surface: proc.surface || 'occlusal',
+            stage: proc.stage || 1,
+            estimatedCost: proc.estimatedCost || 0,
+            notes: proc.notes || '',
+            // NO status field
+          }))
+        })),
+        stages: stagesData,
+        startToday: shouldStartToday
       };
-    });
-    
-    formattedTreatmentPlan = {
-      planName: treatmentPlan.planName.trim(),
-      description: treatmentPlan.description?.trim() || '',
-      teeth: treatmentPlan.teeth.map(toothPlan => ({
-        toothNumber: toothPlan.toothNumber,
-        priority: toothPlan.priority || 'medium',
-        isCompleted: false,
-        procedures: toothPlan.procedures.map(proc => ({
-          name: proc.name,
-          surface: proc.surface || 'occlusal',
-          stage: proc.stage || 1,
-          estimatedCost: proc.estimatedCost || 0,
-          notes: proc.notes || '',
-          // NO status field
-        }))
-      })),
-      stages: stagesData,
-      startToday: shouldStartToday
-    };
-    
-    console.log("✅ Final treatment plan structure:", {
-      planName: formattedTreatmentPlan.planName,
-      teethCount: formattedTreatmentPlan.teeth.length,
-      stagesCount: formattedTreatmentPlan.stages.length,
-      startToday: formattedTreatmentPlan.startToday,
-      totalProcedures: formattedTreatmentPlan.teeth.reduce((sum: number, t: any) => 
-        sum + t.procedures.length, 0
-      )
-    });
-    
-    // Log each stage status
-    console.log("📊 Stage Statuses being sent:");
-    formattedTreatmentPlan.stages.forEach((stage: any, index: number) => {
-      console.log(`  Stage ${stage.stageNumber}: ${stage.stageName} - Status: ${stage.status}`);
-    });
-  }
+      
+      console.log("✅ Final treatment plan structure:", {
+        planName: formattedTreatmentPlan.planName,
+        teethCount: formattedTreatmentPlan.teeth.length,
+        stagesCount: formattedTreatmentPlan.stages.length,
+        startToday: formattedTreatmentPlan.startToday,
+        totalProcedures: formattedTreatmentPlan.teeth.reduce((sum: number, t: any) => 
+          sum + t.procedures.length, 0
+        )
+      });
+      
+      // Log each stage status
+      console.log("📊 Stage Statuses being sent:");
+      formattedTreatmentPlan.stages.forEach((stage: any, index: number) => {
+        console.log(`  Stage ${stage.stageNumber}: ${stage.stageName} - Status: ${stage.status}`);
+      });
+    }
 
-  return { 
-    performedTeeth, 
-    plannedProcedures, 
-    treatmentPlan: formattedTreatmentPlan 
+    return { 
+      performedTeeth, 
+      plannedProcedures, 
+      treatmentPlan: formattedTreatmentPlan 
+    };
   };
-};
-  
-const handleClose = () => {
-  console.log("🦷 DentalChart handleClose called");
-  
-  // Always format and send data, even if empty
-  const dentalData = formatDentalDataForAPI();
-  
-  console.log("📤 Sending dental data to parent:", {
-    performedTeeth: dentalData.performedTeeth?.length || 0,
-    plannedProcedures: dentalData.plannedProcedures?.length || 0,
-    hasTreatmentPlan: !!dentalData.treatmentPlan,
-    treatmentPlan: dentalData.treatmentPlan ? {
-      planName: dentalData.treatmentPlan.planName,
-      teethCount: dentalData.treatmentPlan.teeth?.length || 0,
-      startToday: dentalData.treatmentPlan.startToday
-    } : null
-  });
-  
-  if (onSave) {
-    onSave(dentalData);
-  }
-  
-  if (onClose) onClose();
-};
+    
+  const handleClose = () => {
+    console.log("🦷 DentalChart handleClose called");
+    
+    // Always format and send data, even if empty
+    const dentalData = formatDentalDataForAPI();
+    
+    console.log("📤 Sending dental data to parent:", {
+      performedTeeth: dentalData.performedTeeth?.length || 0,
+      plannedProcedures: dentalData.plannedProcedures?.length || 0,
+      hasTreatmentPlan: !!dentalData.treatmentPlan,
+      treatmentPlan: dentalData.treatmentPlan ? {
+        planName: dentalData.treatmentPlan.planName,
+        teethCount: dentalData.treatmentPlan.teeth?.length || 0,
+        startToday: dentalData.treatmentPlan.startToday
+      } : null
+    });
+    
+    if (onSave) {
+      onSave(dentalData);
+    }
+    
+    if (onClose) onClose();
+  };
 
   // Function to get teeth sorted by their X position for proper display
   const getSortedTeethByQuadrant = (quadrant: number) => {
@@ -1261,10 +1749,16 @@ const handleClose = () => {
   };
 
   const handleToothClick = (tooth: ToothData) => {
-    setSelectedTooth(tooth);
-    if (onToothSelected) {
-      const condition = toothConditions.find(tc => tc.toothNumber === tooth.number) || null;
-      onToothSelected(tooth, condition);
+    if (selectionMode === "multiple") {
+      // In multiple mode, toggle selection instead of opening popup
+      handleToothToggle(tooth.number);
+    } else {
+      // Single mode - open tooth popup
+      setSelectedTooth(tooth);
+      if (onToothSelected) {
+        const condition = toothConditions.find(tc => tc.toothNumber === tooth.number) || null;
+        onToothSelected(tooth, condition);
+      }
     }
   };
 
@@ -1316,40 +1810,40 @@ const handleClose = () => {
     setShowTreatmentPlanForm(true);
   };
 
-const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
-  console.log("✅ Received plan from form WITH TEETH:", plan);
-  
-  // Verify that teeth data exists
-  if (!plan.teeth || plan.teeth.length === 0) {
-    console.error("❌ Treatment plan has no teeth data!");
-    alert("Error: Treatment plan must include teeth procedures. Please add procedures to teeth.");
-    return;
-  }
-  
-  // CRITICAL FIX: Ensure stages have proper status from the plan
-  const enhancedPlan = {
-    ...plan,
-    stages: plan.stages.map((stage, index) => {
-      // Preserve the status from the form (which comes from the stage status toggle buttons)
-      const stageFromPlan = plan.stages[index];
-      return {
-        ...stage,
-        status: stageFromPlan?.status || 'pending', // Use the status from the form
-        stageNumber: index + 1 // Ensure stage numbers are sequential
-      };
-    }),
-    teeth: plan.teeth
+  const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
+    console.log("✅ Received plan from form WITH TEETH:", plan);
+    
+    // Verify that teeth data exists
+    if (!plan.teeth || plan.teeth.length === 0) {
+      console.error("❌ Treatment plan has no teeth data!");
+      alert("Error: Treatment plan must include teeth procedures. Please add procedures to teeth.");
+      return;
+    }
+    
+    // CRITICAL FIX: Ensure stages have proper status from the plan
+    const enhancedPlan = {
+      ...plan,
+      stages: plan.stages.map((stage, index) => {
+        // Preserve the status from the form (which comes from the stage status toggle buttons)
+        const stageFromPlan = plan.stages[index];
+        return {
+          ...stage,
+          status: stageFromPlan?.status || 'pending', // Use the status from the form
+          stageNumber: index + 1 // Ensure stage numbers are sequential
+        };
+      }),
+      teeth: plan.teeth
+    };
+    
+    console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
+    console.log("📊 Stage Statuses:");
+    enhancedPlan.stages.forEach((stage, index) => {
+      console.log(`  Stage ${index + 1}: ${stage.stageName} - Status: ${stage.status}`);
+    });
+    
+    setTreatmentPlan(enhancedPlan);
+    setShowTreatmentPlanForm(false);
   };
-  
-  console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
-  console.log("📊 Stage Statuses:");
-  enhancedPlan.stages.forEach((stage, index) => {
-    console.log(`  Stage ${index + 1}: ${stage.stageName} - Status: ${stage.status}`);
-  });
-  
-  setTreatmentPlan(enhancedPlan);
-  setShowTreatmentPlanForm(false);
-};
 
   const stats = getConditionSummary();
 
@@ -1423,67 +1917,210 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
                 )}
               </div>
             </div>
+{/* 
             <div className="flex items-center gap-2">
               {onClose && (
                 <Button variant="ghost" size="sm" onClick={handleClose}>
                   <X className="h-4 w-4" />
                 </Button>
               )}
-            </div>
+            </div> */}
+
+<div className="flex items-center gap-2">
+  {/* Add Clear All Button */}
+  {mode === "edit" && (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        if (confirm("Are you sure you want to clear all teeth data?")) {
+          setToothConditions([]);
+          setSelectedTeeth([]);
+        }
+      }}
+      title="Clear all teeth data"
+    >
+      <Trash2 className="h-4 w-4 mr-1" />
+      Clear All
+    </Button>
+  )}
+  {onClose && (
+    <Button variant="ghost" size="sm" onClick={handleClose}>
+      <X className="h-4 w-4" />
+    </Button>
+  )}
+</div>
           </div>
 
-          <div className="flex flex-wrap gap-4 mt-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Chart Type:</label>
-              <div className="flex border rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setChartType("adult")}
-                  className={`px-3 py-1 text-sm ${chartType === "adult" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
-                >
-                  Adult (Permanent)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChartType("pediatric")}
-                  className={`px-3 py-1 text-sm ${chartType === "pediatric" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
-                >
-                  Pediatric (Primary)
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Quadrant:</label>
-              <div className="flex border rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setSelectedQuadrant("all")}
-                  className={`px-3 py-1 text-sm ${selectedQuadrant === "all" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
-                >
-                  All
-                </button>
-                {[1, 2, 3, 4].map(q => (
+          {/* Selection Mode Tabs */}
+          <div className="flex flex-col gap-4 mt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">Selection Mode:</label>
+                <div className="flex border rounded-lg">
                   <button
-                    key={q}
                     type="button"
-                    onClick={() => setSelectedQuadrant(q as 1 | 2 | 3 | 4)}
-                    className={`px-3 py-1 text-sm ${selectedQuadrant === q ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+                    onClick={() => {
+                      setSelectionMode("single");
+                      setSelectedTeeth([]);
+                    }}
+                    className={`px-3 py-1 text-sm flex items-center gap-2 ${
+                      selectionMode === "single" ? 'bg-primary text-primary-foreground' : 'bg-white'
+                    }`}
                   >
-                    Q{q}
+                    {selectionMode === "single" ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                    Single Tooth
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectionMode("multiple");
+                      handleMultipleSelection("full-mouth");
+                    }}
+                    className={`px-3 py-1 text-sm flex items-center gap-2 ${
+                      selectionMode === "multiple" ? 'bg-primary text-primary-foreground' : 'bg-white'
+                    }`}
+                  >
+                    {selectionMode === "multiple" ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                    Multiple Teeth
+                  </button>
+                </div>
               </div>
+              
+              {/* Open Multi-Tooth Modal Button */}
+              {selectionMode === "multiple" && selectedTeeth.length > 0 && (
+                <Button 
+                  onClick={handleOpenMultiToothModal}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Edit {selectedTeeth.length} Teeth
+                </Button>
+              )}
             </div>
 
-            <div className="flex items-center gap-4 ml-auto">
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">Affected Teeth</div>
-                <div className="text-lg font-semibold">{stats.affectedTeeth}/{stats.totalTeeth}</div>
+            {/* Multiple Teeth Selection Controls */}
+            {selectionMode === "multiple" && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-medium">Multiple Teeth Selection</h4>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {selectedTeeth.length} teeth selected
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearSelection}
+                      disabled={selectedTeeth.length === 0}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {[
+                    { type: "full-mouth", label: "Full Mouth" },
+                    { type: "upper", label: "Upper Arch" },
+                    { type: "lower", label: "Lower Arch" },
+                    { type: "upper-right", label: "Upper Right" },
+                    { type: "upper-left", label: "Upper Left" },
+                    { type: "lower-right", label: "Lower Right" },
+                    { type: "lower-left", label: "Lower Left" },
+                    { type: "custom", label: "Custom Select" }
+                  ].map((item) => (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => {
+                        if (item.type === "custom") {
+                          setMultipleSelectionType("custom");
+                          setSelectedTeeth([]);
+                        } else {
+                          handleMultipleSelection(item.type);
+                        }
+                      }}
+                      className={`px-3 py-2 border rounded text-sm ${
+                        multipleSelectionType === item.type
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-white border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {multipleSelectionType === "custom" && (
+                  <div className="mt-3 text-sm text-gray-600">
+                    <p>Click on individual teeth to select/deselect them</p>
+                  </div>
+                )}
               </div>
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">Treatment Plan</div>
-                <div className="text-lg font-semibold">{treatmentPlan ? "Created" : "None"}</div>
+            )}
+
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">Chart Type:</label>
+                <div className="flex border rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setChartType("adult")}
+                    className={`px-3 py-1 text-sm ${chartType === "adult" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+                  >
+                    Adult (Permanent)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartType("pediatric")}
+                    className={`px-3 py-1 text-sm ${chartType === "pediatric" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+                  >
+                    Pediatric (Primary)
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">Quadrant:</label>
+                <div className="flex border rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQuadrant("all")}
+                    className={`px-3 py-1 text-sm ${selectedQuadrant === "all" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+                  >
+                    All
+                  </button>
+                  {[1, 2, 3, 4].map(q => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setSelectedQuadrant(q as 1 | 2 | 3 | 4)}
+                      className={`px-3 py-1 text-sm ${selectedQuadrant === q ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+                    >
+                      Q{q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 ml-auto">
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Affected Teeth</div>
+                  <div className="text-lg font-semibold">{stats.affectedTeeth}/{stats.totalTeeth}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Treatment Plan</div>
+                  <div className="text-lg font-semibold">{treatmentPlan ? "Created" : "None"}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -1509,381 +2146,437 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
               <div className="w-3 h-3 rounded-full bg-[#9ca3af]"></div>
               <span>Missing</span>
             </div>
+            {/* Selection highlight color */}
+            {selectionMode === "multiple" && (
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-[#22c55e] border-2 border-white"></div>
+                <span>Selected</span>
+              </div>
+            )}
           </div>
         </CardHeader>
 
-      <CardContent className="flex-1 overflow-auto">
-  <div className="relative border border-border rounded-xl bg-white p-6">
-    {/* Only show Maxillary label if we have upper teeth to display */}
-    {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
-      <div className="text-center mb-6">
-        <Badge variant="outline">Maxillary (Upper Arch)</Badge>
-      </div>
-    )}
-
-    {/* Upper Arch - Only show if we have upper teeth */}
-    {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
-      <div className="flex justify-center items-center gap-2 mb-12">
-        {/* Quadrant 1 - Upper Right */}
-        {upperRightTeeth.map(tooth => {
-          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-          return (
-            <div key={tooth.number} className="relative group flex flex-col items-center">
-              <button
-                type="button"
-                onClick={() => handleToothClick(tooth)}
-                className="relative transition-transform hover:scale-110"
-                disabled={mode === "view"}
-              >
-                <ToothSVG
-                  type={tooth.svgName}
-                  color={getToothColor(tooth.number)}
-                  width={chartType === "adult" ? 44 : 40}
-                  height={chartType === "adult" ? 44 : 40}
-                  rotation={tooth.rotation}
-                />
-                {condition && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                           style={{ backgroundColor: getToothColor(tooth.number) }} />
-                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
-                      {/* Show indicator if tooth has any procedures */}
-                      {condition.procedures?.length > 0 && (
-                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </button>
-              <div className="mt-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                {tooth.number}
+        <CardContent className="flex-1 overflow-auto">
+          <div className="relative border border-border rounded-xl bg-white p-6">
+            {/* Only show Maxillary label if we have upper teeth to display */}
+            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
+              <div className="text-center mb-6">
+                <Badge variant="outline">Maxillary (Upper Arch)</Badge>
               </div>
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                Tooth #{tooth.number} (FDI): {tooth.name}
-                {condition && condition.conditions.length > 0 && (
-                  <div className="mt-1">
-                    {condition.conditions.slice(0, 2).map(c => (
-                      <div key={c} className="text-[10px]">• {c}</div>
-                    ))}
-                    {condition.conditions.length > 2 && (
-                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                    )}
-                  </div>
-                )}
-                {condition && condition.procedures?.length > 0 && (
-                  <div className="mt-1">
-                    <div className="text-[10px] text-green-300">
-                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Quadrant 2 - Upper Left */}
-        {upperLeftTeeth.map(tooth => {
-          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-          return (
-            <div key={tooth.number} className="relative group flex flex-col items-center">
-              <button
-                type="button"
-                onClick={() => handleToothClick(tooth)}
-                className="relative transition-transform hover:scale-110"
-                disabled={mode === "view"}
-              >
-                <ToothSVG
-                  type={tooth.svgName}
-                  color={getToothColor(tooth.number)}
-                  width={chartType === "adult" ? 44 : 40}
-                  height={chartType === "adult" ? 44 : 40}
-                  rotation={tooth.rotation}
-                />
-                {condition && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                           style={{ backgroundColor: getToothColor(tooth.number) }} />
-                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
-                      {/* Show indicator if tooth has any procedures */}
-                      {condition.procedures?.length > 0 && (
-                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </button>
-              <div className="mt-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                {tooth.number}
-              </div>
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                Tooth #{tooth.number} (FDI): {tooth.name}
-                {condition && condition.conditions.length > 0 && (
-                  <div className="mt-1">
-                    {condition.conditions.slice(0, 2).map(c => (
-                      <div key={c} className="text-[10px]">• {c}</div>
-                    ))}
-                    {condition.conditions.length > 2 && (
-                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                    )}
-                  </div>
-                )}
-                {condition && condition.procedures?.length > 0 && (
-                  <div className="mt-1">
-                    <div className="text-[10px] text-green-300">
-                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-
-    {/* Only show midline if we have both upper and lower teeth */}
-    {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && 
-     (lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-      <div className="absolute left-1/2 transform -translate-x-1/2 top-0 h-full w-px bg-gray-300"></div>
-    )}
-
-    {/* Only show Mandibular label if we have lower teeth to display */}
-    {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-      <div className="text-center mt-12">
-        <Badge variant="outline">Mandibular (Lower Arch)</Badge>
-      </div>
-    )}
-
-    {/* Lower Arch - Only show if we have lower teeth */}
-    {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-      <div className="flex justify-center items-center gap-2 mt-12">
-        {/* Quadrant 4 - Lower Right */}
-        {lowerRightTeeth.map(tooth => {
-          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-          return (
-            <div key={tooth.number} className="relative group flex flex-col items-center">
-              <div className="mb-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                {tooth.number}
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToothClick(tooth)}
-                className="relative transition-transform hover:scale-110"
-                disabled={mode === "view"}
-              >
-                <ToothSVG
-                  type={tooth.svgName}
-                  color={getToothColor(tooth.number)}
-                  width={chartType === "adult" ? 44 : 40}
-                  height={chartType === "adult" ? 44 : 40}
-                  rotation={tooth.rotation}
-                />
-                {condition && (
-                  <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                           style={{ backgroundColor: getToothColor(tooth.number) }} />
-                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
-                      {/* Show indicator if tooth has any procedures */}
-                      {condition.procedures?.length > 0 && (
-                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </button>
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                Tooth #{tooth.number} (FDI): {tooth.name}
-                {condition && condition.conditions.length > 0 && (
-                  <div className="mt-1">
-                    {condition.conditions.slice(0, 2).map(c => (
-                      <div key={c} className="text-[10px]">• {c}</div>
-                    ))}
-                    {condition.conditions.length > 2 && (
-                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                    )}
-                  </div>
-                )}
-                {condition && condition.procedures?.length > 0 && (
-                  <div className="mt-1">
-                    <div className="text-[10px] text-green-300">
-                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Quadrant 3 - Lower Left */}
-        {lowerLeftTeeth.map(tooth => {
-          const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
-          return (
-            <div key={tooth.number} className="relative group flex flex-col items-center">
-              <div className="mb-2 bg-primary text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center">
-                {tooth.number}
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToothClick(tooth)}
-                className="relative transition-transform hover:scale-110"
-                disabled={mode === "view"}
-              >
-                <ToothSVG
-                  type={tooth.svgName}
-                  color={getToothColor(tooth.number)}
-                  width={chartType === "adult" ? 44 : 40}
-                  height={chartType === "adult" ? 44 : 40}
-                  rotation={tooth.rotation}
-                />
-                {condition && (
-                  <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
-                           style={{ backgroundColor: getToothColor(tooth.number) }} />
-                      {/* REMOVED: Completed procedure indicator since procedures don't have status */}
-                      {/* Show indicator if tooth has any procedures */}
-                      {condition.procedures?.length > 0 && (
-                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </button>
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                Tooth #{tooth.number} (FDI): {tooth.name}
-                {condition && condition.conditions.length > 0 && (
-                  <div className="mt-1">
-                    {condition.conditions.slice(0, 2).map(c => (
-                      <div key={c} className="text-[10px]">• {c}</div>
-                    ))}
-                    {condition.conditions.length > 2 && (
-                      <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
-                    )}
-                  </div>
-                )}
-                {condition && condition.procedures?.length > 0 && (
-                  <div className="mt-1">
-                    <div className="text-[10px] text-green-300">
-                      {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-
-    {/* Only show quadrant labels when showing all quadrants */}
-    {selectedQuadrant === "all" && (
-      <>
-        <div className="absolute top-4 left-4">
-          <Badge className="bg-blue-100 text-blue-800">Quadrant 1 (UR)</Badge>
-        </div>
-        <div className="absolute top-4 right-4">
-          <Badge className="bg-green-100 text-green-800">Quadrant 2 (UL)</Badge>
-        </div>
-        <div className="absolute bottom-4 right-4">
-          <Badge className="bg-yellow-100 text-yellow-800">Quadrant 3 (LL)</Badge>
-        </div>
-        <div className="absolute bottom-4 left-4">
-          <Badge className="bg-red-100 text-red-800">Quadrant 4 (LR)</Badge>
-        </div>
-      </>
-    )}
-  </div>
-
-  <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Common Conditions</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {toothConditions.slice(0, 5).map((tc, idx) => (
-            <div key={idx} className="flex items-center justify-between">
-              <span className="text-sm">Tooth #{tc.toothNumber}</span>
-              <div className="flex gap-1">
-                {tc.conditions.slice(0, 2).map(cond => (
-                  <Badge key={cond} variant="outline" className="text-xs">
-                    {cond}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Treatment Plan</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {treatmentPlan ? (
-          <div className="space-y-2">
-            <div className="font-medium">{treatmentPlan.planName}</div>
-            {treatmentPlan.description && (
-              <p className="text-sm text-muted-foreground">{treatmentPlan.description}</p>
             )}
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                {treatmentPlan.stages.length} stages
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {treatmentPlan.teeth.reduce((sum, tooth) => sum + tooth.procedures.length, 0)} procedures
-              </Badge>
-              {/* Add stage status summary */}
-              <div className="text-xs text-gray-500">
-                {treatmentPlan.stages.filter(s => s.status === 'completed').length} completed, 
-                {treatmentPlan.stages.filter(s => s.status === 'in-progress').length} in-progress
+
+            {/* Upper Arch - Only show if we have upper teeth */}
+            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
+              <div className="flex justify-center items-center gap-4 mb-16">
+                {/* Quadrant 1 - Upper Right */}
+                {upperRightTeeth.map(tooth => {
+                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+                  const isSelected = selectedTeeth.includes(tooth.number);
+                  
+                  return (
+                    <div key={tooth.number} className="relative group flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleToothClick(tooth)}
+                        className="relative transition-transform hover:scale-110"
+                        disabled={mode === "view" && selectionMode === "multiple"}
+                      >
+                        <ToothSVG
+                          type={tooth.svgName}
+                          color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                          width={chartType === "adult" ? 60 : 56} // Increased size
+                          height={chartType === "adult" ? 60 : 56} // Increased size
+                          rotation={tooth.rotation}
+                        />
+                        {/* Selection indicator */}
+                        {isSelected && (
+                          <div className="absolute -inset-1 border-2 border-green-500 rounded-lg animate-pulse pointer-events-none"></div>
+                        )}
+                        {condition && !isSelected && (
+                          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                  style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {/* Show indicator if tooth has any procedures */}
+                              {condition.procedures?.length > 0 && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      <div className={`mt-2 text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center ${
+                        isSelected 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-primary text-primary-foreground'
+                      }`}>
+                        {tooth.number}
+                      </div>
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        Tooth #{tooth.number} (FDI): {tooth.name}
+                        {isSelected && (
+                          <div className="mt-1 text-green-300 text-[10px]">Selected</div>
+                        )}
+                        {condition && condition.conditions.length > 0 && (
+                          <div className="mt-1">
+                            {condition.conditions.slice(0, 2).map(c => (
+                              <div key={c} className="text-[10px]">• {c}</div>
+                            ))}
+                            {condition.conditions.length > 2 && (
+                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                            )}
+                          </div>
+                        )}
+                        {condition && condition.procedures?.length > 0 && (
+                          <div className="mt-1">
+                            <div className="text-[10px] text-green-300">
+                              {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Quadrant 2 - Upper Left */}
+                {upperLeftTeeth.map(tooth => {
+                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+                  const isSelected = selectedTeeth.includes(tooth.number);
+                  
+                  return (
+                    <div key={tooth.number} className="relative group flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleToothClick(tooth)}
+                        className="relative transition-transform hover:scale-110"
+                        disabled={mode === "view" && selectionMode === "multiple"}
+                      >
+                        <ToothSVG
+                          type={tooth.svgName}
+                          color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                          width={chartType === "adult" ? 60 : 56} // Increased size
+                          height={chartType === "adult" ? 60 : 56} // Increased size
+                          rotation={tooth.rotation}
+                        />
+                        {/* Selection indicator */}
+                        {isSelected && (
+                          <div className="absolute -inset-1 border-2 border-green-500 rounded-lg animate-pulse pointer-events-none"></div>
+                        )}
+                        {condition && !isSelected && (
+                          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                  style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {/* Show indicator if tooth has any procedures */}
+                              {condition.procedures?.length > 0 && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      <div className={`mt-2 text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center ${
+                        isSelected 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-primary text-primary-foreground'
+                      }`}>
+                        {tooth.number}
+                      </div>
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        Tooth #{tooth.number} (FDI): {tooth.name}
+                        {isSelected && (
+                          <div className="mt-1 text-green-300 text-[10px]">Selected</div>
+                        )}
+                        {condition && condition.conditions.length > 0 && (
+                          <div className="mt-1">
+                            {condition.conditions.slice(0, 2).map(c => (
+                              <div key={c} className="text-[10px]">• {c}</div>
+                            ))}
+                            {condition.conditions.length > 2 && (
+                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                            )}
+                          </div>
+                        )}
+                        {condition && condition.procedures?.length > 0 && (
+                          <div className="mt-1">
+                            <div className="text-[10px] text-green-300">
+                              {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">No treatment plan created</p>
-            {mode === "edit" && (
-              <Button variant="outline" size="sm" className="w-full" onClick={handleCreateTreatmentPlan}>
-                Create Treatment Plan
-              </Button>
+            )}
+
+            {/* Only show midline if we have both upper and lower teeth */}
+            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && 
+            (lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+              <div className="absolute left-1/2 transform -translate-x-1/2 top-0 h-full w-px bg-gray-300"></div>
+            )}
+
+            {/* Only show Mandibular label if we have lower teeth to display */}
+            {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+              <div className="text-center mt-12">
+                <Badge variant="outline">Mandibular (Lower Arch)</Badge>
+              </div>
+            )}
+
+            {/* Lower Arch - Only show if we have lower teeth */}
+            {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+              <div className="flex justify-center items-center gap-4 mt-12">
+                {/* Quadrant 4 - Lower Right */}
+                {lowerRightTeeth.map(tooth => {
+                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+                  const isSelected = selectedTeeth.includes(tooth.number);
+                  
+                  return (
+                    <div key={tooth.number} className="relative group flex flex-col items-center">
+                      <div className={`mb-3 text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center ${
+                        isSelected 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-primary text-primary-foreground'
+                      }`}>
+                        {tooth.number}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToothClick(tooth)}
+                        className="relative transition-transform hover:scale-110"
+                        disabled={mode === "view" && selectionMode === "multiple"}
+                      >
+                        <ToothSVG
+                          type={tooth.svgName}
+                          color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                          width={chartType === "adult" ? 60 : 56} // Increased size
+                          height={chartType === "adult" ? 60 : 56} // Increased size
+                          rotation={tooth.rotation}
+                        />
+                        {/* Selection indicator */}
+                        {isSelected && (
+                          <div className="absolute -inset-1 border-2 border-green-500 rounded-lg animate-pulse pointer-events-none"></div>
+                        )}
+                        {condition && !isSelected && (
+                          <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                  style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {/* Show indicator if tooth has any procedures */}
+                              {condition.procedures?.length > 0 && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        Tooth #{tooth.number} (FDI): {tooth.name}
+                        {isSelected && (
+                          <div className="mt-1 text-green-300 text-[10px]">Selected</div>
+                        )}
+                        {condition && condition.conditions.length > 0 && (
+                          <div className="mt-1">
+                            {condition.conditions.slice(0, 2).map(c => (
+                              <div key={c} className="text-[10px]">• {c}</div>
+                            ))}
+                            {condition.conditions.length > 2 && (
+                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                            )}
+                          </div>
+                        )}
+                        {condition && condition.procedures?.length > 0 && (
+                          <div className="mt-1">
+                            <div className="text-[10px] text-green-300">
+                              {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Quadrant 3 - Lower Left */}
+                {lowerLeftTeeth.map(tooth => {
+                  const condition = toothConditions.find(tc => tc.toothNumber === tooth.number);
+                  const isSelected = selectedTeeth.includes(tooth.number);
+                  
+                  return (
+                    <div key={tooth.number} className="relative group flex flex-col items-center">
+                      <div className={`mb-3 text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center ${
+                        isSelected 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-primary text-primary-foreground'
+                      }`}>
+                        {tooth.number}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToothClick(tooth)}
+                        className="relative transition-transform hover:scale-110"
+                        disabled={mode === "view" && selectionMode === "multiple"}
+                      >
+                        <ToothSVG
+                          type={tooth.svgName}
+                          color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                          width={chartType === "adult" ? 60 : 56} // Increased size
+                          height={chartType === "adult" ? 60 : 56} // Increased size
+                          rotation={tooth.rotation}
+                        />
+                        {/* Selection indicator */}
+                        {isSelected && (
+                          <div className="absolute -inset-1 border-2 border-green-500 rounded-lg animate-pulse pointer-events-none"></div>
+                        )}
+                        {condition && !isSelected && (
+                          <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                            <div className="flex flex-col items-center">
+                              <div className={`w-3 h-3 rounded-full ${condition.conditions.length > 0 ? 'animate-pulse' : ''}`}
+                                  style={{ backgroundColor: getToothColor(tooth.number) }} />
+                              {/* Show indicator if tooth has any procedures */}
+                              {condition.procedures?.length > 0 && (
+                                <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        Tooth #{tooth.number} (FDI): {tooth.name}
+                        {isSelected && (
+                          <div className="mt-1 text-green-300 text-[10px]">Selected</div>
+                        )}
+                        {condition && condition.conditions.length > 0 && (
+                          <div className="mt-1">
+                            {condition.conditions.slice(0, 2).map(c => (
+                              <div key={c} className="text-[10px]">• {c}</div>
+                            ))}
+                            {condition.conditions.length > 2 && (
+                              <div className="text-[10px]">+{condition.conditions.length - 2} more</div>
+                            )}
+                          </div>
+                        )}
+                        {condition && condition.procedures?.length > 0 && (
+                          <div className="mt-1">
+                            <div className="text-[10px] text-green-300">
+                              {condition.procedures.length} procedure{condition.procedures.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Only show quadrant labels when showing all quadrants */}
+            {selectedQuadrant === "all" && (
+              <>
+                <div className="absolute top-4 left-4">
+                  <Badge className="bg-blue-100 text-blue-800">Quadrant 1 (UR)</Badge>
+                </div>
+                <div className="absolute top-4 right-4">
+                  <Badge className="bg-green-100 text-green-800">Quadrant 2 (UL)</Badge>
+                </div>
+                <div className="absolute bottom-4 right-4">
+                  <Badge className="bg-yellow-100 text-yellow-800">Quadrant 3 (LL)</Badge>
+                </div>
+                <div className="absolute bottom-4 left-4">
+                  <Badge className="bg-red-100 text-red-800">Quadrant 4 (LR)</Badge>
+                </div>
+              </>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
 
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Quick Actions</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <Button variant="outline" className="w-full justify-start">
-            Print Chart
-          </Button>
-          <Button variant="outline" className="w-full justify-start">
-            Export as PDF
-          </Button>
-          {mode === "edit" && !treatmentPlan && (
-            <Button variant="outline" className="w-full justify-start" onClick={handleCreateTreatmentPlan}>
-              Generate Treatment Plan
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-</CardContent>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Common Conditions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {toothConditions.slice(0, 5).map((tc, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-sm">Tooth #{tc.toothNumber}</span>
+                      <div className="flex gap-1">
+                        {tc.conditions.slice(0, 2).map(cond => (
+                          <Badge key={cond} variant="outline" className="text-xs">
+                            {cond}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Treatment Plan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {treatmentPlan ? (
+                  <div className="space-y-2">
+                    <div className="font-medium">{treatmentPlan.planName}</div>
+                    {treatmentPlan.description && (
+                      <p className="text-sm text-muted-foreground">{treatmentPlan.description}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {treatmentPlan.stages.length} stages
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {treatmentPlan.teeth.reduce((sum, tooth) => sum + tooth.procedures.length, 0)} procedures
+                      </Badge>
+                      {/* Add stage status summary */}
+                      <div className="text-xs text-gray-500">
+                        {treatmentPlan.stages.filter(s => s.status === 'completed').length} completed, 
+                        {treatmentPlan.stages.filter(s => s.status === 'in-progress').length} in-progress
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">No treatment plan created</p>
+                    {mode === "edit" && (
+                      <Button variant="outline" size="sm" className="w-full" onClick={handleCreateTreatmentPlan}>
+                        Create Treatment Plan
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Button variant="outline" className="w-full justify-start">
+                    Print Chart
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    Export as PDF
+                  </Button>
+                  {mode === "edit" && !treatmentPlan && (
+                    <Button variant="outline" className="w-full justify-start" onClick={handleCreateTreatmentPlan}>
+                      Generate Treatment Plan
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
       </Card>
 
+      {/* Single Tooth Popup */}
       {selectedTooth && (
         <ToothPopup
           tooth={selectedTooth}
@@ -1894,13 +2587,25 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
         />
       )}
 
+      {/* NEW: Multi-Tooth Popup */}
+      {showMultiToothModal && (
+        <MultiToothPopup
+          selectedTeeth={selectedTeeth}
+          toothData={toothData}
+          mode={mode}
+          onClose={() => setShowMultiToothModal(false)}
+          onSave={handleSaveMultiToothData}
+        />
+      )}
+
+      {/* Treatment Plan Form */}
       {showTreatmentPlanForm && (
         <TreatmentPlanForm
           patientId={patientId}
           existingConditions={toothConditions}
           onClose={() => setShowTreatmentPlanForm(false)}
           onSave={handleSaveTreatmentPlan}
-             initialData={treatmentPlan} 
+          initialData={treatmentPlan}
         />
       )}
     </div>
@@ -1908,14 +2613,14 @@ const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
 }
 
 // Treatment Plan Form Component
-// Treatment Plan Form Component - UPDATED
 interface TreatmentPlanFormProps {
   patientId: string;
   existingConditions: ToothCondition[];
   onClose: () => void;
   onSave: (plan: TreatmentPlanData) => void;
-  initialData?: TreatmentPlanData | null; // Add this
+  initialData?: TreatmentPlanData | null;
 }
+
 const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({ 
   patientId, 
   existingConditions, 
@@ -2074,48 +2779,48 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   };
 
   const handleRemoveStage = (index: number) => {
-  if (stages.length <= 1) {
-    alert("At least one stage is required");
-    return;
-  }
-  
-  // Check if any procedures are assigned to this stage
-  const proceduresInStage = teethPlans.reduce((count, tooth) => {
-    return count + tooth.procedures.filter(p => p.stage === index + 1).length;
-  }, 0);
-  
-  if (proceduresInStage > 0) {
-    if (!confirm(`Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`)) {
+    if (stages.length <= 1) {
+      alert("At least one stage is required");
       return;
     }
     
-    // Remove procedures assigned to this stage completely
-    const updatedTeethPlans = teethPlans.map(tooth => ({
-      ...tooth,
-      procedures: tooth.procedures.filter(proc => proc.stage !== index + 1)
-    })).filter(tooth => tooth.procedures.length > 0); // Remove teeth with no procedures
+    // Check if any procedures are assigned to this stage
+    const proceduresInStage = teethPlans.reduce((count, tooth) => {
+      return count + tooth.procedures.filter(p => p.stage === index + 1).length;
+    }, 0);
     
-    setTeethPlans(updatedTeethPlans);
-  }
-  
-  // Remove the stage
-  const updatedStages = stages.filter((_, i) => i !== index);
-  
-  // Renumber remaining stages to maintain order
-  const renumberedStages = updatedStages.map((stage, idx) => ({
-    ...stage,
-    stageName: stage.stageName.replace(/\d+$/, String(idx + 1))
-  }));
-  
-  setStages(renumberedStages);
-  
-  // Adjust selected stage if needed
-  if (selectedStage > renumberedStages.length) {
-    setSelectedStage(renumberedStages.length);
-  } else if (selectedStage === index + 1) {
-    setSelectedStage(1);
-  }
-};
+    if (proceduresInStage > 0) {
+      if (!confirm(`Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`)) {
+        return;
+      }
+      
+      // Remove procedures assigned to this stage completely
+      const updatedTeethPlans = teethPlans.map(tooth => ({
+        ...tooth,
+        procedures: tooth.procedures.filter(proc => proc.stage !== index + 1)
+      })).filter(tooth => tooth.procedures.length > 0); // Remove teeth with no procedures
+      
+      setTeethPlans(updatedTeethPlans);
+    }
+    
+    // Remove the stage
+    const updatedStages = stages.filter((_, i) => i !== index);
+    
+    // Renumber remaining stages to maintain order
+    const renumberedStages = updatedStages.map((stage, idx) => ({
+      ...stage,
+      stageName: stage.stageName.replace(/\d+$/, String(idx + 1))
+    }));
+    
+    setStages(renumberedStages);
+    
+    // Adjust selected stage if needed
+    if (selectedStage > renumberedStages.length) {
+      setSelectedStage(renumberedStages.length);
+    } else if (selectedStage === index + 1) {
+      setSelectedStage(1);
+    }
+  };
 
   const handleUpdateStageStatus = (stageIndex: number, newStatus: 'pending' | 'completed' | 'in-progress') => {
     const updatedStages = [...stages];
@@ -2598,23 +3303,6 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <span className="text-sm font-medium">₹{proc.estimatedCost}</span>
-                                    
-                                    {/* Remove button for procedure */}
-                                    {/* <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        const updated = [...teethPlans];
-                                        updated[idx].procedures.splice(procIdx, 1);
-                                        if (updated[idx].procedures.length === 0) {
-                                          updated.splice(idx, 1);
-                                        }
-                                        setTeethPlans(updated);
-                                      }}
-                                      className="text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button> */}
                                   </div>
                                 </div>
                               ))}
