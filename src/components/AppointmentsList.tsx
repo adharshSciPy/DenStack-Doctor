@@ -891,48 +891,50 @@ const calculateStats = () => {
           </div>
         )}
 
-        {/* Progress Summary */}
-        <div className="mb-6">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h4 className="font-medium text-blue-800 mb-3">Treatment Progress</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{stats.totalTeeth}</div>
-                <div className="text-xs text-blue-600">Teeth</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{stats.completedProcedures}</div>
-                <div className="text-xs text-green-600">Completed Procedures</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{stats.completedStages}/{stats.stagesCount}</div>
-                <div className="text-xs text-orange-600">Stages Completed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-700">{stats.progressPercentage}%</div>
-                <div className="text-xs text-gray-600">Overall Progress</div>
-              </div>
-            </div>
-       {stats.totalProcedures > 0 && (
-  <div className="mt-3">
-    <div className="flex justify-between text-xs text-gray-600 mb-1">
-      <span>Stage Progress</span>
-      <span>{stats.completedStages}/{stats.stagesCount} stages completed</span>
-    </div>
-    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-      <div 
-        className="h-full bg-primary transition-all duration-300"
-        style={{ width: `${stats.progressPercentage}%` }}
-      />
-    </div>
-    {/* Optional: Show procedure completion separately */}
-    <div className="text-xs text-gray-500 mt-1">
-      ({stats.completedProcedures}/{stats.totalProcedures} procedures completed)
+     {/* Progress Summary - Only show for saved plans (not temp plans) */}
+{!localPlan?._id?.startsWith('temp-') && (
+  <div className="mb-6">
+    <div className="bg-blue-50 rounded-lg p-4">
+      <h4 className="font-medium text-blue-800 mb-3">Treatment Progress</h4>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-primary">{stats.totalTeeth}</div>
+          <div className="text-xs text-blue-600">Teeth</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">{stats.completedProcedures}</div>
+          <div className="text-xs text-green-600">Completed Procedures</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-600">{stats.completedStages}/{stats.stagesCount}</div>
+          <div className="text-xs text-orange-600">Stages Completed</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-gray-700">{stats.progressPercentage}%</div>
+          <div className="text-xs text-gray-600">Overall Progress</div>
+        </div>
+      </div>
+      {stats.totalProcedures > 0 && (
+        <div className="mt-3">
+          <div className="flex justify-between text-xs text-gray-600 mb-1">
+            <span>Stage Progress</span>
+            <span>{stats.completedStages}/{stats.stagesCount} stages completed</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${stats.progressPercentage}%` }}
+            />
+          </div>
+          {/* Optional: Show procedure completion separately */}
+          <div className="text-xs text-gray-500 mt-1">
+            ({stats.completedProcedures}/{stats.totalProcedures} procedures completed)
+          </div>
+        </div>
+      )}
     </div>
   </div>
 )}
-          </div>
-        </div>
 
         {/* Action Buttons - Hide if viewOnly */}
         {!viewOnly && (
@@ -993,30 +995,7 @@ const calculateStats = () => {
 
         {/* If viewOnly, show only Close button */}
      {/* If viewOnly, show only Close button */}
-{viewOnly && (
-  <div className="flex justify-end items-center pt-4 border-t">
-    {/* Show Edit Plan button for temporary plans in preview mode */}
-    {localPlan?._id?.startsWith('temp-') && onEditPlan && (
-      <Button
-        variant="outline"
-        onClick={() => {
-          onClose();
-          onEditPlan(localPlan);
-        }}
-        className="text-sm mr-3"
-      >
-        ✏️ Edit Plan
-      </Button>
-    )}
-    <Button
-      variant="outline"
-      onClick={onClose}
-      className="text-sm"
-    >
-      Close Preview
-    </Button>
-  </div>
-)}
+
       </div>
     </div>
   );
