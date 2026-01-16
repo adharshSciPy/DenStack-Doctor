@@ -750,7 +750,7 @@ const calculateStats = () => {
                 </p>
               </div>
               {/* Only show Add Stage button if NOT viewOnly */}
-              {!viewOnly && (
+              {/* {!viewOnly && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -760,7 +760,7 @@ const calculateStats = () => {
                   <Plus size={14} className="mr-1" />
                   Add Stage
                 </Button>
-              )}
+              )} */}
             </div>
 
             {/* Stages List */}

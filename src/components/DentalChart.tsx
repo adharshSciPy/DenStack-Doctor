@@ -1946,14 +1946,12 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         stage: p.stage || 1,
         estimatedCost: p.estimatedCost || 0,
         notes: p.notes || '',
-        // REMOVED: status: p.status || 'planned'
       }))
     })) || []
   );
   const [selectedPriority, setSelectedPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [selectedStage, setSelectedStage] = useState<number>(1);
 
-  // Add useEffect to log when initialData changes
   useEffect(() => {
     if (initialData) {
       console.log("📋 TreatmentPlanForm received initial data:", initialData);
@@ -1973,10 +1971,9 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     const newProcedure = {
       name: selectedProcedure,
       surface: selectedSurface,
-      stage: selectedStage, // Add stage number
+      stage: selectedStage,
       estimatedCost: estimatedCost || 0,
       notes,
-      // REMOVED: status: "planned" as const
     };
     
     if (toothIndex === -1) {
@@ -1998,72 +1995,69 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     setNotes("");
   };
 
-// In TreatmentPlanForm component, update handleSavePlan function:
-const handleSavePlan = () => {
-  // ✅ CRITICAL: Ensure teeth data is included
-  if (teethPlans.length === 0) {
-    alert("Please add at least one tooth procedure before saving the treatment plan");
-    return;
-  }
+  const handleSavePlan = () => {
+    if (teethPlans.length === 0) {
+      alert("Please add at least one tooth procedure before saving the treatment plan");
+      return;
+    }
 
-  // Format teeth data properly
-  const formattedTeeth = teethPlans.map(toothPlan => ({
-    toothNumber: toothPlan.toothNumber,
-    priority: toothPlan.priority || 'medium',
-    procedures: toothPlan.procedures.map(proc => ({
-      name: proc.name,
-      surface: proc.surface || "occlusal",
-      stage: proc.stage || 1,
-      estimatedCost: proc.estimatedCost || 0,
-      notes: proc.notes || "",
-      // REMOVED: status: proc.status || 'planned'
-    }))
-  }));
+    // Format teeth data properly
+    const formattedTeeth = teethPlans.map(toothPlan => ({
+      toothNumber: toothPlan.toothNumber,
+      priority: toothPlan.priority || 'medium',
+      procedures: toothPlan.procedures.map(proc => ({
+        name: proc.name,
+        surface: proc.surface || "occlusal",
+        stage: proc.stage || 1,
+        estimatedCost: proc.estimatedCost || 0,
+        notes: proc.notes || "",
+      }))
+    }));
 
-  // Format stages with procedureRefs - CRITICAL FIX: Include status from the form
-  const formattedStages = stages.map((stage, index) => {
-    const stageNumber = index + 1;
+    // Format stages with procedureRefs
+    const formattedStages = stages.map((stage, index) => {
+      const stageNumber = index + 1;
+      
+      const proceduresInStage = teethPlans.flatMap(toothPlan => 
+        toothPlan.procedures
+          .filter(proc => proc.stage === stageNumber)
+          .map(proc => ({
+            toothNumber: toothPlan.toothNumber,
+            procedureName: proc.name
+          }))
+      );
+      
+      const stageStatus = stage.status || 'pending';
+      
+      return {
+        stageName: stage.stageName || `Stage ${stageNumber}`,
+        description: stage.description || '',
+        procedureRefs: proceduresInStage,
+        status: stageStatus,
+        scheduledDate: stage.scheduledDate || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        notes: stage.notes || '',
+        ...(stageStatus === 'in-progress' && { startedAt: new Date().toISOString() }),
+        ...(stageStatus === 'completed' && { completedAt: new Date().toISOString() })
+      };
+    });
     
-    // Get procedures for this stage
-    const proceduresInStage = teethPlans.flatMap(toothPlan => 
-      toothPlan.procedures
-        .filter(proc => proc.stage === stageNumber)
-        .map(proc => ({
-          toothNumber: toothPlan.toothNumber,
-          procedureName: proc.name
-        }))
-    );
+    console.log("📊 Stage Statuses being sent to backend:");
+    formattedStages.forEach((stage, idx) => {
+      console.log(`  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`);
+    });
     
-    return {
-      stageName: stage.stageName || `Stage ${stageNumber}`,
-      description: stage.description || '',
-      procedureRefs: proceduresInStage,
-      status: stage.status || 'pending', // ✅ Use status from the form state
-      scheduledDate: stage.scheduledDate || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      notes: stage.notes || ''
+    const plan: TreatmentPlanData = {
+      planName,
+      description,
+      teeth: formattedTeeth,
+      stages: formattedStages
     };
-  });
-  
-  // ✅ This is the format that backend expects
-  const plan: TreatmentPlanData = {
-    planName,
-    description,
-    teeth: formattedTeeth,
-    stages: formattedStages
+    
+    console.log("✅ Saving treatment plan:");
+    console.log("- Stages count:", formattedStages.length);
+    
+    onSave(plan);
   };
-  
-  console.log("✅ Saving treatment plan:");
-  console.log("- Plan Name:", planName);
-  console.log("- Teeth count:", formattedTeeth.length);
-  console.log("- Total procedures:", formattedTeeth.reduce((sum, t) => sum + t.procedures.length, 0));
-  console.log("- Stages count:", formattedStages.length);
-  console.log("- Stage Statuses being sent:");
-  formattedStages.forEach((stage, idx) => {
-    console.log(`  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`);
-  });
-  
-  onSave(plan);
-};
 
   const handleAddStage = () => {
     const newStageNumber = stages.length + 1;
@@ -2080,43 +2074,49 @@ const handleSavePlan = () => {
   };
 
   const handleRemoveStage = (index: number) => {
-    if (stages.length <= 1) {
-      alert("At least one stage is required");
+  if (stages.length <= 1) {
+    alert("At least one stage is required");
+    return;
+  }
+  
+  // Check if any procedures are assigned to this stage
+  const proceduresInStage = teethPlans.reduce((count, tooth) => {
+    return count + tooth.procedures.filter(p => p.stage === index + 1).length;
+  }, 0);
+  
+  if (proceduresInStage > 0) {
+    if (!confirm(`Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`)) {
       return;
     }
     
-    // Check if any procedures are assigned to this stage
-    const proceduresInStage = teethPlans.reduce((count, tooth) => {
-      return count + tooth.procedures.filter(p => p.stage === index + 1).length;
-    }, 0);
+    // Remove procedures assigned to this stage completely
+    const updatedTeethPlans = teethPlans.map(tooth => ({
+      ...tooth,
+      procedures: tooth.procedures.filter(proc => proc.stage !== index + 1)
+    })).filter(tooth => tooth.procedures.length > 0); // Remove teeth with no procedures
     
-    if (proceduresInStage > 0) {
-      if (!confirm(`Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing it will reassign them to Stage 1. Continue?`)) {
-        return;
-      }
-      
-      // Reassign procedures to stage 1
-      const updatedTeethPlans = teethPlans.map(tooth => ({
-        ...tooth,
-        procedures: tooth.procedures.map(proc => ({
-          ...proc,
-          stage: proc.stage === index + 1 ? 1 : proc.stage
-        }))
-      }));
-      setTeethPlans(updatedTeethPlans);
-    }
-    
-    // Remove the stage
-    const updatedStages = stages.filter((_, i) => i !== index);
-    setStages(updatedStages);
-    
-    // Adjust selected stage if needed
-    if (selectedStage > updatedStages.length) {
-      setSelectedStage(updatedStages.length);
-    }
-  };
+    setTeethPlans(updatedTeethPlans);
+  }
+  
+  // Remove the stage
+  const updatedStages = stages.filter((_, i) => i !== index);
+  
+  // Renumber remaining stages to maintain order
+  const renumberedStages = updatedStages.map((stage, idx) => ({
+    ...stage,
+    stageName: stage.stageName.replace(/\d+$/, String(idx + 1))
+  }));
+  
+  setStages(renumberedStages);
+  
+  // Adjust selected stage if needed
+  if (selectedStage > renumberedStages.length) {
+    setSelectedStage(renumberedStages.length);
+  } else if (selectedStage === index + 1) {
+    setSelectedStage(1);
+  }
+};
 
-  // Function to update stage status
   const handleUpdateStageStatus = (stageIndex: number, newStatus: 'pending' | 'completed' | 'in-progress') => {
     const updatedStages = [...stages];
     updatedStages[stageIndex].status = newStatus;
@@ -2172,7 +2172,7 @@ const handleSavePlan = () => {
               />
             </div>
 
-            {/* Stages Management */}
+            {/* Stages Management - WITHOUT REMOVE BUTTON */}
             <div className="border rounded-lg p-4">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="font-medium">Stages Management</h4>
@@ -2199,7 +2199,6 @@ const handleSavePlan = () => {
                             {proceduresInStage.length} procedure(s)
                           </Badge>
                         </div>
-                
                       </div>
                       
                       {/* Stage Status Badge */}
@@ -2412,209 +2411,222 @@ const handleSavePlan = () => {
 
             {/* Added Procedures */}
             {teethPlans.length > 0 && (
-  <div className="border rounded-lg p-4">
-    <div className="flex justify-between items-center mb-4">
-      <h4 className="font-medium">Added Procedures</h4>
-      <div className="text-sm text-gray-500">
-        Total: {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)} procedures
-      </div>
-    </div>
-    
-    {/* Summary by Stage WITH STATUS TOGGLE BUTTONS */}
-    <div className="mb-6">
-      <h5 className="text-sm font-medium mb-3 text-gray-700">Stage Status Management</h5>
-      <div className="space-y-3">
-        {stages.map((stage, index) => {
-          const stageNumber = index + 1;
-          const proceduresInStage = getProceduresByStage(stageNumber);
-          if (proceduresInStage.length === 0) return null;
-          
-          return (
-            <div key={index} className="border rounded-lg p-4 bg-white">
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    Stage {stageNumber}
-                  </Badge>
-                  <span className="font-medium">{stage.stageName}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {proceduresInStage.length} procedure(s)
-                  </Badge>
-                </div>
-                
-                {/* Current Status Badge */}
-                <Badge className={`text-xs ${
-                  stage.status === 'completed' ? 'bg-green-100 text-green-700' :
-                  stage.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {stage.status}
-                </Badge>
-              </div>
-              
-              {/* Stage Status Toggle Buttons */}
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs text-gray-500">Update Status:</span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateStageStatus(index, 'pending')}
-                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                      stage.status === 'pending' 
-                        ? 'bg-gray-100 text-gray-700 border-gray-300' 
-                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
-                    }`}
-                    title="Mark as Pending"
-                  >
-                    Pending
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateStageStatus(index, 'in-progress')}
-                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                      stage.status === 'in-progress' 
-                        ? 'bg-blue-100 text-blue-700 border-blue-300' 
-                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
-                    }`}
-                    title="Mark as In Progress"
-                  >
-                    In Progress
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateStageStatus(index, 'completed')}
-                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                      stage.status === 'completed' 
-                        ? 'bg-green-100 text-green-700 border-green-300' 
-                        : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
-                    }`}
-                    title="Mark as Completed"
-                  >
-                    Completed
-                  </button>
-                </div>
-              </div>
-              
-              {/* Optional: Show procedures in this stage */}
-              {proceduresInStage.length > 0 && (
-                <div className="mt-3 pt-3 border-t">
-                  <p className="text-xs text-gray-500 mb-1">Procedures in this stage:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {proceduresInStage.slice(0, 3).map((proc, procIdx) => (
-                      <Badge key={procIdx} variant="outline" className="text-[10px]">
-                        T{proc.toothNumber}: {proc.name}
-                      </Badge>
-                    ))}
-                    {proceduresInStage.length > 3 && (
-                      <Badge variant="outline" className="text-[10px]">
-                        +{proceduresInStage.length - 3} more
-                      </Badge>
-                    )}
+              <div className="border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-medium">Added Procedures</h4>
+                  <div className="text-sm text-gray-500">
+                    Total: {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)} procedures
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-    
-    <div className="space-y-3">
-      {teethPlans.map((toothPlan, idx) => (
-        <div key={idx} className="border rounded-lg p-4">
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-gray-100">
-                Tooth #{toothPlan.toothNumber}
-              </Badge>
-              {toothPlan.priority && toothPlan.priority !== 'medium' && (
-                <Badge className={`text-xs ${
-                  toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                  toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                  'bg-green-100 text-green-700'
-                }`}>
-                  {toothPlan.priority}
-                </Badge>
-              )}
-            </div>
-            <span className="text-sm text-gray-500">
-              {toothPlan.procedures.length} procedure(s)
-            </span>
-          </div>
-          
-          {/* Group procedures by stage */}
-          {(() => {
-            const proceduresByStage: Record<number, any[]> = {};
-            toothPlan.procedures.forEach(proc => {
-              const stage = proc.stage || 1;
-              if (!proceduresByStage[stage]) {
-                proceduresByStage[stage] = [];
-              }
-              proceduresByStage[stage].push(proc);
-            });
-            
-            return Object.entries(proceduresByStage).map(([stageNum, procs]) => (
-              <div key={stageNum} className="mb-3 last:mb-0">
-                <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                  <span>Stage {stageNum}</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    {procs.length} procedure(s)
-                  </Badge>
-                  {/* Show stage status */}
-                  <Badge className={`text-[10px] ${
-                    stages[parseInt(stageNum) - 1]?.status === 'completed' ? 'bg-green-100 text-green-700' :
-                    stages[parseInt(stageNum) - 1]?.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {stages[parseInt(stageNum) - 1]?.status || 'pending'}
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  {procs.map((proc, procIdx) => (
-                    <div key={procIdx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{proc.name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {proc.surface}
-                          </Badge>
-                          {/* NO STATUS BADGE FOR PROCEDURES */}
+                
+                {/* Summary by Stage WITH STATUS TOGGLE BUTTONS AND REMOVE BUTTON */}
+                <div className="mb-6">
+                  <h5 className="text-sm font-medium mb-3 text-gray-700">Stage Status Management</h5>
+                  <div className="space-y-3">
+                    {stages.map((stage, index) => {
+                      const stageNumber = index + 1;
+                      const proceduresInStage = getProceduresByStage(stageNumber);
+                      
+                      return (
+                        <div key={index} className="border rounded-lg p-4 bg-white">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                Stage {stageNumber}
+                              </Badge>
+                              <span className="font-medium">{stage.stageName}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {proceduresInStage.length} procedure(s)
+                              </Badge>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              {/* Current Status Badge */}
+                              <Badge className={`text-xs ${
+                                stage.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                stage.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {stage.status}
+                              </Badge>
+                              
+                              {/* Remove Stage Button - Only show if more than 1 stage */}
+                              {stages.length > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveStage(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                  title="Remove this stage"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Stage Status Toggle Buttons */}
+                          <div className="mt-3 flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Update Status:</span>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStageStatus(index, 'pending')}
+                                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                                  stage.status === 'pending' 
+                                    ? 'bg-gray-100 text-gray-700 border-gray-300' 
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                                }`}
+                                title="Mark as Pending"
+                              >
+                                Pending
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStageStatus(index, 'in-progress')}
+                                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                                  stage.status === 'in-progress' 
+                                    ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                                }`}
+                                title="Mark as In Progress"
+                              >
+                                In Progress
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStageStatus(index, 'completed')}
+                                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                                  stage.status === 'completed' 
+                                    ? 'bg-green-100 text-green-700 border-green-300' 
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                                }`}
+                                title="Mark as Completed"
+                              >
+                                Completed
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* Optional: Show procedures in this stage */}
+                          {proceduresInStage.length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                              <p className="text-xs text-gray-500 mb-1">Procedures in this stage:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {proceduresInStage.slice(0, 3).map((proc, procIdx) => (
+                                  <Badge key={procIdx} variant="outline" className="text-[10px]">
+                                    T{proc.toothNumber}: {proc.name}
+                                  </Badge>
+                                ))}
+                                {proceduresInStage.length > 3 && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    +{proceduresInStage.length - 3} more
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        {proc.notes && (
-                          <div className="text-sm text-gray-600 mt-1">{proc.notes}</div>
-                        )}
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {teethPlans.map((toothPlan, idx) => (
+                    <div key={idx} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-gray-100">
+                            Tooth #{toothPlan.toothNumber}
+                          </Badge>
+                          {toothPlan.priority && toothPlan.priority !== 'medium' && (
+                            <Badge className={`text-xs ${
+                              toothPlan.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                              toothPlan.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {toothPlan.priority}
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {toothPlan.procedures.length} procedure(s)
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium">₹{proc.estimatedCost}</span>
+                      
+                      {/* Group procedures by stage */}
+                      {(() => {
+                        const proceduresByStage: Record<number, any[]> = {};
+                        toothPlan.procedures.forEach(proc => {
+                          const stage = proc.stage || 1;
+                          if (!proceduresByStage[stage]) {
+                            proceduresByStage[stage] = [];
+                          }
+                          proceduresByStage[stage].push(proc);
+                        });
                         
-                        {/* Remove button for procedure */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const updated = [...teethPlans];
-                            updated[idx].procedures.splice(procIdx, 1);
-                            if (updated[idx].procedures.length === 0) {
-                              updated.splice(idx, 1);
-                            }
-                            setTeethPlans(updated);
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        return Object.entries(proceduresByStage).map(([stageNum, procs]) => (
+                          <div key={stageNum} className="mb-3 last:mb-0">
+                            <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                              <span>Stage {stageNum}</span>
+                              <Badge variant="outline" className="text-[10px]">
+                                {procs.length} procedure(s)
+                              </Badge>
+                              {/* Show stage status */}
+                              <Badge className={`text-[10px] ${
+                                stages[parseInt(stageNum) - 1]?.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                stages[parseInt(stageNum) - 1]?.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {stages[parseInt(stageNum) - 1]?.status || 'pending'}
+                              </Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {procs.map((proc, procIdx) => (
+                                <div key={procIdx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">{proc.name}</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        {proc.surface}
+                                      </Badge>
+                                    </div>
+                                    {proc.notes && (
+                                      <div className="text-sm text-gray-600 mt-1">{proc.notes}</div>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-sm font-medium">₹{proc.estimatedCost}</span>
+                                    
+                                    {/* Remove button for procedure */}
+                                    {/* <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const updated = [...teethPlans];
+                                        updated[idx].procedures.splice(procIdx, 1);
+                                        if (updated[idx].procedures.length === 0) {
+                                          updated.splice(idx, 1);
+                                        }
+                                        setTeethPlans(updated);
+                                      }}
+                                      className="text-red-500 hover:text-red-700"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button> */}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })()}
                     </div>
                   ))}
                 </div>
               </div>
-            ));
-          })()}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+            )}
           </div>
         </div>
 
