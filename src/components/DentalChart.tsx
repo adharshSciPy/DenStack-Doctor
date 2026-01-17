@@ -1,8 +1,8 @@
 // DentalChart.tsx - COMPLETE CODE WITH SOFT TISSUE AND TMJ SUPPORT
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect,useRef } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { X, Plus, CheckSquare, Square, ArrowRight,Trash2, AlertCircle, Stethoscope, Bone } from "lucide-react";
+import { X, Plus, CheckSquare, Square, ArrowRight,Trash2, AlertCircle, Stethoscope, Bone,Grid,ChevronDown,Menu } from "lucide-react";
 import { Badge } from "./ui/badge";
 
 // Import Tooth SVG components
@@ -2362,6 +2362,312 @@ const TMJPopup: React.FC<TMJPopupProps> = ({ tmj, mode, onClose, onSave }) => {
   );
 };
 
+// NEW: RESPONSIVE DROPDOWN COMPONENTS
+
+// Dropdown Tooth Selection Component
+const DropdownToothSelector: React.FC<{
+  toothData: ToothData[];
+  selectedTeeth: number[];
+  selectionMode: "single" | "multiple";
+  onSelectTeeth: (toothNumbers: number[]) => void;
+  chartType: "adult" | "pediatric";
+  onOpenMultiToothModal: () => void;
+  disabled?: boolean;
+}> = ({ 
+  toothData, 
+  selectedTeeth, 
+  selectionMode, 
+  onSelectTeeth, 
+  chartType,
+  onOpenMultiToothModal,
+  disabled 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filter teeth based on search
+  const filteredTeeth = toothData.filter(tooth =>
+    tooth.number.toString().includes(searchTerm) ||
+    tooth.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `quadrant ${tooth.quadrant}`.includes(searchTerm.toLowerCase())
+  );
+
+  // Group teeth by quadrant
+  const teethByQuadrant = {
+    "Upper Right (1)": filteredTeeth.filter(t => t.quadrant === 1),
+    "Upper Left (2)": filteredTeeth.filter(t => t.quadrant === 2),
+    "Lower Left (3)": filteredTeeth.filter(t => t.quadrant === 3),
+    "Lower Right (4)": filteredTeeth.filter(t => t.quadrant === 4),
+  };
+
+  const handleToothToggle = (toothNumber: number) => {
+    if (selectionMode === "single") {
+      onSelectTeeth([toothNumber]);
+      setIsOpen(false);
+    } else {
+      const newSelection = selectedTeeth.includes(toothNumber)
+        ? selectedTeeth.filter(num => num !== toothNumber)
+        : [...selectedTeeth, toothNumber];
+      onSelectTeeth(newSelection);
+    }
+  };
+
+  // Quick selection options
+  const quickSelections = [
+    { label: "Full Mouth", teeth: toothData.map(t => t.number) },
+    { label: "Upper Arch", teeth: toothData.filter(t => [1, 2].includes(t.quadrant)).map(t => t.number) },
+    { label: "Lower Arch", teeth: toothData.filter(t => [3, 4].includes(t.quadrant)).map(t => t.number) },
+    { label: "Upper Right", teeth: toothData.filter(t => t.quadrant === 1).map(t => t.number) },
+    { label: "Upper Left", teeth: toothData.filter(t => t.quadrant === 2).map(t => t.number) },
+    { label: "Lower Left", teeth: toothData.filter(t => t.quadrant === 3).map(t => t.number) },
+    { label: "Lower Right", teeth: toothData.filter(t => t.quadrant === 4).map(t => t.number) },
+  ];
+
+  const handleQuickSelect = (teethNumbers: number[]) => {
+    onSelectTeeth(teethNumbers);
+  };
+
+  const clearSelection = () => {
+    onSelectTeeth([]);
+  };
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex-1 flex items-center justify-between px-4 py-3 border rounded-lg bg-white hover:bg-gray-50"
+            disabled={disabled}
+          >
+            <div className="flex items-center gap-2">
+              <Grid className="h-4 w-4" />
+              <span>
+                {selectedTeeth.length === 0
+                  ? "Select teeth..."
+                  : `${selectedTeeth.length} tooth${selectedTeeth.length !== 1 ? "s" : ""} selected`}
+              </span>
+            </div>
+            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </button>
+          
+          {selectedTeeth.length > 0 && selectionMode === "multiple" && (
+            <Button
+              onClick={onOpenMultiToothModal}
+              size="sm"
+              className="whitespace-nowrap"
+              disabled={disabled}
+            >
+              Edit {selectedTeeth.length}
+            </Button>
+          )}
+        </div>
+
+        {/* Selected teeth pills */}
+        {selectedTeeth.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-2 border rounded-lg bg-gray-50">
+            {selectedTeeth.slice(0, 5).map(num => (
+              <Badge key={num} variant="secondary" className="flex items-center gap-1">
+                #{num}
+                <button
+                  type="button"
+                  onClick={() => handleToothToggle(num)}
+                  className="ml-1 text-red-500 hover:text-red-700"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+            {selectedTeeth.length > 5 && (
+              <Badge variant="outline" className="text-xs">
+                +{selectedTeeth.length - 5} more
+              </Badge>
+            )}
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="ml-auto text-xs text-red-500 hover:text-red-700"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+      </div>
+
+
+
+{isOpen && (
+  <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 overflow-hidden flex flex-col">
+    {/* Add max-h constraint for mobile */}
+    <div className="flex-1 overflow-y-auto max-h-[calc(80vh-200px)]">
+      {/* Existing search and quick actions */}
+      <div className="p-3 border-b bg-gray-50 sticky top-0 z-10">
+        <input
+          type="text"
+          placeholder="Search by tooth number, name, or quadrant..."
+          className="w-full px-3 py-2 border rounded text-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        
+        {/* Quick selection buttons */}
+        <div className="mt-2 flex flex-wrap gap-1">
+          {quickSelections.map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleQuickSelect(item.teeth)}
+              className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Teeth list with proper scrolling */}
+      <div className="flex-1 overflow-y-auto p-2">
+        {Object.entries(teethByQuadrant).map(([quadrantName, teeth]) => (
+          teeth.length > 0 && (
+            <div key={quadrantName} className="border-b last:border-b-0">
+              <div className="sticky top-0 bg-gray-100 px-3 py-2 font-medium text-sm z-10">
+                {quadrantName}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 p-2">
+                {teeth.map(tooth => {
+                  const isSelected = selectedTeeth.includes(tooth.number);
+                  return (
+                    <button
+                      key={tooth.number}
+                      type="button"
+                      onClick={() => handleToothToggle(tooth.number)}
+                      className={`flex items-center gap-2 p-2 rounded border text-left ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold ${
+                        isSelected ? 'bg-primary-foreground text-primary' : 'bg-gray-100'
+                      }`}>
+                        {tooth.number}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">#{tooth.number}</div>
+                        <div className="text-xs opacity-75 truncate">
+                          {tooth.name}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <CheckSquare className="h-4 w-4 flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+    </div>
+  );
+};
+
+// Dropdown Surface Selection Component
+const DropdownSurfaceSelector: React.FC<{
+  selectedSurfaces: string[];
+  onSelectSurfaces: (surfaces: string[]) => void;
+  mode: "view" | "edit";
+}> = ({ selectedSurfaces, onSelectSurfaces, mode }) => {
+  const surfaces = [
+    { id: "buccal", label: "Buccal (Cheek side)", color: "#f59e0b" },
+    { id: "lingual", label: "Lingual (Tongue side)", color: "#8b5cf6" },
+    { id: "mesial", label: "Mesial (Front side)", color: "#3b82f6" },
+    { id: "distal", label: "Distal (Back side)", color: "#10b981" },
+    { id: "occlusal", label: "Occlusal (Biting surface)", color: "#ef4444" },
+    { id: "entire", label: "Entire Tooth", color: "#6b7280" },
+  ];
+
+  const handleSurfaceToggle = (surfaceId: string) => {
+    const newSurfaces = selectedSurfaces.includes(surfaceId)
+      ? selectedSurfaces.filter(s => s !== surfaceId)
+      : [...selectedSurfaces, surfaceId];
+    onSelectSurfaces(newSurfaces);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Select Surfaces</label>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {surfaces.map(surface => {
+          const isSelected = selectedSurfaces.includes(surface.id);
+          return (
+            <button
+              key={surface.id}
+              type="button"
+              onClick={() => mode === "edit" && handleSurfaceToggle(surface.id)}
+              disabled={mode === "view"}
+              className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
+                isSelected
+                  ? 'ring-2 ring-offset-1'
+                  : 'hover:bg-gray-50'
+              } ${mode === "view" ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              style={{
+                borderColor: isSelected ? surface.color : '#e5e7eb',
+                backgroundColor: isSelected ? `${surface.color}20` : 'white',
+              }}
+            >
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: surface.color }}
+              />
+              <span className="text-sm font-medium capitalize">{surface.id}</span>
+              {isSelected && (
+                <CheckSquare className="h-4 w-4 ml-auto text-gray-600" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+      
+      {selectedSurfaces.length > 0 && (
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+          <div className="flex flex-wrap gap-2">
+            {selectedSurfaces.map(surface => {
+              const surfaceInfo = surfaces.find(s => s.id === surface);
+              return (
+                <Badge 
+                  key={surface} 
+                  variant="secondary"
+                  className="flex items-center gap-1"
+                  style={{ backgroundColor: surfaceInfo?.color, color: 'white' }}
+                >
+                  {surfaceInfo?.id}
+                  {mode === "edit" && (
+                    <button
+                      type="button"
+                      onClick={() => handleSurfaceToggle(surface)}
+                      className="ml-1 hover:text-white/80"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </Badge>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export default function DentalChart({
   patientId,
   visitId,
@@ -2422,10 +2728,17 @@ const [tmjExaminations, setTMJExaminations] = useState<TMJExamination[]>(() => {
   
   // NEW: Multi-tooth modal state
   const [showMultiToothModal, setShowMultiToothModal] = useState(false);
+  const [showQuickAddModal, setShowQuickAddModal] = useState(false);
   
   // NEW: Active Tab State
   const [activeTab, setActiveTab] = useState<"teeth" | "soft-tissue" | "tmj">("teeth");
+    const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>(["occlusal"]);
   
+  // NEW: Procedure selection state
+  const [selectedProcedure, setSelectedProcedure] = useState("");
+  const [procedureNotes, setProcedureNotes] = useState("");
+  const [procedureCost, setProcedureCost] = useState<number>(0);
+    const [useDropdownView, setUseDropdownView] = useState(false);
   const toothData = chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
   
   useEffect(() => {
@@ -2440,6 +2753,16 @@ const [tmjExaminations, setTMJExaminations] = useState<TMJExamination[]>(() => {
       return () => clearTimeout(timer);
     }
   }, [existingTreatmentPlan]);
+// Check window width on mount and resize
+  useEffect(() => {
+    const checkWidth = () => {
+      setUseDropdownView(window.innerWidth < 768); // Switch to dropdown on mobile
+    };
+    
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
 
   // Function to get tooth numbers based on selection type
   const getTeethNumbersBySelectionType = (type: string): number[] => {
@@ -3001,6 +3324,84 @@ const [tmjExaminations, setTMJExaminations] = useState<TMJExamination[]>(() => {
   const upperLeftTeeth = displayTeeth.upperLeft;
   const lowerRightTeeth = displayTeeth.lowerRight;
   const lowerLeftTeeth = displayTeeth.lowerLeft;
+
+ // NEW: Quick Add Procedure Function
+  const handleQuickAddProcedure = () => {
+    if (selectedTeeth.length === 0) {
+      alert("Please select teeth first");
+      return;
+    }
+    
+    if (!selectedProcedure) {
+      alert("Please select a procedure");
+      return;
+    }
+    
+    const newProcedures = selectedTeeth.map(toothNumber => ({
+      name: selectedProcedure,
+      surface: selectedSurfaces[0] || "occlusal",
+      cost: procedureCost,
+      notes: procedureNotes,
+      date: new Date().toISOString()
+    }));
+    
+    // Update each selected tooth with the procedure
+    const updatedConditions = [...toothConditions];
+    
+    selectedTeeth.forEach(toothNumber => {
+      const existingIndex = updatedConditions.findIndex(tc => tc.toothNumber === toothNumber);
+      const tooth = toothData.find(t => t.number === toothNumber);
+      
+      if (existingIndex >= 0) {
+        updatedConditions[existingIndex] = {
+          ...updatedConditions[existingIndex],
+          procedures: [
+            ...updatedConditions[existingIndex].procedures,
+            {
+              name: selectedProcedure,
+              surface: selectedSurfaces[0] || "occlusal",
+              cost: procedureCost,
+              notes: procedureNotes,
+              date: new Date().toISOString()
+            }
+          ]
+        };
+      } else {
+        updatedConditions.push({
+          toothNumber,
+          conditions: [],
+          notes: "",
+          procedures: [{
+            name: selectedProcedure,
+            surface: selectedSurfaces[0] || "occlusal",
+            cost: procedureCost,
+            notes: procedureNotes,
+            date: new Date().toISOString()
+          }],
+          surfaceConditions: [],
+          color: "#4b5563"
+        });
+      }
+      
+      // Trigger procedure added callback
+      if (onProcedureAdded) {
+        onProcedureAdded(toothNumber, {
+          name: selectedProcedure,
+          surface: selectedSurfaces[0] || "occlusal",
+          cost: procedureCost,
+          notes: procedureNotes
+        });
+      }
+    });
+    
+    setToothConditions(updatedConditions);
+    setShowQuickAddModal(false);
+    
+    // Reset form
+    setSelectedProcedure("");
+    setProcedureNotes("");
+    setProcedureCost(0);
+  };
 
   // Render Teeth Tab Content
   const renderTeethTab = () => (
@@ -3726,6 +4127,199 @@ const renderTMJTab = () => (
   </div>
 );
 
+  // NEW: Render Dropdown View for Teeth
+
+const renderDropdownTeethView = () => (
+  <div className="space-y-6 h-full overflow-y-auto pb-20">
+    <div className="flex flex-wrap gap-4 items-center">
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium">Chart Type:</label>
+        <div className="flex border rounded-lg">
+          <button
+            type="button"
+            onClick={() => {
+              setChartType("adult");
+              setSelectedTeeth([]);
+            }}
+            className={`px-3 py-1 text-sm ${chartType === "adult" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+          >
+            Adult
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setChartType("pediatric");
+              setSelectedTeeth([]);
+            }}
+            className={`px-3 py-1 text-sm ${chartType === "pediatric" ? 'bg-primary text-primary-foreground' : 'bg-white'}`}
+          >
+            Pediatric
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium">Selection:</label>
+        <div className="flex border rounded-lg">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectionMode("single");
+              setSelectedTeeth([]);
+            }}
+            className={`px-3 py-1 text-sm flex items-center gap-2 ${
+              selectionMode === "single" ? 'bg-primary text-primary-foreground' : 'bg-white'
+            }`}
+          >
+            {selectionMode === "single" ? (
+              <CheckSquare className="h-4 w-4" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            Single
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectionMode("multiple")}
+            className={`px-3 py-1 text-sm flex items-center gap-2 ${
+              selectionMode === "multiple" ? 'bg-primary text-primary-foreground' : 'bg-white'
+            }`}
+          >
+            {selectionMode === "multiple" ? (
+              <CheckSquare className="h-4 w-4" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            Multiple
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* Dropdown Tooth Selector - Increased height and better styling */}
+    <div className="min-h-[300px] relative z-10">
+      <DropdownToothSelector
+        toothData={toothData}
+        selectedTeeth={selectedTeeth}
+        selectionMode={selectionMode}
+        onSelectTeeth={setSelectedTeeth}
+        chartType={chartType}
+        onOpenMultiToothModal={() => {
+          if (selectedTeeth.length > 0) {
+            setShowMultiToothModal(true);
+          } else {
+            alert("Please select teeth first");
+          }
+        }}
+        disabled={mode === "view"}
+      />
+    </div>
+
+    {/* Quick Add Procedures Section */}
+    {mode === "edit" && selectedTeeth.length > 0 && (
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="font-medium">Quick Add Procedure</h4>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowQuickAddModal(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Procedure
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Surface Selection */}
+          <DropdownSurfaceSelector
+            selectedSurfaces={selectedSurfaces}
+            onSelectSurfaces={setSelectedSurfaces}
+            mode={mode}
+          />
+          
+          {/* Selected Teeth Summary */}
+          <div className="border rounded-lg p-4 bg-white">
+            <h5 className="font-medium mb-2">Selected Summary</h5>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Teeth:</span>
+                <Badge variant="outline">
+                  {selectedTeeth.length} selected
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Surfaces:</span>
+                <div className="flex flex-wrap gap-1">
+                  {selectedSurfaces.map(surface => (
+                    <Badge key={surface} variant="secondary" className="text-xs capitalize">
+                      {surface}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Existing Conditions Summary - Scrollable if needed */}
+    {toothConditions.length > 0 && (
+      <div className="border rounded-lg p-4 max-h-[300px] overflow-y-auto">
+        <h4 className="font-medium mb-3">Existing Conditions ({toothConditions.length})</h4>
+        <div className="space-y-3">
+          {toothConditions.map(condition => {
+            const tooth = toothData.find(t => t.number === condition.toothNumber);
+            return (
+              <div key={condition.toothNumber} className="border rounded p-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium">Tooth #{condition.toothNumber}</div>
+                    {tooth && (
+                      <div className="text-sm text-gray-600">{tooth.name}</div>
+                    )}
+                    {condition.conditions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {condition.conditions.slice(0, 3).map(cond => (
+                          <Badge key={cond} variant="secondary" className="text-xs">
+                            {cond}
+                          </Badge>
+                        ))}
+                        {condition.conditions.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{condition.conditions.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    {condition.procedures?.length > 0 && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="text-xs bg-blue-50">
+                          {condition.procedures.length} procedure(s)
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const tooth = toothData.find(t => t.number === condition.toothNumber);
+                      if (tooth) setSelectedTooth(tooth);
+                    }}
+                  >
+                    View
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+  </div>
+);
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <Card className="max-w-7xl w-full max-h-[90vh] flex flex-col">
@@ -3744,6 +4338,25 @@ const renderTMJTab = () => (
             </div>
 
             <div className="flex items-center gap-2">
+                {/* View Toggle Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setUseDropdownView(!useDropdownView)}
+                title={useDropdownView ? "Switch to visual chart" : "Switch to dropdown view"}
+              >
+                {useDropdownView ? (
+                  <>
+                    <Grid className="h-4 w-4 mr-2" />
+                    Chart View
+                  </>
+                ) : (
+                  <>
+                    <Menu className="h-4 w-4 mr-2" />
+                    Dropdown View
+                  </>
+                )}
+              </Button>
               {/* Add Clear All Button */}
               {mode === "edit" && (
                 <Button
@@ -3808,13 +4421,30 @@ const renderTMJTab = () => (
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-auto">
-          {/* Render Active Tab Content */}
-          {activeTab === "teeth" && renderTeethTab()}
-          {activeTab === "soft-tissue" && renderSoftTissueTab()}
-          {activeTab === "tmj" && renderTMJTab()}
+        
+      <CardContent className="flex-1 overflow-auto">
+        {activeTab === "teeth" ? (
+    useDropdownView ? (
+      <div className="h-full overflow-y-auto">
+        {renderDropdownTeethView()}
+      </div>
+    ) : (
+      <div className="h-full overflow-y-auto">
+        {renderTeethTab()}
+      </div>
+    )
+  ) : activeTab === "soft-tissue" ? (
+    <div className="h-full overflow-y-auto">
+      {renderSoftTissueTab()}
+    </div>
+  ) : (
+    <div className="h-full overflow-y-auto">
+      {renderTMJTab()}
+    </div>
+  )}
 
-          {/* Summary Cards */}
+        {/* Summary Cards - Only show in visual view or when not in dropdown */}
+        {(!useDropdownView || activeTab !== "teeth") && (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader>
@@ -3856,7 +4486,6 @@ const renderTMJTab = () => (
                       <Badge variant="outline" className="text-xs">
                         {treatmentPlan.teeth.reduce((sum, tooth) => sum + tooth.procedures.length, 0)} procedures
                       </Badge>
-                      {/* Add stage status summary */}
                       <div className="text-xs text-gray-500">
                         {treatmentPlan.stages.filter(s => s.status === 'completed').length} completed, 
                         {treatmentPlan.stages.filter(s => s.status === 'in-progress').length} in-progress
@@ -3897,9 +4526,9 @@ const renderTMJTab = () => (
               </CardContent>
             </Card>
           </div>
-        </CardContent>
-        
-      </Card>
+        )}
+      </CardContent>
+    </Card>
 
       {/* Single Tooth Popup */}
       {selectedTooth && (
@@ -3953,6 +4582,100 @@ const renderTMJTab = () => (
           initialData={treatmentPlan}
         />
       )}
+
+         {/* Quick Add Procedure Modal */}
+      {showQuickAddModal && (
+         <Card className="max-w-7xl w-full max-h-[90vh] flex flex-col md:max-h-[90vh] h-[90vh]">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col shadow-lg">
+            <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Add Procedure</h3>
+                <p className="text-sm text-muted-foreground">
+                  For {selectedTeeth.length} selected teeth
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowQuickAddModal(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* Procedure Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Procedure</label>
+                  <select
+                    className="w-full border rounded-lg p-2"
+                    value={selectedProcedure}
+                    onChange={(e) => setSelectedProcedure(e.target.value)}
+                  >
+                    <option value="">Select a procedure...</option>
+                    {DENTAL_PROCEDURES.map(proc => (
+                      <option key={proc} value={proc}>{proc}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selected Surfaces Display */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Selected Surfaces</label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSurfaces.map(surface => (
+                      <Badge key={surface} variant="secondary" className="capitalize">
+                        {surface}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Estimated Cost */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Estimated Cost (₹)</label>
+                  <input
+                    type="number"
+                    className="w-full border rounded-lg p-2"
+                    value={procedureCost}
+                    onChange={(e) => setProcedureCost(Number(e.target.value))}
+                    min="0"
+                    step="100"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Notes</label>
+                  <textarea
+                    className="w-full border rounded-lg p-2"
+                    value={procedureNotes}
+                    onChange={(e) => setProcedureNotes(e.target.value)}
+                    placeholder="Add any notes about this procedure..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t px-6 py-4 flex justify-between items-center">
+              <div className="text-sm text-gray-500">
+                Will apply to {selectedTeeth.length} teeth
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowQuickAddModal(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleQuickAddProcedure}
+                  disabled={!selectedProcedure}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Add to Selected Teeth
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
     </div>
   );
 }
