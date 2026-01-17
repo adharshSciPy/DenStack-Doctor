@@ -109,7 +109,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, onLike, onView, isLiking = fa
         className={`${styles.statusBadge} ${
           styles[
             `status${
-              blog.status.charAt(0).toUpperCase() + blog.status.slice(1)
+              blog?.status?.charAt(0).toUpperCase() + blog?.status?.slice(1)
             }`
           ]
         }`}
@@ -168,12 +168,12 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, onLike, onView, isLiking = fa
 
         {/* Tags */}
         <div className={styles.tags}>
-          {blog.tags.slice(0, 3).map((tag) => (
+          {blog?.tags?.slice(0, 3).map((tag) => (
             <span key={tag} className={styles.tag}>
               #{tag}
             </span>
           ))}
-          {blog.tags.length > 3 && (
+          {blog?.tags?.length > 3 && (
             <span className={styles.moreTags}>
               +{blog.tags.length - 3} more
             </span>

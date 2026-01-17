@@ -126,13 +126,16 @@ interface PatientSearchResponse {
 export function PatientRecords() {
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
-  const [patientData, setPatientData] = useState<PatientSearchResponse | null>(null);
-  const [selectedVisit, setSelectedVisit] = useState<PatientHistory | null>(null);
-  const [clinicPage, setClinicPage] = useState<{ [clinicId: string]: number }>({});
-const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-
-
-
+  const [patientData, setPatientData] = useState<PatientSearchResponse | null>(
+    null
+  );
+  const [selectedVisit, setSelectedVisit] = useState<PatientHistory | null>(
+    null
+  );
+  const [clinicPage, setClinicPage] = useState<{ [clinicId: string]: number }>(
+    {}
+  );
+  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
 
   const VISITS_PER_PAGE = 1;
 
@@ -148,70 +151,69 @@ const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
   };
 
   // Search patient by Random ID
- const handlePatientSearch = async () => {
-  if (!patientSearchQuery.trim()) return alert("Enter Patient ID");
+  const handlePatientSearch = async () => {
+    if (!patientSearchQuery.trim()) return alert("Enter Patient ID");
 
-  try {
-    setSearchLoading(true);
-    setSelectedVisit(null);
+    try {
+      setSearchLoading(true);
+      setSelectedVisit(null);
 
-    const res = await axios.get(
-      `${patientServiceBaseUrl}/api/v1/patient-service/patient/patient-by-randomId/${patientSearchQuery}?page=1&limit=${VISITS_PER_PAGE}`
-    );
+      const res = await axios.get(
+        `${patientServiceBaseUrl}/api/v1/patient-service/patient/patient-by-randomId/${patientSearchQuery}?page=1&limit=${VISITS_PER_PAGE}`
+      );
 
-    if (res.data.success) {
-      setPatientData(res.data.data);
+      if (res.data.success) {
+        setPatientData(res.data.data);
 
-      const pages: { [key: string]: number } = {};
-      res.data.data.records.forEach((rec: PatientRecord) => {
-        pages[rec.clinicId] = 1;
-      });
+        const pages: { [key: string]: number } = {};
+        res.data.data.records.forEach((rec: PatientRecord) => {
+          pages[rec.clinicId] = 1;
+        });
 
-      setClinicPage(pages);
-    } else {
-      alert("No patient found");
+        setClinicPage(pages);
+      } else {
+        alert("No patient found");
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Error fetching patient");
+    } finally {
+      setSearchLoading(false);
     }
-  } catch (error: any) {
-    alert(error.response?.data?.message || "Error fetching patient");
-  } finally {
-    setSearchLoading(false);
-  }
-};
-
+  };
 
   // Fetch visits for a clinic with pagination
-const fetchClinicVisits = async (clinicId: string, page: number) => {
-  if (!patientSearchQuery.trim()) return;
+  const fetchClinicVisits = async (clinicId: string, page: number) => {
+    if (!patientSearchQuery.trim()) return;
 
-  try {
-    setSearchLoading(true);
+    try {
+      setSearchLoading(true);
 
-    const res = await axios.get(
-      `${patientServiceBaseUrl}/api/v1/patient-service/patient/patient-by-randomId/${patientSearchQuery}?clinicId=${clinicId}&page=${page}&limit=${VISITS_PER_PAGE}`
-    );
+      const res = await axios.get(
+        `${patientServiceBaseUrl}/api/v1/patient-service/patient/patient-by-randomId/${patientSearchQuery}?clinicId=${clinicId}&page=${page}&limit=${VISITS_PER_PAGE}`
+      );
 
-    if (res.data.success) {
-      const updatedRecord = res.data.data.records.find((r: PatientRecord) => r.clinicId === clinicId);
+      if (res.data.success) {
+        const updatedRecord = res.data.data.records.find(
+          (r: PatientRecord) => r.clinicId === clinicId
+        );
 
-      setPatientData((prev) => {
-        if (!prev) return res.data.data;
+        setPatientData((prev) => {
+          if (!prev) return res.data.data;
 
-        return {
-          ...prev,
-          records: prev.records.map((rec) =>
-            rec.clinicId === clinicId ? updatedRecord : rec
-          )
-        };
-      });
+          return {
+            ...prev,
+            records: prev.records.map((rec) =>
+              rec.clinicId === clinicId ? updatedRecord : rec
+            ),
+          };
+        });
 
-      setClinicPage((prev) => ({ ...prev, [clinicId]: page }));
+        setClinicPage((prev) => ({ ...prev, [clinicId]: page }));
+      }
+    } finally {
+      setSearchLoading(false);
     }
-  } finally {
-    setSearchLoading(false);
-  }
-};
-
-
+  };
 
   // Clear search
   const handleClearSearch = () => {
@@ -238,12 +240,20 @@ const fetchClinicVisits = async (clinicId: string, page: number) => {
                 className="h-12"
               />
             </div>
-            <Button onClick={handlePatientSearch} disabled={searchLoading} className="h-12 min-w-[140px]">
+            <Button
+              onClick={handlePatientSearch}
+              disabled={searchLoading}
+              className="h-12 min-w-[140px]"
+            >
               <Search className="w-4 h-4 mr-2" />
               {searchLoading ? "Searching..." : "Search"}
             </Button>
             {patientData && (
-              <Button variant="outline" onClick={handleClearSearch} className="h-12">
+              <Button
+                variant="outline"
+                onClick={handleClearSearch}
+                className="h-12"
+              >
                 Clear
               </Button>
             )}
@@ -258,148 +268,165 @@ const fetchClinicVisits = async (clinicId: string, page: number) => {
             <h3 className="text-2xl font-bold text-green-800">
               Patient ID: {patientData.patientRandomId}
             </h3>
-            <p className="text-sm text-gray-600">Linked Clinics: {patientData.records.length}</p>
+            <p className="text-sm text-gray-600">
+              Linked Clinics: {patientData.records.length}
+            </p>
           </CardContent>
         </Card>
       )}
-      
 
       {/* History List */}
-{selectedClinic === null ? (
-  <div className="space-y-4">
-    {patientData?.records.map((record) => {
-      const visitCount = record.visitHistory.length;
-      const lastVisit = visitCount
-        ? formatDate(record.visitHistory[0].visitDate)
-        : "Not visited yet";
+      {selectedClinic === null ? (
+        <div className="space-y-4">
+          {patientData?.records.map((record) => {
+            const visitCount = record.visitHistory.length;
+            const lastVisit = visitCount
+              ? formatDate(record.visitHistory[0].visitDate)
+              : "Not visited yet";
 
-      return (
-        <Card
-          key={record.clinicId}
-          className="p-5 hover:shadow-lg cursor-pointer transition"
-          onClick={() => setSelectedClinic(record.clinicId)}
-        >
-          <CardContent>
-            <h2 className="font-bold text-lg">
-              {record.clinicDetails.name} — ({record.patientUniqueId})
-            </h2>
+            return (
+              <Card
+                key={record.clinicId}
+                className="p-5 hover:shadow-lg cursor-pointer transition"
+                onClick={() => setSelectedClinic(record.clinicId)}
+              >
+                <CardContent>
+                  <h2 className="font-bold text-lg">
+                    {record.clinicDetails.name} — ({record.patientUniqueId})
+                  </h2>
 
-            <p className="text-sm text-gray-600 mt-2">
-              Visits: <strong>{visitCount}</strong>
-              {" | "}
-              Last Visit: <strong>{lastVisit}</strong>
-            </p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Visits: <strong>{visitCount}</strong>
+                    {" | "}
+                    Last Visit: <strong>{lastVisit}</strong>
+                  </p>
 
-            {record.clinicDetails?.phone && (
-              <p className="text-sm text-gray-500">
-                Contact: {record.clinicDetails.phone}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      );
-    })}
-  </div>
+                  {record.clinicDetails?.phone && (
+                    <p className="text-sm text-gray-500">
+                      Contact: {record.clinicDetails.phone}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div>
+          {/* Back button */}
+          <Button
+            variant="outline"
+            className="mb-4"
+            onClick={() => setSelectedClinic(null)}
+          >
+            ← Back to Clinics
+          </Button>
 
-) : (
-  <div>
-    {/* Back button */}
-    <Button variant="outline" className="mb-4" onClick={() => setSelectedClinic(null)}>
-      ← Back to Clinics
-    </Button>
+          {patientData?.records
+            .filter((r) => r.clinicId === selectedClinic)
+            .map((record) => {
+              const currentPage = record.pagination?.page || 1;
+              const totalPages = record.pagination?.totalPages || 1;
 
-    {patientData?.records
-      .filter((r) => r.clinicId === selectedClinic)
-      .map((record) => {
-        const currentPage = record.pagination?.page || 1;
-const totalPages = record.pagination?.totalPages || 1;
+              return (
+                <div key={record.clinicId}>
+                  <h2 className="text-xl font-bold mb-3">
+                    {record.clinicDetails.name} — Visit History
+                  </h2>
 
-
-        return (
-          <div key={record.clinicId}>
-            <h2 className="text-xl font-bold mb-3">
-              {record.clinicDetails.name} — Visit History
-            </h2>
-
-            {record.visitHistory.length > 0 ? (
-              <>
-                {record.visitHistory.map((visit) => (
-                  <Card
-                    key={visit._id}
-                    className="hover:shadow-md cursor-pointer mt-3"
-                    onClick={() => setSelectedVisit(visit)}
-                  >
-                    <CardContent className="p-5">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold">
-                          {formatDate(visit.visitDate)}
-                        </span>
-                        <Badge
-                          className={
-                            visit.status === "completed"
-                              ? "bg-green-600"
-                              : "bg-gray-400"
-                          }
+                  {record.visitHistory.length > 0 ? (
+                    <>
+                      {record.visitHistory.map((visit) => (
+                        <Card
+                          key={visit._id}
+                          className="hover:shadow-md cursor-pointer mt-3"
+                          onClick={() => setSelectedVisit(visit)}
                         >
-                          {visit.status}
-                        </Badge>
-                      </div>
+                          <CardContent className="p-5">
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold">
+                                {formatDate(visit.visitDate)}
+                              </span>
+                              <Badge
+                                className={
+                                  visit.status === "completed"
+                                    ? "bg-green-600"
+                                    : "bg-gray-400"
+                                }
+                              >
+                                {visit.status}
+                              </Badge>
+                            </div>
 
-                      <div className="text-sm mt-3">
-                        Doctor:{" "}
-                        <span className="font-bold">
-                          {visit.doctor?.name || "N/A"}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Prescriptions: {visit.prescriptions.length}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                            <div className="text-sm mt-3">
+                              Doctor:{" "}
+                              <span className="font-bold">
+                                {visit.doctor?.name || "N/A"}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Prescriptions: {visit.prescriptions.length}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
 
-                {/* Pagination */}
-               {totalPages > 1 && (
-  <div className="flex justify-center gap-2 mt-4">
-    <Button
-      size="sm"
-      disabled={currentPage === 1 || searchLoading}
-      onClick={() => fetchClinicVisits(record.clinicId, currentPage - 1)}
-    >
-      Previous
-    </Button>
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-center gap-2 mt-4">
+                          <Button
+                            size="sm"
+                            disabled={currentPage === 1 || searchLoading}
+                            onClick={() =>
+                              fetchClinicVisits(
+                                record.clinicId,
+                                currentPage - 1
+                              )
+                            }
+                          >
+                            Previous
+                          </Button>
 
-    <span className="px-2 py-1 text-sm bg-gray-200 rounded">
-      {currentPage} / {totalPages}
-    </span>
+                          <span className="px-2 py-1 text-sm bg-gray-200 rounded">
+                            {currentPage} / {totalPages}
+                          </span>
 
-    <Button
-      size="sm"
-      disabled={currentPage === totalPages || searchLoading}
-      onClick={() => fetchClinicVisits(record.clinicId, currentPage + 1)}
-    >
-      Next
-    </Button>
-  </div>
-)}
-
-              </>
-            ) : (
-              <p className="text-gray-500 italic">No visit history available.</p>
-            )}
-          </div>
-        );
-      })}
-  </div>
-)}
-
-
+                          <Button
+                            size="sm"
+                            disabled={
+                              currentPage === totalPages || searchLoading
+                            }
+                            onClick={() =>
+                              fetchClinicVisits(
+                                record.clinicId,
+                                currentPage + 1
+                              )
+                            }
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-gray-500 italic">
+                      No visit history available.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       {/* Detail Modal */}
       {selectedVisit && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)" }}
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(8px)",
+          }}
           onClick={() => setSelectedVisit(null)}
         >
           <div
@@ -410,7 +437,9 @@ const totalPages = record.pagination?.totalPages || 1;
             <div className="bg-primary text-white px-6 py-5 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Visit Details</h2>
-                <p className="text-sm text-white/80 mt-1">{formatDate(selectedVisit.visitDate)}</p>
+                <p className="text-sm text-white/80 mt-1">
+                  {formatDate(selectedVisit.visitDate)}
+                </p>
               </div>
               <Button
                 variant="ghost"
@@ -435,19 +464,31 @@ const totalPages = record.pagination?.totalPages || 1;
                 <CardContent className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Name</p>
-                    <p className="font-semibold">{selectedVisit.doctor?.name || "N/A"}</p>
+                    <p className="font-semibold">
+                      {selectedVisit.doctor?.name || "N/A"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Specialization</p>
-                    <p className="font-semibold">{selectedVisit.doctor?.specialization || "N/A"}</p>
+                    <p className="font-semibold">
+                      {selectedVisit.doctor?.specialization || "N/A"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Phone</p>
-                    <p className="font-semibold">{selectedVisit.doctor?.phoneNumber || "N/A"}</p>
+                    <p className="font-semibold">
+                      {selectedVisit.doctor?.phoneNumber || "N/A"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Status</p>
-                    <Badge className={selectedVisit.status === "completed" ? "bg-green-600" : "bg-gray-400"}>
+                    <Badge
+                      className={
+                        selectedVisit.status === "completed"
+                          ? "bg-green-600"
+                          : "bg-gray-400"
+                      }
+                    >
                       {selectedVisit.status}
                     </Badge>
                   </div>
@@ -505,20 +546,31 @@ const totalPages = record.pagination?.totalPages || 1;
                   <CardContent>
                     <div className="space-y-3">
                       {selectedVisit.prescriptions.map((prescription) => (
-                        <div key={prescription._id} className="p-4 bg-gray-50 rounded-lg border">
-                          <p className="font-semibold text-lg">{prescription.medicineName}</p>
+                        <div
+                          key={prescription._id}
+                          className="p-4 bg-gray-50 rounded-lg border"
+                        >
+                          <p className="font-semibold text-lg">
+                            {prescription.medicineName}
+                          </p>
                           <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
                             <div>
                               <p className="text-gray-600">Dosage</p>
-                              <p className="font-medium">{prescription.dosage}</p>
+                              <p className="font-medium">
+                                {prescription.dosage}
+                              </p>
                             </div>
                             <div>
                               <p className="text-gray-600">Frequency</p>
-                              <p className="font-medium">{prescription.frequency}/day</p>
+                              <p className="font-medium">
+                                {prescription.frequency}/day
+                              </p>
                             </div>
                             <div>
                               <p className="text-gray-600">Duration</p>
-                              <p className="font-medium">{prescription.duration} days</p>
+                              <p className="font-medium">
+                                {prescription.duration} days
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -538,7 +590,9 @@ const totalPages = record.pagination?.totalPages || 1;
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{selectedVisit.notes}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {selectedVisit.notes}
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -551,35 +605,56 @@ const totalPages = record.pagination?.totalPages || 1;
                       <Activity className="w-5 h-5 text-blue-600" />
                       Treatment Plan: {selectedVisit.treatmentPlan.planName}
                     </CardTitle>
-                    <p className="text-sm text-gray-600">{selectedVisit.treatmentPlan.description}</p>
+                    <p className="text-sm text-gray-600">
+                      {selectedVisit.treatmentPlan.description}
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {selectedVisit.treatmentPlan.stages.map((stage, idx) => (
                       <div
                         key={stage._id}
                         className={`p-4 rounded-lg border-2 ${
-                          stage.status === "completed" ? "bg-green-50 border-green-300" : "bg-gray-50 border-gray-300"
+                          stage.status === "completed"
+                            ? "bg-green-50 border-green-300"
+                            : "bg-gray-50 border-gray-300"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="font-semibold">
                             Stage {idx + 1}: {stage.stageName}
                           </h4>
-                          <Badge className={stage.status === "completed" ? "bg-green-600" : "bg-gray-400"}>
+                          <Badge
+                            className={
+                              stage.status === "completed"
+                                ? "bg-green-600"
+                                : "bg-gray-400"
+                            }
+                          >
                             {stage.status}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600 mb-2">{stage.description}</p>
+                        <p className="text-sm text-gray-600 mb-2">
+                          {stage.description}
+                        </p>
                         <p className="text-xs text-gray-500">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Scheduled: {formatDate(stage.scheduledDate)}
                         </p>
                         {stage.procedures.length > 0 && (
                           <div className="mt-3 space-y-2">
-                            <p className="text-xs font-semibold text-gray-700">Procedures:</p>
+                            <p className="text-xs font-semibold text-gray-700">
+                              Procedures:
+                            </p>
                             {stage.procedures.map((proc) => (
-                              <div key={proc._id} className="pl-4 text-sm flex items-center gap-2">
-                                {proc.completed ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                              <div
+                                key={proc._id}
+                                className="pl-4 text-sm flex items-center gap-2"
+                              >
+                                {proc.completed ? (
+                                  <CheckCircle className="w-4 h-4 text-green-600" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-gray-400" />
+                                )}
                                 <span>{proc.name}</span>
                               </div>
                             ))}
@@ -593,7 +668,10 @@ const totalPages = record.pagination?.totalPages || 1;
             </div>
 
             {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end gap-3" style={{ padding: "10px" }}>
+            <div
+              className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end gap-3"
+              style={{ padding: "10px" }}
+            >
               <Button variant="outline" onClick={() => setSelectedVisit(null)}>
                 Close
               </Button>
