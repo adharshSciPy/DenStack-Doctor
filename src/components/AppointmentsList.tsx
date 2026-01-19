@@ -1236,6 +1236,48 @@ interface Doctor {
   doctorId: string;   // existing
   doctor?: any;       // add only if your API actually sends this
 }
+interface ExaminationItem {
+  value: string;
+  isCustom: boolean;
+}
+interface SoftTissueData {
+  id: string;
+  name: string;
+  onExamination: string[];
+  diagnosis: string[];
+  treatment: string[];
+  notes?: string;
+  surfaceConditions?: {  
+    surface: string;
+    conditions: string[];
+  }[];
+}
+interface TMJData {
+  id: string;       
+  name: string;
+  onExamination: string[];
+  diagnosis: string[];
+  treatment: string[];
+  notes?: string;
+}
+// Add these constants before the AppointmentsList component
+const SOFT_TISSUE_DATA = [
+  { id: 'tongue', name: 'Tongue' },
+  { id: 'gingiva', name: 'Gingiva' },
+  { id: 'palate', name: 'Palate' },
+  { id: 'buccal-mucosa', name: 'Buccal Mucosa' },
+  { id: 'floor-of-mouth', name: 'Floor of Mouth' },
+  { id: 'labial-mucosa', name: 'Labial Mucosa' },
+  { id: 'salivary-glands', name: 'Salivary Glands' },
+  { id: 'frenum', name: 'Frenum' }
+];
+
+const TMJ_DATA: Pick<TMJData, 'id' | 'name'>[] = [
+  { id: 'tmj-left', name: 'TMJ Left' },
+  { id: 'tmj-right', name: 'TMJ Right' },
+  { id: 'tmj-both', name: 'TMJ Both' }
+];
+
 const generateProcedureId = (): string => {
   return `proc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
@@ -1321,6 +1363,8 @@ const [dentalData, setDentalData] = useState<{
 const [editingTreatmentPlan, setEditingTreatmentPlan] = useState<TreatmentPlan | null>(null)
 const [isTransitioningToEdit, setIsTransitioningToEdit] = useState(false);
 // const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
+const [softTissues, setSoftTissues] = useState<SoftTissueData[]>([]);
+const [tmjExaminations, setTMJExaminations] = useState<TMJData[]>([]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
@@ -1719,9 +1763,6 @@ useEffect(() => {
 
 // Fixed helper function to generate ObjectId-like strings
 
-
-// In your AppointmentsList component, fix the handleSaveConsultation function:
-
 const handleSaveConsultation = async () => {
   // Validate required fields
   if (!chiefComplaint.trim()) {
@@ -1777,55 +1818,123 @@ const handleSaveConsultation = async () => {
     }));
     formData.append('files', JSON.stringify(existingFiles));
 
-    // ✅ Transform performed teeth
-    if (dentalData.performedTeeth.length > 0) {
-      const transformedPerformedTeeth = dentalData.performedTeeth.map(tooth => ({
-        toothNumber: tooth.toothNumber,
-        conditions: (tooth.conditions || []).map((cond: string) => 
-          cond.toLowerCase()
-        ),
-        surfaceConditions: (tooth.surfaceConditions || []).map((sc: any) => ({
-          surface: sc.surface || 'occlusal',
-          conditions: (sc.conditions || []).map((cond: string) => 
-            cond.toLowerCase()
-          )
-        })),
-        procedures: (tooth.procedures || []).map((p: any) => ({
-          name: p.name,
-          surface: p.surface || 'occlusal',
-          status: p.status || 'completed',
-          cost: p.cost || p.estimatedCost || 0,
-          notes: p.notes || '',
-          performedAt: p.performedAt || new Date().toISOString()
-        }))
-      }));
+    // ✅ Transform soft tissue examinations for backend
+ if (softTissues && softTissues.length > 0) {
+  const transformedSoftTissues = softTissues
+    .filter((st: SoftTissueData) => 
+      (st.onExamination && st.onExamination.length > 0) ||
+      (st.diagnosis && st.diagnosis.length > 0) ||
+      (st.treatment && st.treatment.length > 0)
+    )
+    .map((st: SoftTissueData) => ({
+      id: st.id,
+      name: st.name,
+      onExamination: (st.onExamination || []).map((item: string) => ({
+        value: item,
+        isCustom: false // You can add logic to detect custom entries
+      })),
+      diagnosis: (st.diagnosis || []).map((item: string) => ({
+        value: item,
+        isCustom: false
+      })),
+      treatment: (st.treatment || []).map((item: string) => ({
+        value: item,
+        isCustom: false
+      })),
+      notes: st.notes || ""
+    }));
+  
+  if (transformedSoftTissues.length > 0) {
+    formData.append('softTissueExamination', JSON.stringify(transformedSoftTissues));
+    console.log("✅ Soft tissue data added:", transformedSoftTissues.length, "tissues");
+  }
+}
+
+    // ✅ Transform TMJ examinations for backend
+  if (tmjExaminations && tmjExaminations.length > 0) {
+  const transformedTMJExaminations = tmjExaminations
+    .filter((tmj: TMJData) => 
+      (tmj.onExamination && tmj.onExamination.length > 0) ||
+      (tmj.diagnosis && tmj.diagnosis.length > 0) ||
+      (tmj.treatment && tmj.treatment.length > 0)
+    )
+    .map((tmj: TMJData) => ({
+      id: tmj.id,
+      name: tmj.name,
+      onExamination: (tmj.onExamination || []).map((item: string) => ({
+        value: item,
+        isCustom: false
+      })),
+      diagnosis: (tmj.diagnosis || []).map((item: string) => ({
+        value: item,
+        isCustom: false
+      })),
+      treatment: (tmj.treatment || []).map((item: string) => ({
+        value: item,
+        isCustom: false
+      })),
+      notes: tmj.notes || ""
+    }));
+  
+  if (transformedTMJExaminations.length > 0) {
+    formData.append('tmjExamination', JSON.stringify(transformedTMJExaminations));
+    console.log("✅ TMJ data added:", transformedTMJExaminations.length, "examinations");
+  }
+}
+
+    // ✅ Transform performed teeth (NO status filter)
+    if (dentalData.performedTeeth && dentalData.performedTeeth.length > 0) {
+      const transformedPerformedTeeth = dentalData.performedTeeth
+        .filter(tc => 
+          tc.conditions.length > 0 || 
+          tc.surfaceConditions?.length > 0 || 
+          tc.procedures?.length > 0
+        )
+        .map(tc => ({
+          toothNumber: tc.toothNumber,
+          conditions: tc.conditions || [],
+          surfaceConditions: (tc.surfaceConditions || []).map((sc:any) => ({
+            surface: sc.surface,
+            conditions: sc.conditions || []
+          })),
+          procedures: (tc.procedures || [])
+            .map((p:any) => ({
+              name: p.name,
+              surface: p.surface || "occlusal",
+              cost: p.cost || p.estimatedCost || 0,
+              notes: p.notes || "",
+              performedAt: p.performedAt || new Date().toISOString()
+            }))
+        }));
       
-      formData.append('performedTeeth', JSON.stringify(transformedPerformedTeeth));
+      if (transformedPerformedTeeth.length > 0) {
+        formData.append('performedTeeth', JSON.stringify(transformedPerformedTeeth));
+        console.log("✅ Performed teeth data added:", transformedPerformedTeeth.length, "teeth");
+      }
     }
 
-    // ✅ Transform planned procedures
-    if (dentalData.plannedProcedures.length > 0) {
+    // ✅ Transform planned procedures for treatment plan
+    if (dentalData.plannedProcedures && dentalData.plannedProcedures.length > 0) {
       formData.append('plannedProcedures', JSON.stringify(dentalData.plannedProcedures));
+      console.log("✅ Planned procedures added:", dentalData.plannedProcedures.length);
     }
 
-    // ✅ TREATMENT PLAN HANDLING - UPDATED LOGIC
+    // ✅ TREATMENT PLAN HANDLING
     let treatmentPlanInput = null;
     let treatmentPlanStatusUpdate = null;
     
     if (dentalData.treatmentPlan) {
       console.log("📋 Processing treatment plan data");
       
-      // Check if we're editing an existing plan (not temporary)
+      // Check if we're editing an existing plan
       if (editingTreatmentPlan && !editingTreatmentPlan._id.startsWith('temp-')) {
         console.log("🔄 Updating existing treatment plan:", editingTreatmentPlan._id);
         
-        // 🔄 CASE 1: EDITING EXISTING PLAN
         // Find completed procedures in Stage 1
         const completedProcedures: any[] = [];
         
         dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
           toothPlan.procedures.forEach((proc: any) => {
-            // If procedure is marked as completed in Stage 1
             if (proc.status === 'completed' && proc.stage === 1) {
               completedProcedures.push({
                 toothNumber: toothPlan.toothNumber,
@@ -1852,11 +1961,10 @@ const handleSaveConsultation = async () => {
           completedProcedures: completedProcedures
         };
         
-        console.log("📊 Treatment plan status update:", treatmentPlanStatusUpdate);
         formData.append('treatmentPlanStatus', JSON.stringify(treatmentPlanStatusUpdate));
         
       } else {
-        // 🆕 CASE 2: CREATING NEW TREATMENT PLAN
+        // Creating new treatment plan
         console.log("🆕 Creating new treatment plan");
         
         // Get teeth procedures by stage
@@ -1880,94 +1988,78 @@ const handleSaveConsultation = async () => {
           });
         });
         
-        // Check if any procedures were performed today (Stage 1)
+        // Check if any procedures were performed today
         const stage1Procedures = proceduresByStage[1] || [];
         const completedInStage1 = stage1Procedures.filter(p => p.status === 'completed');
         const shouldStartToday = completedInStage1.length > 0;
         
-        console.log(`Stage 1: ${stage1Procedures.length} procedures, ${completedInStage1.length} completed`);
-        console.log(`Should start today: ${shouldStartToday}`);
-        
-        // Build stages with toothSurfaceProcedures
-        // Build stages with toothSurfaceProcedures
-const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
-  const stageNumber = parseInt(stageNumStr);
-  
-  // Group procedures by tooth and surface
-  const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
-  
-  procs.forEach(proc => {
-    if (!toothSurfaceMap[proc.toothNumber]) {
-      toothSurfaceMap[proc.toothNumber] = {};
-    }
-    
-    if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
-      toothSurfaceMap[proc.toothNumber][proc.surface] = [];
-    }
-    
-    if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
-      toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
-    }
-  });
-  
-  // Convert to toothSurfaceProcedures format
-  const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
-    const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
-      surface: surface,
-      procedureNames: procedureNames
-    }));
-    
-    return {
-      toothNumber: parseInt(toothNumStr),
-      surfaceProcedures: surfaceProcedures
-    };
-  });
-  
-
-const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
-  (s.stageNumber || s.stage) === stageNumber
-);
-
-// Use the status from the form if available, otherwise calculate it
-let stageStatus;
-if (stageInput?.status) {
-  // Use the user-selected status from the form
-  stageStatus = stageInput.status;
-  console.log(`📝 Stage ${stageNumber}: Using user-selected status: ${stageStatus}`);
-} else {
-  // Fallback: Calculate based on procedures
-  const proceduresInStage = procs;
-  const totalProcedures = proceduresInStage.length;
-  const completedProcedures = proceduresInStage.filter(p => p.status === 'completed').length;
-  
-  console.log(`📊 Stage ${stageNumber}: ${completedProcedures}/${totalProcedures} procedures completed`);
-  
-  if (totalProcedures === 0) {
-    stageStatus = 'pending';
-  } else if (completedProcedures === totalProcedures) {
-    stageStatus = 'completed';
-  } else if (completedProcedures > 0) {
-    stageStatus = 'in-progress';
-  } else {
-    stageStatus = 'pending';
-  }
-}
-  
-  console.log(`Stage ${stageNumber} status being sent:`, stageStatus);
-  
-  return {
-    stageNumber: stageNumber,
-    stageName: stageInput?.stageName || `Stage ${stageNumber}`,
-    description: stageInput?.description || '',
-    status: stageStatus, // ← Calculated dynamically
-    scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
-    toothSurfaceProcedures: toothSurfaceProcedures,
-    notes: stageInput?.notes || '',
-    // Add timestamps based on status
-    ...(stageStatus === 'in-progress' && { startedAt: new Date().toISOString() }),
-    ...(stageStatus === 'completed' && { completedAt: new Date().toISOString() })
-  };
-});
+        // Build stages
+        const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
+          const stageNumber = parseInt(stageNumStr);
+          
+          // Group procedures by tooth and surface
+          const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+          
+          procs.forEach(proc => {
+            if (!toothSurfaceMap[proc.toothNumber]) {
+              toothSurfaceMap[proc.toothNumber] = {};
+            }
+            
+            if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+              toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+            }
+            
+            if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
+              toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
+            }
+          });
+          
+          // Convert to toothSurfaceProcedures format
+          const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
+            const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
+              surface: surface,
+              procedureNames: procedureNames
+            }));
+            
+            return {
+              toothNumber: parseInt(toothNumStr),
+              surfaceProcedures: surfaceProcedures
+            };
+          });
+          
+          const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
+            (s.stageNumber || s.stage) === stageNumber
+          );
+          
+          // Determine stage status
+          let stageStatus;
+          if (stageInput?.status) {
+            stageStatus = stageInput.status;
+          } else {
+            const totalProcedures = procs.length;
+            const completedProcedures = procs.filter(p => p.status === 'completed').length;
+            
+            if (totalProcedures === 0) {
+              stageStatus = 'pending';
+            } else if (completedProcedures === totalProcedures) {
+              stageStatus = 'completed';
+            } else if (completedProcedures > 0) {
+              stageStatus = 'in-progress';
+            } else {
+              stageStatus = 'pending';
+            }
+          }
+          
+          return {
+            stageNumber: stageNumber,
+            stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+            description: stageInput?.description || '',
+            status: stageStatus,
+            scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
+            toothSurfaceProcedures: toothSurfaceProcedures,
+            notes: stageInput?.notes || ''
+          };
+        });
         
         // Build teeth data
         const teethData = dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
@@ -1989,18 +2081,8 @@ if (stageInput?.status) {
           description: dentalData.treatmentPlan.description?.trim() || '',
           teeth: teethData,
           stages: stagesData,
-          startToday: shouldStartToday // ✅ CRITICAL: Tell backend to start plan if procedures completed
+          startToday: shouldStartToday
         };
-        
-        console.log("✅ New treatment plan data:", {
-          planName: treatmentPlanInput.planName,
-          teethCount: treatmentPlanInput.teeth.length,
-          stagesCount: treatmentPlanInput.stages.length,
-          startToday: treatmentPlanInput.startToday,
-          totalProcedures: treatmentPlanInput.teeth.reduce((sum: number, t: any) => 
-            sum + t.procedures.length, 0
-          )
-        });
         
         formData.append('treatmentPlan', JSON.stringify(treatmentPlanInput));
       }
@@ -2029,12 +2111,19 @@ if (stageInput?.status) {
     });
 
     console.log("=== FORM DATA SUMMARY ===");
+    console.log("Soft tissues:", softTissues.filter(st => 
+      st.onExamination.length > 0 || 
+      st.diagnosis.length > 0 || 
+      st.treatment.length > 0
+    ).length);
+    console.log("TMJ examinations:", tmjExaminations.filter(tmj => 
+      tmj.onExamination.length > 0 || 
+      tmj.diagnosis.length > 0 || 
+      tmj.treatment.length > 0
+    ).length);
     console.log("Has treatment plan:", !!dentalData.treatmentPlan);
-    console.log("Is editing existing:", !!editingTreatmentPlan);
-    console.log("Treatment plan input:", treatmentPlanInput);
-    console.log("Treatment plan status update:", treatmentPlanStatusUpdate);
-    console.log("Has performed teeth:", dentalData.performedTeeth.length > 0);
-    console.log("Has files:", uploadFiles.length > 0);
+    console.log("Has performed teeth:", dentalData.performedTeeth?.length || 0);
+    console.log("Has files:", uploadFiles.length);
 
     // Using axios with FormData
     const response = await axios.post(
@@ -2084,6 +2173,20 @@ if (stageInput?.status) {
         treatmentPlan: null
       });
       
+      // Reset soft tissues and TMJ examinations
+     setSoftTissues(SOFT_TISSUE_DATA.map(tissue => ({
+  ...tissue,
+  onExamination: [],
+  diagnosis: [],
+  treatment: []
+})));
+   setTMJExaminations(TMJ_DATA.map(tmj => ({
+  ...tmj,
+  onExamination: [],
+  diagnosis: [],
+  treatment: []
+})));
+      
       // Close dental chart if open
       setShowDentalChart(false);
       
@@ -2097,7 +2200,6 @@ if (stageInput?.status) {
   } catch (err: any) {
     console.error("❌ Error saving consultation:", err);
     console.error("Error response:", err.response?.data);
-    console.error("Error details:", err.response?.config?.data);
     
     if (err.response?.data?.errors) {
       const errorMessages = Object.entries(err.response.data.errors)
@@ -2566,30 +2668,40 @@ useEffect(() => {
   onClose={() => {
     setShowDentalChart(false);
   }}
-  onSave={(dentalDataFromChart) => {
-    console.log("DentalChart onSave called with:", dentalDataFromChart);
-    
-    // ✅ UPDATED: Directly use what DentalChart sends
-    setDentalData({
-      performedTeeth: dentalDataFromChart.performedTeeth || [],
-      plannedProcedures: dentalDataFromChart.plannedProcedures || [],
-      treatmentPlan: dentalDataFromChart.treatmentPlan || null
-    });
-    
-    console.log("Updated dental data:", {
-      performedTeeth: dentalDataFromChart.performedTeeth?.length || 0,
-      plannedProcedures: dentalDataFromChart.plannedProcedures?.length || 0,
-      hasTreatmentPlan: !!dentalDataFromChart.treatmentPlan
-    });
-    
-    // Clear editing state if we were editing
-    if (editingTreatmentPlan) {
-      setEditingTreatmentPlan(null);
-    }
-    
-    alert("Dental chart data saved successfully!");
-    setShowDentalChart(false);
-  }}
+onSave={(dentalDataFromChart) => {
+  console.log("DentalChart onSave called with:", dentalDataFromChart);
+  
+  setDentalData({
+    performedTeeth: dentalDataFromChart.performedTeeth || [],
+    plannedProcedures: dentalDataFromChart.plannedProcedures || [],
+    treatmentPlan: dentalDataFromChart.treatmentPlan || null
+  });
+  
+  // Also update soft tissues and TMJ from the chart
+  if (dentalDataFromChart.softTissues) {
+    setSoftTissues(dentalDataFromChart.softTissues);
+  }
+  
+  if (dentalDataFromChart.tmjExaminations) {
+    setTMJExaminations(dentalDataFromChart.tmjExaminations);
+  }
+  
+  console.log("Updated dental data:", {
+    performedTeeth: dentalDataFromChart.performedTeeth?.length || 0,
+    plannedProcedures: dentalDataFromChart.plannedProcedures?.length || 0,
+    hasTreatmentPlan: !!dentalDataFromChart.treatmentPlan,
+    softTissues: dentalDataFromChart.softTissues?.length || 0,
+    tmjExaminations: dentalDataFromChart.tmjExaminations?.length || 0
+  });
+  
+  // Clear editing state if we were editing
+  if (editingTreatmentPlan) {
+    setEditingTreatmentPlan(null);
+  }
+  
+  alert("Dental chart data saved successfully!");
+  setShowDentalChart(false);
+}}
   onProcedureAdded={(toothNumber, procedure) => {
     console.log(`Procedure ${procedure.name} added to tooth ${toothNumber}`);
   }}
