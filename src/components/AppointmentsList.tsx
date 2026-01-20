@@ -2657,7 +2657,7 @@ useEffect(() => {
           </div>
 
           {/* Full-screen Dental Chart Container */}
-          <div className="h-[calc(100vh-80px)] w-full">
+       <div className="h-[calc(100vh-60px)] w-full"> 
 
 <DentalChart
   patientId={appointmentDetail.patientId._id}
