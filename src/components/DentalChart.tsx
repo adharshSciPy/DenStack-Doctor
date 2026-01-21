@@ -15,7 +15,8 @@ import {
   Grid,
   ChevronDown,
   Menu,
-  ChevronUp
+  ChevronUp,
+  Check
 } from "lucide-react";
 import { Badge } from "./ui/badge";
 
@@ -1618,25 +1619,35 @@ const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useSta
               <h5 className="text-xs font-medium mb-2 text-gray-600">
                 Select Conditions:
               </h5>
-              <div className="grid grid-cols-2 gap-2">
-                {DENTAL_CONDITIONS.map((cond) => (
-                  <button
-                    key={cond}
-                    type="button"
-                    onClick={() => handleConditionToggle(cond)}
-                    className={`px-2 py-1.5 rounded text-xs border transition-colors text-left truncate ${
-                      selectedConditions.includes(cond)
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    <span className="mr-1">
-                      {selectedConditions.includes(cond) ? "✓" : "+"}
-                    </span>
-                    {cond}
-                  </button>
-                ))}
-              </div>
+             <div className="grid grid-cols-2 gap-2">
+                            {DENTAL_CONDITIONS.map((cond) => {
+                              const isSelected = selectedConditions.includes(cond);
+                              return (
+                                <button
+                                  key={cond}
+                                  type="button"
+                                  onClick={() => handleConditionToggle(cond)}
+                                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
+                                    isSelected
+                                      ? "bg-blue-500 text-white border-blue-500 shadow-sm"
+                                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  {isSelected ? (
+                                    <>
+                                      <Check className="h-3 w-3" />
+                                      {cond}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-3 w-3" />
+                                      {cond}
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
               
               {/* Quick Actions */}
               <div className="mt-3 pt-3 border-t">
@@ -1894,21 +1905,26 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
   onSave,
 }) => {
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
   const [surfaceConditions, setSurfaceConditions] = useState<
     { surface: string; conditions: string[] }[]
   >([]);
-  const [procedures, setProcedures] = useState<any[]>([]);
-  const [notes, setNotes] = useState("");
-  const [activeTab, setActiveTab] = useState<"conditions" | "procedures">(
-    "conditions",
-  );
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useState(false);
 
-  // Get tooth names for display
-  const selectedToothObjects = toothData.filter((t) =>
-    selectedTeeth.includes(t.number),
-  );
+  // Sort teeth numbers
+  const sortedTeethNumbers = [...selectedTeeth].sort((a, b) => a - b);
 
+  // Handle condition toggle
+  const handleConditionToggle = (conditionName: string) => {
+    setSelectedConditions((prev) =>
+      prev.includes(conditionName)
+        ? prev.filter((c) => c !== conditionName)
+        : [...prev, conditionName],
+    );
+  };
+
+  // Handle area click - TOGGLE multiple areas
   const handleAreaClick = (area: string) => {
     setSelectedAreas((prev) => {
       if (prev.includes(area)) {
@@ -1919,14 +1935,7 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
     });
   };
 
-  const handleConditionToggle = (conditionName: string) => {
-    setSelectedConditions((prev) =>
-      prev.includes(conditionName)
-        ? prev.filter((c) => c !== conditionName)
-        : [...prev, conditionName],
-    );
-  };
-
+  // Handle surface condition toggle for a specific area
   const handleSurfaceConditionToggle = (
     surface: string,
     conditionName: string,
@@ -1958,53 +1967,39 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
     });
   };
 
-  const handleAddProcedure = () => {
-    const procedureName = prompt("Enter procedure name:");
-    if (!procedureName) return;
-
-    const surface =
-      prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") ||
-      "occlusal";
-    const cost = Number(prompt("Enter estimated cost:") || 0);
-    const notes = prompt("Enter notes (optional):") || "";
-
-    const newProcedure = {
-      name: procedureName,
-      surface,
-      cost,
-      notes,
-      date: new Date().toISOString(),
-    };
-
-    setProcedures([...procedures, newProcedure]);
-  };
-
-  const handleSave = () => {
-    onSave({
-      teethNumbers: selectedTeeth,
-      conditions: selectedConditions,
-      procedures,
-      surfaceConditions,
-      notes,
-    });
-  };
-
+  // Get conditions by area for the diagram
   const conditionsByArea: Record<string, string[]> = {};
   surfaceConditions.forEach((sc) => {
     conditionsByArea[sc.surface] = sc.conditions;
   });
 
+  // Handle save with formatted data
+  const handleSave = () => {
+    const toothData = {
+      teethNumbers: selectedTeeth,
+      conditions: selectedConditions,
+      notes,
+      surfaceConditions,
+      procedures: [],
+    };
+
+    onSave(toothData);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
+      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-lg">
         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">
-              Bulk Edit - {selectedTeeth.length} Teeth Selected
+              Multiple Teeth - {selectedTeeth.length} Selected
             </h3>
             <p className="text-sm text-muted-foreground">
-              Teeth: {selectedTeeth.sort((a, b) => a - b).join(", ")}
+              Teeth: {sortedTeethNumbers.join(", ")}
             </p>
+            <Badge variant="outline" className="mt-1">
+              Multi-Tooth Edit
+            </Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -2012,54 +2007,183 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Selected Teeth Preview */}
-          <div className="mb-6">
-            <h4 className="font-medium mb-3">Selected Teeth</h4>
-            <div className="flex flex-wrap gap-3">
-              {selectedToothObjects.map((tooth) => (
-                <div key={tooth.number} className="flex flex-col items-center">
-                  <ToothSVG
-                    type={tooth.svgName}
-                    width={50}
-                    height={50}
-                    rotation={tooth.rotation}
-                    color="#4b5563"
-                  />
-                  <div className="mt-1 text-xs font-bold bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center">
-                    {tooth.number}
+          {/* TWO CONTAINERS LAYOUT */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Left Container: Tooth Preview and General Conditions */}
+            <div className="space-y-6">
+              {/* Teeth Preview Container */}
+              <div className="border rounded-xl p-4 bg-gray-50">
+                <div className="flex items-start gap-4">
+                  {/* Teeth SVG Preview */}
+                  <div className="flex-shrink-0">
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedTeeth.slice(0, 6).map((toothNumber) => {
+                        const tooth = toothData.find(t => t.number === toothNumber);
+                        return tooth ? (
+                          <div key={tooth.number} className="flex flex-col items-center">
+                            <ToothSVG
+                              type={tooth.svgName}
+                              width={50}
+                              height={50}
+                              rotation={tooth.rotation || 0}
+                              color="#4b5563"
+                            />
+                            <div className="text-center mt-1">
+                              <div className="text-sm font-bold text-gray-800">
+                                #{tooth.number}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                    {selectedTeeth.length > 6 && (
+                      <div className="text-center mt-2 text-xs text-gray-500">
+                        +{selectedTeeth.length - 6} more teeth
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* General Conditions Section with Dropdown */}
+                  <div className="flex-1">
+                    <div className="mt-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-sm">General Conditions</h4>
+                        {mode === "edit" && (
+                          <button
+                            type="button"
+                            onClick={() => setShowGeneralConditionsDropdown(!showGeneralConditionsDropdown)}
+                            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                          >
+                            {showGeneralConditionsDropdown ? (
+                              <>
+                                <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
+                                <span className="text-sm font-medium">Hide Conditions</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
+                                <span className="text-sm font-medium">Select Conditions</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Current selected conditions display */}
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedConditions.map((cond) => (
+                            <Badge 
+                              key={cond} 
+                              variant="secondary" 
+                              className="text-xs py-1 px-2"
+                            >
+                              {cond}
+                              {mode === "edit" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleConditionToggle(cond)}
+                                  className="ml-1.5 text-red-500 hover:text-red-700"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </Badge>
+                          ))}
+                          {selectedConditions.length === 0 && (
+                            <p className="text-sm text-muted-foreground italic">
+                              No general conditions
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Dropdown for adding conditions - Only visible when toggled */}
+                      {mode === "edit" && showGeneralConditionsDropdown && (
+                        <div className="border rounded-lg p-3 bg-white shadow-sm animate-in fade-in duration-200">
+                          <h5 className="text-xs font-medium mb-2 text-gray-600">
+                            Select Conditions:
+                          </h5>
+                          <div className="grid grid-cols-2 gap-2">
+                            {DENTAL_CONDITIONS.map((cond) => {
+                              const isSelected = selectedConditions.includes(cond);
+                              return (
+                                <button
+                                  key={cond}
+                                  type="button"
+                                  onClick={() => handleConditionToggle(cond)}
+                                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  {isSelected ? (
+                                    <>
+                                      <Check className="h-3 w-3" />
+                                      {cond}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-3 w-3" />
+                                      {cond}
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          {/* Quick Actions */}
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedConditions([])}
+                                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded border hover:bg-gray-200 transition-colors"
+                              >
+                                Clear All
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedConditions([...DENTAL_CONDITIONS])}
+                                className="text-xs px-2 py-1 bg-primary/10 text-primary rounded border border-primary/20 hover:bg-primary/20 transition-colors"
+                              >
+                                Select All
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Notes Section */}
+              <div>
+                <h4 className="font-medium mb-2">Notes</h4>
+                <textarea
+                  className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add notes for all selected teeth..."
+                  readOnly={mode === "view"}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Tabs */}
-          <div className="border-b mb-6">
-            <div className="flex">
-              <button
-                type="button"
-                onClick={() => setActiveTab("conditions")}
-                className={`px-4 py-2 font-medium ${activeTab === "conditions" ? "border-b-2 border-primary text-primary" : "text-gray-500"}`}
-              >
-                Conditions
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("procedures")}
-                className={`px-4 py-2 font-medium ${activeTab === "procedures" ? "border-b-2 border-primary text-primary" : "text-gray-500"}`}
-              >
-                Procedures
-              </button>
-            </div>
-          </div>
+            {/* RIGHT CONTAINER: Surface Selection Diagram */}
+            <div className="space-y-4">
+              <div className="border rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white shadow-sm">
+                <h4 className="font-semibold mb-4 text-base text-gray-800 text-center">
+                  Surface Selection
+                </h4>
 
-          {activeTab === "conditions" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column: Surface Selection */}
-              <div className="space-y-6">
-                <div className="border rounded-xl p-4 bg-gray-50">
-                  <h4 className="font-medium mb-3">Surface Selection</h4>
-
+                {/* Surface Selection Diagram - Centered */}
+                <div className="flex justify-center">
                   <ToothDiagram
                     toothType="molar"
                     rotation={0}
@@ -2067,95 +2191,95 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
                     onAreaClick={handleAreaClick}
                     mode={mode}
                     conditionsByArea={conditionsByArea}
+                    size={95}
                   />
-
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600 mb-2">
-                      Selected surfaces will apply to all {selectedTeeth.length}{" "}
-                      teeth
-                    </p>
-                    {selectedAreas.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedAreas.map((area) => (
-                          <Badge
-                            key={area}
-                            variant="secondary"
-                            className="capitalize"
-                          >
-                            {area}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
 
-                {/* Surface Conditions */}
-                {selectedAreas.length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-3">Surface Conditions</h4>
-                    <div className="space-y-3">
-                      {selectedAreas.map((area) => {
+                {/* Selected Areas Display */}
+                {selectedAreas.length > 0 && mode === "edit" && (
+                  <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 mt-4">
+                    <h5 className="font-medium mb-2 text-xs text-gray-700">
+                      Surface Conditions:
+                    </h5>
+
+                    {/* Show each selected area in REVERSE ORDER */}
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      {[...selectedAreas].reverse().map((area) => {
                         const areaConditions =
                           surfaceConditions.find((sc) => sc.surface === area)
                             ?.conditions || [];
+                        const areaColor = {
+                          mesial: "#3b82f6",
+                          distal: "#10b981",
+                          buccal: "#f59e0b",
+                          lingual: "#8b5cf6",
+                          occlusal: "#ef4444",
+                        }[area];
 
                         return (
-                          <div key={area} className="border rounded p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge variant="outline" className="capitalize">
+                          <div key={area} className="border rounded p-2 bg-white">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: areaColor }}
+                              />
+                              <span className="font-medium capitalize text-xs">
                                 {area}
-                              </Badge>
-                              <span className="text-sm text-gray-500">
-                                {areaConditions.length} condition(s)
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {areaConditions.map((cond) => (
-                                <Badge
-                                  key={cond}
-                                  variant="secondary"
-                                  className="text-xs flex items-center gap-1"
-                                >
-                                  {cond}
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleSurfaceConditionToggle(area, cond)
-                                    }
-                                    className="ml-1 text-red-500 hover:text-red-700"
+                            {/* Current conditions */}
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {areaConditions.length > 0 ? (
+                                areaConditions.map((cond) => (
+                                  <Badge
+                                    key={cond}
+                                    variant="secondary"
+                                    className="text-[10px] py-0.5 px-1.5 h-auto"
                                   >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
+                                    {cond}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSurfaceConditionToggle(area, cond)}
+                                      className="ml-1 text-red-500 hover:text-red-700"
+                                    >
+                                      <X className="h-2.5 w-2.5" />
+                                    </button>
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-gray-400 italic">
+                                  No conditions
+                                </span>
+                              )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                "Caries",
-                                "Filling",
-                                "Fractured",
-                                "Sensitive",
-                              ].map((cond) => {
+                            {/* Quick condition buttons */}
+                            <div className="flex flex-wrap gap-1">
+                              {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
                                 const isApplied = areaConditions.includes(cond);
                                 return (
                                   <button
                                     key={cond}
                                     type="button"
-                                    onClick={() =>
-                                      handleSurfaceConditionToggle(area, cond)
-                                    }
-                                    className={`px-2 py-1 text-xs border rounded ${
+                                    onClick={() => handleSurfaceConditionToggle(area, cond)}
+                                    className={`px-2 py-1 text-[10px] font-medium rounded-full transition-all ${
                                       isApplied
-                                        ? "bg-red-100 text-red-700 border-red-200"
-                                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                        ? "bg-destructive text-destructive-foreground shadow-sm"
+                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                     }`}
                                   >
-                                    {isApplied
-                                      ? `Remove ${cond}`
-                                      : `Add ${cond}`}
+                                    {isApplied ? (
+                                      <span className="flex items-center gap-1">
+                                        <X className="h-2.5 w-2.5" />
+                                        {cond}
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1">
+                                        <Plus className="h-2.5 w-2.5" />
+                                        {cond}
+                                      </span>
+                                    )}
                                   </button>
                                 );
                               })}
@@ -2164,161 +2288,87 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
                         );
                       })}
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* Right Column: General Conditions */}
-              <div className="space-y-6">
-                <div>
-                  <h4 className="font-medium mb-3">General Tooth Conditions</h4>
-                  <div className="border rounded-lg p-4 bg-gray-50">
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {selectedConditions.map((cond) => (
-                        <Badge key={cond} variant="secondary">
-                          {cond}
-                          <button
-                            type="button"
-                            onClick={() => handleConditionToggle(cond)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
+                    {/* Quick actions for ALL selected areas */}
+                    <div className="mt-2 pt-2 border-t border-primary/20">
+                      <h6 className="text-[10px] font-medium mb-1 text-gray-600">
+                        Quick Actions:
+                      </h6>
+                      <div className="grid grid-cols-2 gap-1">
+                        {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
+                          const isAppliedToAny = selectedAreas.some((area) => {
+                            const areaConditions =
+                              surfaceConditions.find((sc) => sc.surface === area)
+                                ?.conditions || [];
+                            return areaConditions.includes(cond);
+                          });
 
-                    <div className="space-y-2">
-                      <h5 className="text-sm font-medium">
-                        Common Conditions:
-                      </h5>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          "Caries",
-                          "Missing",
-                          "Filling",
-                          "Crown",
-                          "Root Canal",
-                          "Extraction Needed",
-                        ].map((cond) => (
-                          <button
-                            key={cond}
-                            type="button"
-                            onClick={() => handleConditionToggle(cond)}
-                            className={`px-3 py-2 border rounded text-sm ${
-                              selectedConditions.includes(cond)
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-white border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            {selectedConditions.includes(cond) ? "✓ " : "+ "}
-                            {cond}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium mb-2">Notes</h4>
-                  <textarea
-                    className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add notes for all selected teeth..."
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Procedures Tab */
-            <div className="space-y-6">
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-medium">Procedures</h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddProcedure}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Procedure
-                  </Button>
-                </div>
-
-                {procedures.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    No procedures added. Click "Add Procedure" to add one.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {procedures.map((proc, index) => (
-                      <div
-                        key={index}
-                        className="border rounded-lg p-4 bg-white"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium">{proc.name}</div>
-                            <div className="flex items-center gap-2 mt-2">
-                              <Badge variant="outline" className="text-xs">
-                                Surface: {proc.surface}
-                              </Badge>
-                              {proc.cost > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  Cost: ₹{proc.cost}
-                                </Badge>
+                          return (
+                            <button
+                              key={cond}
+                              type="button"
+                              onClick={() => {
+                                if (isAppliedToAny) {
+                                  selectedAreas.forEach((area) => {
+                                    const areaConditions =
+                                      surfaceConditions.find((sc) => sc.surface === area)
+                                        ?.conditions || [];
+                                    if (areaConditions.includes(cond)) {
+                                      handleSurfaceConditionToggle(area, cond);
+                                    }
+                                  });
+                                } else {
+                                  selectedAreas.forEach((area) => {
+                                    const areaConditions =
+                                      surfaceConditions.find((sc) => sc.surface === area)
+                                        ?.conditions || [];
+                                    if (!areaConditions.includes(cond)) {
+                                      handleSurfaceConditionToggle(area, cond);
+                                    }
+                                  });
+                                }
+                              }}
+                              className={`px-1.5 py-0.5 text-[10px] border rounded transition-all truncate ${
+                                isAppliedToAny
+                                  ? "bg-destructive/10 text-destructive border-destructive/20"
+                                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                              }`}
+                            >
+                              {isAppliedToAny ? (
+                                <span className="flex items-center justify-center gap-0.5">
+                                  <X className="h-2 w-2" />
+                                  Remove {cond}
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center gap-0.5">
+                                  <span>+</span>
+                                  Add {cond}
+                                </span>
                               )}
-                            </div>
-                            {proc.notes && (
-                              <p className="text-sm text-gray-600 mt-2">
-                                {proc.notes}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = procedures.filter(
-                                (_, i) => i !== index,
-                              );
-                              setProcedures(updated);
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="mt-2 text-xs text-gray-500">
-                          Will apply to all {selectedTeeth.length} selected
-                          teeth
-                        </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         <div className="border-t px-6 py-4 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            className="bg-primary text-primary-foreground"
-          >
-            Apply to All {selectedTeeth.length} Teeth
-          </Button>
+          {mode === "edit" && (
+            <Button onClick={handleSave}>Save to {selectedTeeth.length} Teeth</Button>
+          )}
         </div>
       </div>
     </div>
   );
 };
-
 // NEW: Soft Tissue Popup Component
 interface SoftTissuePopupProps {
   tissue: SoftTissueExamination;
