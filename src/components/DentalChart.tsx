@@ -15,6 +15,7 @@ import {
   Grid,
   ChevronDown,
   Menu,
+  ChevronUp
 } from "lucide-react";
 import { Badge } from "./ui/badge";
 
@@ -1134,6 +1135,7 @@ const ToothDiagram: React.FC<{
   onAreaClick?: (area: string) => void;
   mode: "view" | "edit";
   conditionsByArea?: Record<string, string[]>;
+  size?: number;
 }> = ({
   toothType,
   rotation,
@@ -1141,6 +1143,7 @@ const ToothDiagram: React.FC<{
   onAreaClick,
   mode,
   conditionsByArea = {},
+  size = 80, // Default to tooth size
 }) => {
   const areas = ["buccal", "mesial", "lingual", "distal", "occlusal"];
   const areaColors: Record<string, string> = {
@@ -1157,10 +1160,10 @@ const ToothDiagram: React.FC<{
     innerRadius: number,
     outerRadius: number,
   ) => {
-    const start = polarToCartesian(100, 100, outerRadius, endAngle);
-    const end = polarToCartesian(100, 100, outerRadius, startAngle);
-    const innerStart = polarToCartesian(100, 100, innerRadius, endAngle);
-    const innerEnd = polarToCartesian(100, 100, innerRadius, startAngle);
+    const start = polarToCartesian(40, 40, outerRadius, endAngle);
+    const end = polarToCartesian(40, 40, outerRadius, startAngle);
+    const innerStart = polarToCartesian(40, 40, innerRadius, endAngle);
+    const innerEnd = polarToCartesian(40, 40, innerRadius, startAngle);
 
     const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
 
@@ -1207,31 +1210,31 @@ const ToothDiagram: React.FC<{
   const getLabelPosition = (area: string) => {
     switch (area) {
       case "buccal":
-        return { x: 100, y: 30, anchor: "middle" };
+        return { x: 40, y: 10, anchor: "middle" };
       case "mesial":
-        return { x: 30, y: 100, anchor: "middle" };
+        return { x: 10, y: 40, anchor: "middle" };
       case "lingual":
-        return { x: 100, y: 170, anchor: "middle" };
+        return { x: 40, y: 70, anchor: "middle" };
       case "distal":
-        return { x: 170, y: 100, anchor: "middle" };
+        return { x: 70, y: 40, anchor: "middle" };
       case "occlusal":
-        return { x: 100, y: 100, anchor: "middle" };
+        return { x: 40, y: 40, anchor: "middle" };
       default:
         return { x: 0, y: 0, anchor: "middle" };
     }
   };
 
   return (
-    <div className="relative w-64 h-64 mx-auto">
+    <div className={`relative w-${size} h-${size} mx-auto`}>
       <svg
-        width="100%"
-        height="100%"
-        viewBox="0 0 200 200"
-        className="absolute inset-0"
+        width={size}
+        height={size}
+        viewBox="0 0 80 80"
+        className="cursor-pointer"
       >
         {/* Buccal (Top) - 0° to 90° */}
         <path
-          d={createArcPath(0, 90, 45, 70)}
+          d={createArcPath(0, 90, 18, 28)}
           fill={
             selectedAreas.includes("buccal") ||
             (conditionsByArea?.buccal || []).length > 0
@@ -1239,7 +1242,7 @@ const ToothDiagram: React.FC<{
               : "#f3f4f6"
           }
           stroke="#d1d5db"
-          strokeWidth="2"
+          strokeWidth="1.5"
           className={
             mode === "edit"
               ? "cursor-pointer hover:opacity-80 transition-opacity"
@@ -1256,7 +1259,7 @@ const ToothDiagram: React.FC<{
 
         {/* Distal (Right) - 90° to 180° */}
         <path
-          d={createArcPath(90, 180, 45, 70)}
+          d={createArcPath(90, 180, 18, 28)}
           fill={
             selectedAreas.includes("distal") ||
             (conditionsByArea?.distal || []).length > 0
@@ -1264,7 +1267,7 @@ const ToothDiagram: React.FC<{
               : "#f3f4f6"
           }
           stroke="#d1d5db"
-          strokeWidth="2"
+          strokeWidth="1.5"
           className={
             mode === "edit"
               ? "cursor-pointer hover:opacity-80 transition-opacity"
@@ -1281,7 +1284,7 @@ const ToothDiagram: React.FC<{
 
         {/* Lingual (Bottom) - 180° to 270° */}
         <path
-          d={createArcPath(180, 270, 45, 70)}
+          d={createArcPath(180, 270, 18, 28)}
           fill={
             selectedAreas.includes("lingual") ||
             (conditionsByArea?.lingual || []).length > 0
@@ -1289,7 +1292,7 @@ const ToothDiagram: React.FC<{
               : "#f3f4f6"
           }
           stroke="#d1d5db"
-          strokeWidth="2"
+          strokeWidth="1.5"
           className={
             mode === "edit"
               ? "cursor-pointer hover:opacity-80 transition-opacity"
@@ -1306,7 +1309,7 @@ const ToothDiagram: React.FC<{
 
         {/* Mesial (Left) - 270° to 360° */}
         <path
-          d={createArcPath(270, 360, 45, 70)}
+          d={createArcPath(270, 360, 18, 28)}
           fill={
             selectedAreas.includes("mesial") ||
             (conditionsByArea?.mesial || []).length > 0
@@ -1314,7 +1317,7 @@ const ToothDiagram: React.FC<{
               : "#f3f4f6"
           }
           stroke="#d1d5db"
-          strokeWidth="2"
+          strokeWidth="1.5"
           className={
             mode === "edit"
               ? "cursor-pointer hover:opacity-80 transition-opacity"
@@ -1331,9 +1334,9 @@ const ToothDiagram: React.FC<{
 
         {/* Occlusal (Center circle) */}
         <circle
-          cx="100"
-          cy="100"
-          r="35"
+          cx="40"
+          cy="40"
+          r="14"
           fill={
             selectedAreas.includes("occlusal") ||
             (conditionsByArea?.occlusal || []).length > 0
@@ -1341,7 +1344,7 @@ const ToothDiagram: React.FC<{
               : "#f3f4f6"
           }
           stroke="#d1d5db"
-          strokeWidth="2"
+          strokeWidth="1.5"
           className={
             mode === "edit"
               ? "cursor-pointer hover:opacity-80 transition-opacity"
@@ -1356,7 +1359,7 @@ const ToothDiagram: React.FC<{
           }
         />
 
-        {/* Area Labels */}
+        {/* Area Labels (Small text) */}
         {areas.map((area) => {
           const pos = getLabelPosition(area);
           const areaConditions = conditionsByArea?.[area] || [];
@@ -1368,18 +1371,18 @@ const ToothDiagram: React.FC<{
                 y={pos.y}
                 textAnchor={pos.anchor as any}
                 dominantBaseline="middle"
-                className="text-xs font-semibold fill-gray-700 pointer-events-none"
-                style={{ textTransform: "capitalize" }}
+                className="text-[8px] font-semibold fill-gray-600 pointer-events-none"
+                style={{ textTransform: "uppercase" }}
               >
-                {area}
+                {area.charAt(0)}
               </text>
 
-              {/* Condition indicator dot */}
+              {/* Condition indicator dot - very small */}
               {areaConditions.length > 0 && (
                 <circle
                   cx={pos.x}
-                  cy={area === "occlusal" ? pos.y + 15 : pos.y + 12}
-                  r="4"
+                  cy={area === "occlusal" ? pos.y + 6 : pos.y + 5}
+                  r="2"
                   fill="#ef4444"
                   className="animate-pulse"
                 />
@@ -1388,19 +1391,6 @@ const ToothDiagram: React.FC<{
           );
         })}
       </svg>
-
-      {/* Legend */}
-      <div className="absolute -bottom-8 left-0 right-0 flex justify-center gap-2 flex-wrap">
-        {areas.map((area) => (
-          <div key={area} className="flex items-center gap-1">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: areaColors[area] }}
-            />
-            <span className="text-xs text-gray-600 capitalize">{area}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };
@@ -1437,7 +1427,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
       date?: string;
     }[]
   >(condition?.procedures || []);
-
+const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useState(false);
   // Handle condition toggle
   const handleConditionToggle = (conditionName: string) => {
     setSelectedConditions((prev) =>
@@ -1451,10 +1441,8 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
   const handleAreaClick = (area: string) => {
     setSelectedAreas((prev) => {
       if (prev.includes(area)) {
-        // Remove area if already selected
         return prev.filter((a) => a !== area);
       } else {
-        // Add area if not already selected
         return [...prev, area];
       }
     });
@@ -1469,23 +1457,19 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
       const surfaceIndex = prev.findIndex((sc) => sc.surface === surface);
 
       if (surfaceIndex === -1) {
-        // New surface - add with this condition
         return [...prev, { surface, conditions: [conditionName] }];
       } else {
         const updated = [...prev];
         const currentConditions = updated[surfaceIndex].conditions;
 
         if (currentConditions.includes(conditionName)) {
-          // Remove condition from this surface
           updated[surfaceIndex].conditions = currentConditions.filter(
             (c) => c !== conditionName,
           );
           if (updated[surfaceIndex].conditions.length === 0) {
-            // Remove entire surface entry if no conditions left
             return prev.filter((_, i) => i !== surfaceIndex);
           }
         } else {
-          // Add condition to this surface
           updated[surfaceIndex].conditions = [
             ...currentConditions,
             conditionName,
@@ -1494,33 +1478,6 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
         return updated;
       }
     });
-  };
-
-  // Add procedure
-  const handleAddProcedure = () => {
-    const procedureName = prompt("Enter procedure name:");
-    if (!procedureName) return;
-
-    const surface =
-      prompt("Enter surface (occlusal, buccal, lingual, mesial, distal):") ||
-      "occlusal";
-    const cost = Number(prompt("Enter estimated cost:") || 0);
-    const notes = prompt("Enter notes (optional):") || "";
-
-    const newProcedure = {
-      name: procedureName,
-      surface,
-      cost,
-      notes,
-    };
-
-    setProcedures([...procedures, newProcedure]);
-  };
-
-  // Remove procedure
-  const handleRemoveProcedure = (index: number) => {
-    const updated = procedures.filter((_, i) => i !== index);
-    setProcedures(updated);
   };
 
   // Get conditions by area for the diagram
@@ -1556,7 +1513,7 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
+      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-lg">
         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">
@@ -1573,356 +1530,332 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Tooth Diagram and Areas */}
-            <div className="space-y-6">
-              <div className="border rounded-xl p-6 bg-gray-50">
-                <h4 className="font-medium mb-4 text-center">Tooth Diagram</h4>
+          {/* TWO CONTAINERS LAYOUT */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+          {/* Left Container: Tooth SVG and General Conditions */}
+<div className="space-y-6">
+  {/* Tooth SVG Container */}
+  <div className="border rounded-xl p-4 bg-gray-50">
+    <div className="flex items-start gap-4">
+      {/* Tooth SVG - Original dental chart size */}
+      <div className="flex-shrink-0">
+        <div className="relative">
+            <ToothSVG
+                        type={tooth.svgName}
+                        width={80}
+                        height={80}
+                        rotation={tooth.rotation || 0}
+                        color={getToothColorForModal()}
+                      />
+        </div>
+        <div className="text-center mt-2">
+          <div className="text-xl font-bold text-gray-800">
+            #{tooth.number}
+          </div>
+          <div className="text-xs text-gray-600">{tooth.name}</div>
+        </div>
+      </div>
+      
+      {/* General Conditions Section with Dropdown */}
+      <div className="flex-1">
+        <div className="mt-1">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-sm">General Conditions</h4>
+            {mode === "edit" && (
+              <button
+                type="button"
+                onClick={() => setShowGeneralConditionsDropdown(!showGeneralConditionsDropdown)}
+                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+              >
+                {showGeneralConditionsDropdown ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
+                  <span className="text-sm font-medium">Hide Conditions</span>
+                  </>
+                ) : (
+                  <>
+                   <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
+                     <span className="text-sm font-medium">Select Conditions</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          
+          {/* Current selected conditions display */}
+          <div className="mb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {selectedConditions.map((cond) => (
+                <Badge 
+                  key={cond} 
+                  variant="secondary" 
+                  className="text-xs py-1 px-2"
+                >
+                  {cond}
+                  {mode === "edit" && (
+                    <button
+                      type="button"
+                      onClick={() => handleConditionToggle(cond)}
+                      className="ml-1.5 text-red-500 hover:text-red-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </Badge>
+              ))}
+              {selectedConditions.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">
+                  No general conditions
+                </p>
+              )}
+            </div>
+          </div>
 
-                {/* Main Tooth SVG in modal with correct rotation */}
-                <div className="relative w-64 h-64 mx-auto mb-6">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ToothSVG
-                      type={tooth.svgName}
-                      width={120}
-                      height={120}
-                      rotation={tooth.rotation || 0}
-                      color={getToothColorForModal()}
-                    />
-                  </div>
+          {/* Dropdown for adding conditions - Only visible when toggled */}
+          {mode === "edit" && showGeneralConditionsDropdown && (
+            <div className="border rounded-lg p-3 bg-white shadow-sm animate-in fade-in duration-200">
+              <h5 className="text-xs font-medium mb-2 text-gray-600">
+                Select Conditions:
+              </h5>
+              <div className="grid grid-cols-2 gap-2">
+                {DENTAL_CONDITIONS.map((cond) => (
+                  <button
+                    key={cond}
+                    type="button"
+                    onClick={() => handleConditionToggle(cond)}
+                    className={`px-2 py-1.5 rounded text-xs border transition-colors text-left truncate ${
+                      selectedConditions.includes(cond)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="mr-1">
+                      {selectedConditions.includes(cond) ? "✓" : "+"}
+                    </span>
+                    {cond}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Quick Actions */}
+              <div className="mt-3 pt-3 border-t">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedConditions([])}
+                    className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded border hover:bg-gray-200 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedConditions([...DENTAL_CONDITIONS])}
+                    className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
+                  >
+                    Select All
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Notes Section */}
+  <div>
+    <h4 className="font-medium mb-2">Notes</h4>
+    <textarea
+      className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
+      value={notes}
+      onChange={(e) => setNotes(e.target.value)}
+      placeholder="Add notes about this tooth..."
+      readOnly={mode === "view"}
+    />
+  </div>
+</div>
+
+          {/* RIGHT CONTAINER: Surface Selection Diagram - COMPACT SIZE */}
+<div className="space-y-4">
+  <div className="border rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white shadow-sm">
+    <h4 className="font-semibold mb-4 text-base text-gray-800 text-center">Surface Selection</h4>
+
+    {/* Surface Selection Diagram - Centered */}
+    <div className="flex justify-center">
+      <ToothDiagram
+        toothType={tooth.svgName}
+        rotation={tooth.rotation || 0}
+        selectedAreas={selectedAreas}
+        onAreaClick={handleAreaClick}
+        mode={mode}
+        conditionsByArea={conditionsByArea}
+        size={95}
+      />
+    </div>
+
+
+
+    {/* Selected Areas Display - COMPACT */}
+    {selectedAreas.length > 0 && mode === "edit" && (
+      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <h5 className="font-medium mb-2 text-xs text-gray-700">
+          Surface Conditions:
+        </h5>
+
+        {/* Show each selected area in REVERSE ORDER */}
+        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+          {[...selectedAreas].reverse().map((area) => {
+            const areaConditions =
+              surfaceConditions.find((sc) => sc.surface === area)
+                ?.conditions || [];
+            const areaColor = {
+              mesial: "#3b82f6",
+              distal: "#10b981",
+              buccal: "#f59e0b",
+              lingual: "#8b5cf6",
+              occlusal: "#ef4444",
+            }[area];
+
+            return (
+              <div key={area} className="border rounded p-2 bg-white">
+                <div className="flex items-center gap-2 mb-1">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: areaColor }}
+                  />
+                  <span className="font-medium capitalize text-xs">
+                    {area}
+                  </span>
                 </div>
 
-                {/* Area Markers Diagram */}
-                <ToothDiagram
-                  toothType={tooth.svgName}
-                  rotation={tooth.rotation || 0}
-                  selectedAreas={selectedAreas}
-                  onAreaClick={handleAreaClick}
-                  mode={mode}
-                  conditionsByArea={conditionsByArea}
-                />
+                {/* Current conditions - COMPACT */}
+              <div className="flex flex-wrap gap-1 mb-2">
+  {areaConditions.length > 0 ? (
+    areaConditions.map((cond) => (
+      <Badge
+        key={cond}
+        variant="secondary"
+        className="text-[10px] py-0.5 px-1.5 h-auto"
+      >
+        {cond}
+        <button
+          type="button"
+          onClick={() => handleSurfaceConditionToggle(area, cond)}
+          className="ml-1 text-red-500 hover:text-red-700"
+        >
+          <X className="h-2.5 w-2.5" />
+        </button>
+      </Badge>
+    ))
+  ) : (
+    <span className="text-[10px] text-gray-400 italic">
+      No conditions
+    </span>
+  )}
+</div>
 
-                {/* Selected Areas Display */}
-                {selectedAreas.length > 0 && mode === "edit" && (
-                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                    <h5 className="font-medium mb-2 text-sm">
-                      Conditions for Selected Areas:
-                    </h5>
+{/* Quick condition buttons - TAB STYLE */}
+<div className="flex flex-wrap gap-1">
+  {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
+    const isApplied = areaConditions.includes(cond);
+    return (
+      <button
+        key={cond}
+        type="button"
+        onClick={() => handleSurfaceConditionToggle(area, cond)}
+        className={`px-2 py-1 text-[10px] font-medium rounded-full transition-all ${
+          isApplied
+            ? "bg-red-500 text-white shadow-sm"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+        }`}
+      >
+        {isApplied ? (
+          <span className="flex items-center gap-1">
+            <X className="h-2.5 w-2.5" />
+            {cond}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1">
+            <Plus className="h-2.5 w-2.5" />
+            {cond}
+          </span>
+        )}
+      </button>
+    );
+  })}
+</div>
+              </div>
+            );
+          })}
+        </div>
 
-                    {/* Show each selected area separately */}
-                    <div className="space-y-3">
-                      {selectedAreas.map((area) => {
+        {/* Quick actions for ALL selected areas - COMPACT */}
+        <div className="mt-2 pt-2 border-t border-blue-300">
+          <h6 className="text-[10px] font-medium mb-1 text-gray-600">
+            Quick Actions:
+          </h6>
+          <div className="grid grid-cols-2 gap-1">
+            {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
+              const isAppliedToAny = selectedAreas.some((area) => {
+                const areaConditions =
+                  surfaceConditions.find((sc) => sc.surface === area)
+                    ?.conditions || [];
+                return areaConditions.includes(cond);
+              });
+
+              return (
+                <button
+                  key={cond}
+                  type="button"
+                  onClick={() => {
+                    if (isAppliedToAny) {
+                      selectedAreas.forEach((area) => {
                         const areaConditions =
                           surfaceConditions.find((sc) => sc.surface === area)
                             ?.conditions || [];
-                        const areaColor = {
-                          mesial: "#3b82f6",
-                          distal: "#10b981",
-                          buccal: "#f59e0b",
-                          lingual: "#8b5cf6",
-                          occlusal: "#ef4444",
-                        }[area];
-
-                        return (
-                          <div
-                            key={area}
-                            className="border rounded-lg p-3 bg-white"
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: areaColor }}
-                              />
-                              <span className="font-medium capitalize">
-                                {area} Surface
-                              </span>
-                            </div>
-
-                            {/* Current conditions for this area */}
-                            <div className="mb-3">
-                              <div className="text-xs text-gray-500 mb-1">
-                                Current conditions:
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {areaConditions.length > 0 ? (
-                                  areaConditions.map((cond) => (
-                                    <Badge
-                                      key={cond}
-                                      variant="secondary"
-                                      className="text-xs flex items-center gap-1"
-                                    >
-                                      {cond}
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleSurfaceConditionToggle(
-                                            area,
-                                            cond,
-                                          )
-                                        }
-                                        className="ml-1 text-red-500 hover:text-red-700"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </Badge>
-                                  ))
-                                ) : (
-                                  <span className="text-xs text-gray-400 italic">
-                                    No conditions added
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Add condition buttons for this specific area */}
-                            <div>
-                              <div className="text-xs text-gray-500 mb-1">
-                                Add condition:
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {[
-                                  "Caries",
-                                  "Filling",
-                                  "Fractured",
-                                  "Sensitive",
-                                ].map((cond) => {
-                                  const isApplied =
-                                    areaConditions.includes(cond);
-                                  return (
-                                    <button
-                                      key={cond}
-                                      type="button"
-                                      onClick={() =>
-                                        handleSurfaceConditionToggle(area, cond)
-                                      }
-                                      className={`px-2 py-1 text-xs border rounded transition-all ${
-                                        isApplied
-                                          ? "bg-red-100 text-red-700 border-red-200 hover:bg-red-200"
-                                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                                      }`}
-                                    >
-                                      {isApplied ? (
-                                        <span className="flex items-center gap-1">
-                                          <X className="h-3 w-3" />
-                                          Remove {cond}
-                                        </span>
-                                      ) : (
-                                        <span className="flex items-center gap-1">
-                                          <span>+</span>
-                                          Add {cond}
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Quick actions for ALL selected areas */}
-                    <div className="mt-4 pt-4 border-t">
-                      <h6 className="text-xs font-medium mb-2 text-gray-600">
-                        Quick Actions for All Selected Areas:
-                      </h6>
-                      <div className="grid grid-cols-2 gap-2">
-                        {["Caries", "Filling", "Fractured", "Sensitive"].map(
-                          (cond) => {
-                            const isAppliedToAny = selectedAreas.some(
-                              (area) => {
-                                const areaConditions =
-                                  surfaceConditions.find(
-                                    (sc) => sc.surface === area,
-                                  )?.conditions || [];
-                                return areaConditions.includes(cond);
-                              },
-                            );
-
-                            return (
-                              <button
-                                key={cond}
-                                type="button"
-                                onClick={() => {
-                                  if (isAppliedToAny) {
-                                    // Remove from all selected areas
-                                    selectedAreas.forEach((area) => {
-                                      const areaConditions =
-                                        surfaceConditions.find(
-                                          (sc) => sc.surface === area,
-                                        )?.conditions || [];
-                                      if (areaConditions.includes(cond)) {
-                                        handleSurfaceConditionToggle(
-                                          area,
-                                          cond,
-                                        );
-                                      }
-                                    });
-                                  } else {
-                                    // Add to all selected areas
-                                    selectedAreas.forEach((area) => {
-                                      const areaConditions =
-                                        surfaceConditions.find(
-                                          (sc) => sc.surface === area,
-                                        )?.conditions || [];
-                                      if (!areaConditions.includes(cond)) {
-                                        handleSurfaceConditionToggle(
-                                          area,
-                                          cond,
-                                        );
-                                      }
-                                    });
-                                  }
-                                }}
-                                className={`px-2 py-1 text-xs border rounded transition-all ${
-                                  isAppliedToAny
-                                    ? "bg-red-100 text-red-700 border-red-200 hover:bg-red-200"
-                                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                                }`}
-                              >
-                                {isAppliedToAny ? (
-                                  <span className="flex items-center justify-center gap-1">
-                                    <X className="h-3 w-3" />
-                                    Remove {cond} from All
-                                  </span>
-                                ) : (
-                                  <span className="flex items-center justify-center gap-1">
-                                    <span>+</span>
-                                    Add {cond} to All
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          },
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-2 text-xs text-gray-500">
-                      * Click X on individual condition badges to remove them
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Area Conditions Summary */}
-              <div>
-                <h4 className="font-medium mb-3">Area-Specific Conditions</h4>
-                <div className="space-y-3">
-                  {["buccal", "mesial", "lingual", "distal", "occlusal"].map(
-                    (area) => {
-                      const conditions = conditionsByArea[area] || [];
-                      const areaColor = {
-                        mesial: "#3b82f6",
-                        distal: "#10b981",
-                        buccal: "#f59e0b",
-                        lingual: "#8b5cf6",
-                        occlusal: "#ef4444",
-                      }[area];
-
-                      if (conditions.length === 0) {
-                        return null;
-                      }
-
-                      return (
-                        <div key={area} className="border rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: areaColor }}
-                              />
-                              <span className="font-medium capitalize">
-                                {area}
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {conditions.length} condition(s)
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {conditions.map((cond) => (
-                              <Badge
-                                key={cond}
-                                variant="secondary"
-                                className="text-xs"
-                              >
-                                {cond}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    },
+                        if (areaConditions.includes(cond)) {
+                          handleSurfaceConditionToggle(area, cond);
+                        }
+                      });
+                    } else {
+                      selectedAreas.forEach((area) => {
+                        const areaConditions =
+                          surfaceConditions.find((sc) => sc.surface === area)
+                            ?.conditions || [];
+                        if (!areaConditions.includes(cond)) {
+                          handleSurfaceConditionToggle(area, cond);
+                        }
+                      });
+                    }
+                  }}
+                  className={`px-1.5 py-0.5 text-[10px] border rounded transition-all truncate ${
+                    isAppliedToAny
+                      ? "bg-red-100 text-red-700 border-red-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {isAppliedToAny ? (
+                    <span className="flex items-center justify-center gap-0.5">
+                      <X className="h-2 w-2" />
+                      Remove {cond}
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-0.5">
+                      <span>+</span>
+                      Add {cond}
+                    </span>
                   )}
-
-                  {Object.keys(conditionsByArea).length === 0 && (
-                    <p className="text-sm text-muted-foreground italic">
-                      No area-specific conditions recorded. Click on areas in
-                      the diagram to add conditions.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Conditions, Notes */}
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-medium mb-2">General Tooth Conditions</h4>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {selectedConditions.map((cond) => (
-                    <Badge key={cond} variant="secondary">
-                      {cond}
-                    </Badge>
-                  ))}
-                  {selectedConditions.length === 0 && (
-                    <p className="text-sm text-muted-foreground italic">
-                      No general conditions
-                    </p>
-                  )}
-                </div>
-
-                {mode === "edit" && (
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <h5 className="text-sm font-medium mb-2">
-                      Add General Conditions:
-                    </h5>
-                    <div className="flex flex-wrap gap-2">
-                      {DENTAL_CONDITIONS.map((cond) => (
-                        <button
-                          key={cond}
-                          type="button"
-                          onClick={() => handleConditionToggle(cond)}
-                          className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                            selectedConditions.includes(cond)
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                          }`}
-                        >
-                          {selectedConditions.includes(cond) ? "✓ " : "+ "}
-                          {cond}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h4 className="font-medium mb-2">Notes</h4>
-                <textarea
-                  className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add notes about this tooth..."
-                  readOnly={mode === "view"}
-                />
-              </div>
-
-              {/* Procedures Section */}
-            </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
           </div>
         </div>
 
@@ -1938,7 +1871,6 @@ const ToothPopup: React.FC<ToothPopupProps> = ({
     </div>
   );
 };
-
 // NEW: Multi-Tooth Popup Component
 interface MultiToothPopupProps {
   selectedTeeth: number[];
@@ -4662,268 +4594,274 @@ const renderTeethTab = () => (
     )}
 
     {/* Teeth Chart - UPDATED AS REQUESTED */}
-    <div className="relative border border-border rounded-xl bg-white p-3 md:p-5">
-      {/* Upper Arch */}
-      {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
-        <div className="flex justify-center items-center gap-1.5 sm:gap-2 md:gap-2.5 mb-6 sm:mb-8 md:mb-10">
-          {/* Quadrant 1 - Upper Right */}
-          {upperRightTeeth.map((tooth) => {
-            const condition = toothConditions.find(
-              (tc) => tc.toothNumber === tooth.number
-            );
-            const isSelected = selectedTeeth.includes(tooth.number);
+   {/* Teeth Chart - UPDATED AS REQUESTED */}
+<div className="relative border border-border rounded-xl bg-white p-3 md:p-5">
+  {/* Vertical midline - separates left and right sides */}
+  <div className="absolute left-1/2 top-0 bottom-0 transform -translate-x-1/2">
+    <div className="w-px h-full bg-gray-200"></div>
+  </div>
 
-            return (
-              <div
-                key={tooth.number}
-                className="relative group flex flex-col items-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToothClick(tooth)}
-                  className="relative transition-all hover:scale-105 active:scale-95"
-                  disabled={mode === "view" && selectionMode === "multiple"}
-                >
-                  <div className="p-1 sm:p-1.5">
-                    <ToothSVG
-                      type={tooth.svgName}
-                      color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
-                      width={getToothSize()}
-                      height={getToothSize()}
-                      rotation={tooth.rotation}
-                    />
-                  </div>
-                  {isSelected && (
-                    <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
-                  )}
-                  {condition && !isSelected && (
-                    <div className="absolute -top-2 sm:-top-2.5 left-1/2 transform -translate-x-1/2">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
-                          style={{
-                            backgroundColor: getToothColor(tooth.number),
-                          }}
-                        />
-                        {condition.procedures?.length > 0 && (
-                          <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </button>
-                <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold ${
-                  isSelected ? "text-green-600" : "text-gray-700"
-                }`}>
-                  {tooth.number}
-                </div>
+  {/* Upper Arch */}
+  {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
+    <div className="flex justify-center items-center gap-1.5 sm:gap-2 md:gap-2.5 mb-6 sm:mb-8 md:mb-10">
+      {/* Quadrant 1 - Upper Right */}
+      {upperRightTeeth.map((tooth) => {
+        const condition = toothConditions.find(
+          (tc) => tc.toothNumber === tooth.number
+        );
+        const isSelected = selectedTeeth.includes(tooth.number);
+
+        return (
+          <div
+            key={tooth.number}
+            className="relative group flex flex-col items-center"
+          >
+            <button
+              type="button"
+              onClick={() => handleToothClick(tooth)}
+              className="relative transition-all hover:scale-105 active:scale-95"
+              disabled={mode === "view" && selectionMode === "multiple"}
+            >
+              <div className="p-1 sm:p-1.5">
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                  width={getToothSize()}
+                  height={getToothSize()}
+                  rotation={tooth.rotation}
+                />
               </div>
-            );
-          })}
-
-          {/* Quadrant 2 - Upper Left */}
-          {upperLeftTeeth.map((tooth) => {
-            const condition = toothConditions.find(
-              (tc) => tc.toothNumber === tooth.number
-            );
-            const isSelected = selectedTeeth.includes(tooth.number);
-
-            return (
-              <div
-                key={tooth.number}
-                className="relative group flex flex-col items-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToothClick(tooth)}
-                  className="relative transition-all hover:scale-105 active:scale-95"
-                  disabled={mode === "view" && selectionMode === "multiple"}
-                >
-                  <div className="p-1 sm:p-1.5">
-                    <ToothSVG
-                      type={tooth.svgName}
-                      color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
-                      width={getToothSize()}
-                      height={getToothSize()}
-                      rotation={tooth.rotation}
+              {isSelected && (
+                <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
+              )}
+              {condition && !isSelected && (
+                <div className="absolute -top-2 sm:-top-2.5 left-1/2 transform -translate-x-1/2">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
+                      style={{
+                        backgroundColor: getToothColor(tooth.number),
+                      }}
                     />
+                    {condition.procedures?.length > 0 && (
+                      <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
+                    )}
                   </div>
-                  {isSelected && (
-                    <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
-                  )}
-                  {condition && !isSelected && (
-                    <div className="absolute -top-2 sm:-top-2.5 left-1/2 transform -translate-x-1/2">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
-                          style={{
-                            backgroundColor: getToothColor(tooth.number),
-                          }}
-                        />
-                        {condition.procedures?.length > 0 && (
-                          <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </button>
-                <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold ${
-                  isSelected ? "text-green-600" : "text-gray-700"
-                }`}>
-                  {tooth.number}
                 </div>
+              )}
+            </button>
+            <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold mb-2 ${
+              isSelected ? "text-green-600" : "text-gray-700"
+            }`}>
+              {tooth.number}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Quadrant 2 - Upper Left */}
+      {upperLeftTeeth.map((tooth) => {
+        const condition = toothConditions.find(
+          (tc) => tc.toothNumber === tooth.number
+        );
+        const isSelected = selectedTeeth.includes(tooth.number);
+
+        return (
+          <div
+            key={tooth.number}
+            className="relative group flex flex-col items-center"
+          >
+            <button
+              type="button"
+              onClick={() => handleToothClick(tooth)}
+              className="relative transition-all hover:scale-105 active:scale-95"
+              disabled={mode === "view" && selectionMode === "multiple"}
+            >
+              <div className="p-1 sm:p-1.5">
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                  width={getToothSize()}
+                  height={getToothSize()}
+                  rotation={tooth.rotation}
+                />
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Middle line - simplified */}
-      <div className="flex justify-center my-3">
-        <div className="h-px w-11/12 bg-gray-200"></div>
-      </div>
-
-      {/* Lower Arch - WITH NUMBER BELOW TEETH */}
-      {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-        <div className="flex justify-center items-center gap-1.5 sm:gap-2 md:gap-2.5 mt-6 sm:mt-8 md:mt-10">
-          {/* Quadrant 4 - Lower Right */}
-          {lowerRightTeeth.map((tooth) => {
-            const condition = toothConditions.find(
-              (tc) => tc.toothNumber === tooth.number
-            );
-            const isSelected = selectedTeeth.includes(tooth.number);
-
-            return (
-              <div
-                key={tooth.number}
-                className="relative group flex flex-col items-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToothClick(tooth)}
-                  className="relative transition-all hover:scale-105 active:scale-95"
-                  disabled={mode === "view" && selectionMode === "multiple"}
-                >
-                  <div className="p-1 sm:p-1.5">
-                    <ToothSVG
-                      type={tooth.svgName}
-                      color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
-                      width={getToothSize()}
-                      height={getToothSize()}
-                      rotation={tooth.rotation}
+              {isSelected && (
+                <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
+              )}
+              {condition && !isSelected && (
+                <div className="absolute -top-2 sm:-top-2.5 left-1/2 transform -translate-x-1/2">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
+                      style={{
+                        backgroundColor: getToothColor(tooth.number),
+                      }}
                     />
+                    {condition.procedures?.length > 0 && (
+                      <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
+                    )}
                   </div>
-                  {isSelected && (
-                    <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
-                  )}
-                  {condition && !isSelected && (
-                    <div className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 transform -translate-x-1/2">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
-                          style={{
-                            backgroundColor: getToothColor(tooth.number),
-                          }}
-                        />
-                        {condition.procedures?.length > 0 && (
-                          <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </button>
-                <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold ${
-                  isSelected ? "text-green-600" : "text-gray-700"
-                }`}>
-                  {tooth.number}
                 </div>
-              </div>
-            );
-          })}
-
-          {/* Quadrant 3 - Lower Left */}
-          {lowerLeftTeeth.map((tooth) => {
-            const condition = toothConditions.find(
-              (tc) => tc.toothNumber === tooth.number
-            );
-            const isSelected = selectedTeeth.includes(tooth.number);
-
-            return (
-              <div
-                key={tooth.number}
-                className="relative group flex flex-col items-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToothClick(tooth)}
-                  className="relative transition-all hover:scale-105 active:scale-95"
-                  disabled={mode === "view" && selectionMode === "multiple"}
-                >
-                  <div className="p-1 sm:p-1.5">
-                    <ToothSVG
-                      type={tooth.svgName}
-                      color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
-                      width={getToothSize()}
-                      height={getToothSize()}
-                      rotation={tooth.rotation}
-                    />
-                  </div>
-                  {isSelected && (
-                    <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
-                  )}
-                  {condition && !isSelected && (
-                    <div className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 transform -translate-x-1/2">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
-                          style={{
-                            backgroundColor: getToothColor(tooth.number),
-                          }}
-                        />
-                        {condition.procedures?.length > 0 && (
-                          <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </button>
-                <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold ${
-                  isSelected ? "text-green-600" : "text-gray-700"
-                }`}>
-                  {tooth.number}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Quadrant Labels - simplified */}
-      {selectedQuadrant === "all" && (
-        <>
-          <div className="absolute top-2 left-2">
-            <Badge className="bg-blue-50 text-blue-700 text-xs border border-blue-200">
-              Q1(UL)
-            </Badge>
+              )}
+            </button>
+            <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold mb-2 ${
+              isSelected ? "text-green-600" : "text-gray-700"
+            }`}>
+              {tooth.number}
+            </div>
           </div>
-          <div className="absolute top-2 right-2">
-            <Badge className="bg-green-50 text-green-700 text-xs border border-green-200">
-              Q2(UR)
-            </Badge>
-          </div>
-          <div className="absolute bottom-2 right-2">
-            <Badge className="bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">
-              Q3(LL)    
-            </Badge>
-          </div>
-          <div className="absolute bottom-2 left-2">
-            <Badge className="bg-red-50 text-red-700 text-xs border border-red-200">
-              Q4(LR)
-            </Badge>
-          </div>
-        </>
-      )}
+        );
+      })}
     </div>
+  )}
+
+  {/* Horizontal midline - optional if you still want it */}
+  {/* <div className="flex justify-center my-3">
+    <div className="h-px w-11/12 bg-gray-200"></div>
+  </div> */}
+
+  {/* Lower Arch - WITH NUMBER BELOW TEETH */}
+  {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
+    <div className="flex justify-center items-center gap-1.5 sm:gap-2 md:gap-2.5 mt-6 sm:mt-8 md:mt-10">
+      {/* Quadrant 4 - Lower Right */}
+      {lowerRightTeeth.map((tooth) => {
+        const condition = toothConditions.find(
+          (tc) => tc.toothNumber === tooth.number
+        );
+        const isSelected = selectedTeeth.includes(tooth.number);
+
+        return (
+          <div
+            key={tooth.number}
+            className="relative group flex flex-col items-center"
+          >
+            <button
+              type="button"
+              onClick={() => handleToothClick(tooth)}
+              className="relative transition-all hover:scale-105 active:scale-95"
+              disabled={mode === "view" && selectionMode === "multiple"}
+            >
+              <div className="p-1 sm:p-1.5">
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                  width={getToothSize()}
+                  height={getToothSize()}
+                  rotation={tooth.rotation}
+                />
+              </div>
+              {isSelected && (
+                <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
+              )}
+              {condition && !isSelected && (
+                <div className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 transform -translate-x-1/2">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
+                      style={{
+                        backgroundColor: getToothColor(tooth.number),
+                      }}
+                    />
+                    {condition.procedures?.length > 0 && (
+                      <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </button>
+            <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold mb-2 ${
+              isSelected ? "text-green-600" : "text-gray-700"
+            }`}>
+              {tooth.number}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Quadrant 3 - Lower Left */}
+      {lowerLeftTeeth.map((tooth) => {
+        const condition = toothConditions.find(
+          (tc) => tc.toothNumber === tooth.number
+        );
+        const isSelected = selectedTeeth.includes(tooth.number);
+
+        return (
+          <div
+            key={tooth.number}
+            className="relative group flex flex-col items-center"
+          >
+            <button
+              type="button"
+              onClick={() => handleToothClick(tooth)}
+              className="relative transition-all hover:scale-105 active:scale-95"
+              disabled={mode === "view" && selectionMode === "multiple"}
+            >
+              <div className="p-1 sm:p-1.5">
+                <ToothSVG
+                  type={tooth.svgName}
+                  color={isSelected ? "#22c55e" : getToothColor(tooth.number)}
+                  width={getToothSize()}
+                  height={getToothSize()}
+                  rotation={tooth.rotation}
+                />
+              </div>
+              {isSelected && (
+                <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
+              )}
+              {condition && !isSelected && (
+                <div className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 transform -translate-x-1/2">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${condition.conditions.length > 0 ? "animate-pulse" : ""}`}
+                      style={{
+                        backgroundColor: getToothColor(tooth.number),
+                      }}
+                    />
+                    {condition.procedures?.length > 0 && (
+                      <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </button>
+            <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold mb-2 ${
+              isSelected ? "text-green-600" : "text-gray-700"
+            }`}>
+              {tooth.number}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+
+  {/* Quadrant Labels - with adjusted bottom padding */}
+  {selectedQuadrant === "all" && (
+    <>
+      <div className="absolute top-2 left-2">
+        <Badge className="bg-blue-50 text-blue-700 text-xs border border-blue-200">
+          Q1(UL)
+        </Badge>
+      </div>
+      <div className="absolute top-2 right-2">
+        <Badge className="bg-green-50 text-green-700 text-xs border border-green-200">
+          Q2(UR)
+        </Badge>
+      </div>
+      <div className="absolute bottom-12 sm:bottom-10 right-2">
+        <Badge className="bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">
+          Q3(LL)    
+        </Badge>
+      </div>
+      <div className="absolute bottom-12 sm:bottom-10 left-2">
+        <Badge className="bg-red-50 text-red-700 text-xs border border-red-200">
+          Q4(LR)
+        </Badge>
+      </div>
+    </>
+  )}
+</div>
 
     {/* Teeth Color Legend - simplified */}
     <div className="flex flex-wrap gap-4 text-sm">
