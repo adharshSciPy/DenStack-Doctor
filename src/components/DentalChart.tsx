@@ -4594,7 +4594,6 @@ const renderTeethTab = () => (
     )}
 
     {/* Teeth Chart - UPDATED AS REQUESTED */}
-   {/* Teeth Chart - UPDATED AS REQUESTED */}
 <div className="relative border border-border rounded-xl bg-white p-3 md:p-5">
   {/* Vertical midline - separates left and right sides */}
   <div className="absolute left-1/2 top-0 bottom-0 transform -translate-x-1/2">
