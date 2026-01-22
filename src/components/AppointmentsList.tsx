@@ -2657,7 +2657,7 @@ useEffect(() => {
           </div>
 
           {/* Full-screen Dental Chart Container */}
-          <div className="h-[calc(100vh-80px)] w-full">
+       <div className="h-[calc(100vh-60px)] w-full"> 
 
 <DentalChart
   patientId={appointmentDetail.patientId._id}
@@ -2671,6 +2671,7 @@ useEffect(() => {
 onSave={(dentalDataFromChart) => {
   console.log("DentalChart onSave called with:", dentalDataFromChart);
   
+  // Update the state
   setDentalData({
     performedTeeth: dentalDataFromChart.performedTeeth || [],
     plannedProcedures: dentalDataFromChart.plannedProcedures || [],
@@ -2699,7 +2700,9 @@ onSave={(dentalDataFromChart) => {
     setEditingTreatmentPlan(null);
   }
   
-  alert("Dental chart data saved successfully!");
+  // ✅ DON'T show alert here - let DentalChart handle it
+  // The alert will be shown in DentalChart's handleClose function
+  
   setShowDentalChart(false);
 }}
   onProcedureAdded={(toothNumber, procedure) => {
