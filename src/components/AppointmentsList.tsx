@@ -813,33 +813,36 @@ const handleCompleteStage = async (stageNumber: number) => {
   };
 
   // 5️⃣ Remove Stage
-  const handleRemoveStage = async (stageNumber: number) => {
-    if(viewOnly)return
+const handleRemoveStage = async (stageNumber: number) => {
+  if(viewOnly)return
 
-    if (!localPlan?._id) return;
+  if (!localPlan?._id) return;
+  
+  if (!confirm(`Are you sure you want to remove Stage ${stageNumber}?`)) return;
+  
+  setLoading(true);
+  try {
+    const token = getAuthToken();
+    const response = await axios.delete(
+      `${patientServiceBaseUrl}${API_BASE}/remove-stage/${localPlan._id}/${stageNumber}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     
-    if (!confirm(`Are you sure you want to remove Stage ${stageNumber}?`)) return;
-    
-    setLoading(true);
-    try {
-      const token = getAuthToken();
-      const response = await axios.delete(
-        `${patientServiceBaseUrl}${API_BASE}/remove-stage/${localPlan._id}/${stageNumber}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+    if (response.data.success) {
+      setLocalPlan(response.data.treatmentPlan);
+      showToast(`Stage ${stageNumber} removed successfully!`, 'success');
+      refetchTreatmentPlans?.();
       
-      if (response.data.success) {
-        setLocalPlan(response.data.data);
-        showToast(`Stage ${stageNumber} removed successfully!`, 'success');
-        refetchTreatmentPlans?.();
-      }
-    } catch (error: any) {
-      console.error("Error removing stage:", error);
-      showToast(error.response?.data?.message || "Failed to remove stage", 'error');
-    } finally {
-      setLoading(false);
+      // Force a refresh of the plan details to get updated status
+      await fetchPlanDetails();
     }
-  };
+  } catch (error: any) {
+    console.error("Error removing stage:", error);
+    showToast(error.response?.data?.message || "Failed to remove stage", 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // 6️⃣ Remove Procedure
 const handleRemoveProcedure = async (toothNumber: number, procedureName: string, surface: string) => {
@@ -1056,9 +1059,6 @@ const calculateStats = () => {
   );
   const completedStages = stages.filter(s => s.status === "completed").length;
   
-  // ✅ CRITICAL FIX: Progress should be based on STAGES, not procedures
-  // If you have 2 stages and 1 is completed, progress is 50%
-  // If you have 3 stages and 2 are completed, progress is 66.7%
   const progressPercentage = stages.length > 0 
     ? Math.round((completedStages / stages.length) * 100) 
     : 0;
@@ -1712,81 +1712,79 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     setNotes("");
   };
 
-  const handleSavePlan = () => {
-    if (teethPlans.length === 0) {
-      alert(
-        "Please add at least one tooth procedure before saving the treatment plan",
-      );
-      return;
-    }
+ const handleSavePlan = () => {
+  if (teethPlans.length === 0) {
+    alert(
+      "Please add at least one tooth procedure before saving the treatment plan",
+    );
+    return;
+  }
 
-    // Format teeth data properly
-    const formattedTeeth = teethPlans.map((toothPlan) => ({
-      toothNumber: toothPlan.toothNumber,
-      priority: toothPlan.priority || "medium",
-      procedures: toothPlan.procedures.map((proc) => ({
-        name: proc.name,
-        surface: proc.surface || "occlusal",
-        stage: proc.stage || 1,
-        estimatedCost: proc.estimatedCost || 0,
-        notes: proc.notes || "",
-      })),
-    }));
+  // Format teeth data properly
+  const formattedTeeth = teethPlans.map((toothPlan) => ({
+    toothNumber: toothPlan.toothNumber,
+    priority: toothPlan.priority || "medium",
+    procedures: toothPlan.procedures.map((proc) => ({
+      name: proc.name,
+      surface: proc.surface || "occlusal",
+      stage: proc.stage || 1,
+      estimatedCost: proc.estimatedCost || 0,
+      notes: proc.notes || "",
+      //status: 'planned' // Default status for new procedures
+    })),
+  }));
 
-    // Format stages with procedureRefs
-    const formattedStages = stages.map((stage, index) => {
-      const stageNumber = index + 1;
+  // Format stages - CRITICAL: Include status from form
+  const formattedStages = stages.map((stage, index) => {
+    const stageNumber = index + 1;
 
-      const proceduresInStage = teethPlans.flatMap((toothPlan) =>
-        toothPlan.procedures
-          .filter((proc) => proc.stage === stageNumber)
-          .map((proc) => ({
-            toothNumber: toothPlan.toothNumber,
-            procedureName: proc.name,
-          })),
-      );
+    const proceduresInStage = teethPlans.flatMap((toothPlan) =>
+      toothPlan.procedures
+        .filter((proc) => proc.stage === stageNumber)
+        .map((proc) => ({
+          toothNumber: toothPlan.toothNumber,
+          procedureName: proc.name,
+        })),
+    );
 
-      const stageStatus = stage.status || "pending";
+    // ✅ Use the actual status from the stage object
+    const stageStatus = stage.status || "pending";
 
-      return {
-        stageName: stage.stageName || `Stage ${stageNumber}`,
-        description: stage.description || "",
-        procedureRefs: proceduresInStage,
-        status: stageStatus,
-        scheduledDate:
-          stage.scheduledDate ||
-          new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
-        notes: stage.notes || "",
-        ...(stageStatus === "in-progress" && {
-          startedAt: new Date().toISOString(),
-        }),
-        ...(stageStatus === "completed" && {
-          completedAt: new Date().toISOString(),
-        }),
-      };
-    });
-
-    console.log("📊 Stage Statuses being sent to backend:");
-    formattedStages.forEach((stage, idx) => {
-      console.log(
-        `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
-      );
-    });
-
-    const plan: TreatmentPlanData = {
-      planName,
-      description,
-      teeth: formattedTeeth,
-      stages: formattedStages,
+    return {
+      stageName: stage.stageName || `Stage ${stageNumber}`,
+      stageNumber: stageNumber,
+      description: stage.description || "",
+      procedureRefs: proceduresInStage,
+      status: stageStatus, 
+      scheduledDate:
+        stage.scheduledDate ||
+        new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0],
+      notes: stage.notes || "",
     };
+  });
 
-    console.log("✅ Saving treatment plan:");
-    console.log("- Stages count:", formattedStages.length);
+  console.log("📊 Stage Statuses being sent to backend:");
+  formattedStages.forEach((stage, idx) => {
+    console.log(
+      `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
+    );
+  });
 
-    onSave(plan);
+  const plan: TreatmentPlanData = {
+    planName,
+    description,
+    teeth: formattedTeeth,
+    stages: formattedStages,
   };
+
+  console.log("✅ Saving treatment plan:");
+  console.log("- Stages count:", formattedStages.length);
+  console.log("- Full stages data:", JSON.stringify(formattedStages, null, 2));
+
+  onSave(plan);
+};
 
   const handleAddStage = () => {
     const newStageNumber = stages.length + 1;
