@@ -505,9 +505,9 @@ const BlogDetail: React.FC = () => {
               <span className={styles.featuredBadge}>Featured</span>
             )}
 
-            <span className={`${styles.statusBadge} ${styles[blog.status]}`}>
+            {/* <span className={`${styles.statusBadge} ${styles[blog.status]}`}>
               {blog.status.charAt(0).toUpperCase() + blog.status.slice(1)}
-            </span>
+            </span> */}
 
             {blog.adminReview?.status && (
               <span
@@ -639,11 +639,11 @@ const BlogDetail: React.FC = () => {
 
           {/* Tags */}
           <div className={styles.tags}>
-            {blog.tags.map((tag) => (
+            {/* {blog.tags.map((tag) => (
               <span key={tag} className={styles.tag}>
                 #{tag}
               </span>
-            ))}
+            ))} */}
           </div>
         </div>
       </header>
