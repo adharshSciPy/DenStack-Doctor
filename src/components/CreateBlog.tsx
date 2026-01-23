@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent, KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Upload, X, Save, Send, Eye, Tag, Image as ImageIcon } from 'lucide-react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import styles from '../styles/CreateBlog.module.css';
-import axios from 'axios';
+import { Upload, X, Tag, Plus } from 'lucide-react';
+import axios, { AxiosError } from 'axios';
 import blogServiceUrl from '../blogServiceUrl';
+import styles from '../styles/CreateBlog.module.css';
 
 interface BlogData {
   _id: string;
   title: string;
   content: string;
-  tags: string[];
-  status: 'draft' | 'published' | 'rejected';
   imageUrl: string[];
+  tags: string[];
   doctorId: {
     _id: string;
     name: string;
@@ -22,47 +19,33 @@ interface BlogData {
   updatedAt: string;
 }
 
+interface ApiResponse {
+  blog?: BlogData;
+  message?: string;
+}
+
 const CreateBlog: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const isEditing = !!id;
   
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
   
-  // Store original image URLs for comparison
+  const [title, setTitle] = useState<string>('');
+  const [content, setContent] = useState<string>('');
+  const [images, setImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [originalImages, setOriginalImages] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [currentTag, setCurrentTag] = useState<string>('');
   
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    tags: '',
-    status: 'draft' as 'draft' | 'published',
-    images: [] as File[],
-    existingImages: [] as string[],
-  });
-  
-  const [tagInput, setTagInput] = useState('');
-  const [suggestedTags] = useState([
-    'Research', 'Clinical', 'Case Study', 'Education', 
-    'Technology', 'Wellness', 'Treatment', 'Diagnosis'
-  ]);
-  
-  const quillModules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }],
-      ['link', 'image'],
-      ['clean']
-    ],
-  };
-  
-  const quillFormats = [
-    'header', 'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet', 'indent', 'link', 'image'
+  // Common medical tags for suggestions
+  const commonTags = [
+    'Cardiology', 'Neurology', 'Oncology', 'Pediatrics', 'Surgery',
+    'Dermatology', 'Psychiatry', 'Radiology', 'Emergency Medicine',
+    'Research', 'Clinical', 'Case Study', 'Technology', 'Wellness',
+    'Prevention', 'Treatment', 'Diagnosis', 'Healthcare', 'Medical Tech'
   ];
   
   useEffect(() => {
@@ -71,7 +54,7 @@ const CreateBlog: React.FC = () => {
     }
   }, [id]);
   
-  const fetchBlog = async () => {
+  const fetchBlog = async (): Promise<void> => {
     try {
       setLoading(true);
       const token = localStorage.getItem("authToken");
@@ -82,117 +65,98 @@ const CreateBlog: React.FC = () => {
         return;
       }
       
-      const response = await axios.get(
-        `${blogServiceUrl}/api/v1/blog/blog/${id}`,
+      const response = await axios.get<ApiResponse>(
+        `${blogServiceUrl}/api/blogs/${id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       
-      const blogData: BlogData = response.data;
-      
-      // Store the original image paths (without baseURL)
+      const blogData = response.data.blog || response.data as BlogData;
       const originalImagePaths = blogData.imageUrl || [];
+      
       setOriginalImages(originalImagePaths);
+      setTitle(blogData.title || '');
+      setContent(blogData.content || '');
+      setTags(blogData.tags || []);
+      setExistingImages(originalImagePaths.map(img => 
+        img.startsWith('http') ? img : `${blogServiceUrl}${img}`
+      ));
       
-      // Set form data with full URLs for display
-      setFormData({
-        title: blogData.title || '',
-        content: blogData.content || '',
-        tags: blogData.tags?.join(', ') || '',
-        status: (blogData.status === 'draft' || blogData.status === 'published') ? blogData.status : 'draft',
-        images: [],
-        existingImages: originalImagePaths.map(img => 
-          img.startsWith('http') ? img : `${blogServiceUrl}${img}`
-        ),
-      });
-      
-    } catch (error: any) {
-      console.error('Error fetching blog:', error);
-      alert(error.response?.data?.message || 'Failed to fetch blog');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      alert(axiosError.response?.data?.message || 'Failed to fetch blog');
       navigate('/blogs');
     } finally {
       setLoading(false);
     }
   };
   
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(e.target.files || []);
-    const totalImages = formData.images.length + files.length + formData.existingImages.length;
+    const totalImages = images.length + files.length + existingImages.length;
     
     if (totalImages > 5) {
-      alert('Cannot upload more than 5 images total');
+      alert('Max 5 images');
       return;
     }
     
-    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+    // Check file sizes (optional)
+    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024); // 5MB
     if (oversizedFiles.length > 0) {
       alert('Some files exceed 5MB limit');
       return;
     }
     
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...files]
-    }));
+    setImages([...images, ...files]);
   };
   
-  const removeImage = (index: number, isExisting: boolean = false) => {
+  const removeImage = (index: number, isExisting: boolean = false): void => {
     if (isExisting) {
-      setFormData(prev => ({
-        ...prev,
-        existingImages: prev.existingImages.filter((_, i) => i !== index)
-      }));
+      setExistingImages(prev => prev.filter((_, i) => i !== index));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        images: prev.images.filter((_, i) => i !== index)
-      }));
+      setImages(prev => prev.filter((_, i) => i !== index));
     }
   };
   
-  const addTag = (tag: string) => {
+  // Tag functions
+  const addTag = (tag: string): void => {
     const trimmedTag = tag.trim();
-    if (!trimmedTag) return;
-    
-    const currentTags = formData.tags 
-      ? formData.tags.split(',').map(t => t.trim()).filter(t => t)
-      : [];
-    
-    if (!currentTags.includes(trimmedTag)) {
-      const updatedTags = [...currentTags, trimmedTag];
-      setFormData(prev => ({
-        ...prev,
-        tags: updatedTags.join(', ')
-      }));
+    if (trimmedTag && !tags.includes(trimmedTag) && tags.length < 10) {
+      setTags([...tags, trimmedTag]);
+      setCurrentTag('');
     }
-    setTagInput('');
   };
   
-  const removeTag = (tagToRemove: string) => {
-    const currentTags = formData.tags 
-      ? formData.tags.split(',').map(t => t.trim()).filter(t => t)
-      : [];
-    
-    const updatedTags = currentTags.filter(tag => tag !== tagToRemove);
-    setFormData(prev => ({
-      ...prev,
-      tags: updatedTags.join(', ')
-    }));
+  const removeTag = (tagToRemove: string): void => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleTagKeyPress = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (currentTag.trim()) {
+        addTag(currentTag);
+      }
+    }
+  };
+  
+  const handleCommonTagClick = (tag: string): void => {
+    if (!tags.includes(tag) && tags.length < 10) {
+      setTags([...tags, tag]);
+    }
+  };
+  
+  const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     
-    if (!formData.title.trim()) {
+    if (!title.trim()) {
       alert('Please enter a title');
       return;
     }
     
-    if (!formData.content.trim() || formData.content === '<p><br></p>') {
-      alert('Please enter blog content');
+    if (!content.trim()) {
+      alert('Please enter content');
       return;
     }
     
@@ -208,430 +172,308 @@ const CreateBlog: React.FC = () => {
         return;
       }
       
-      const formDataToSend = new FormData();
-      formDataToSend.append("title", formData.title.trim());
-      formDataToSend.append("content", formData.content);
-      formDataToSend.append("status", formData.status);
-      formDataToSend.append("doctorId", doctorId);
+      const formData = new FormData();
+      formData.append("title", title.trim());
+      formData.append("content", content);
+      formData.append("doctorId", doctorId);
       
-      // Handle tags
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag);
-      formDataToSend.append("tags", tagsArray.join(','));
+      // Add tags as comma-separated string
+      if (tags.length > 0) {
+        formData.append("tags", tags.join(','));
+      }
       
-      // Handle new images
-      formData.images.forEach((image) => {
-        formDataToSend.append("images", image);
+      images.forEach((image) => {
+        formData.append("images", image);
       });
       
-      // For editing, handle image changes
       if (isEditing) {
-        // Get current existing images (with full URLs)
-        const currentExistingUrls = formData.existingImages;
-        
-        // Convert them back to paths for comparison
-        const currentExistingPaths = currentExistingUrls.map(url => 
+        const currentPaths = existingImages.map(url => 
           url.replace(`${blogServiceUrl}`, '')
         );
         
-        // Find removed images by comparing with original
-        const removedImagePaths = originalImages.filter(originalPath => 
-          !currentExistingPaths.includes(originalPath)
+        if (currentPaths.length > 0) {
+          formData.append("existingImages", JSON.stringify(currentPaths));
+        }
+        
+        // Handle removed images
+        const removedImages = originalImages.filter(original => 
+          !currentPaths.includes(original)
         );
         
-        if (removedImagePaths.length > 0) {
-          console.log('Removed images:', removedImagePaths);
-          // Send the full paths (e.g., "/uploads/blogImages/filename.jpg")
-          formDataToSend.append("removedImages", JSON.stringify(removedImagePaths));
-        }
-        
-        // Send remaining existing images (just paths)
-        if (currentExistingPaths.length > 0) {
-          formDataToSend.append("existingImages", JSON.stringify(currentExistingPaths));
+        if (removedImages.length > 0) {
+          formData.append("removedImages", JSON.stringify(removedImages));
         }
       }
       
-      let url;
-      let method;
+      const url = isEditing 
+        ? `${blogServiceUrl}/api/v1/blog/${id}`
+        : `${blogServiceUrl}/api/v1/blog/post-blog`;
       
-      if (isEditing) {
-        url = `${blogServiceUrl}/api/v1/blog/edit-blog/${id}`;
-        method = 'patch';
-      } else {
-        url = `${blogServiceUrl}/api/v1/blog/post-blog`;
-        method = 'post';
-      }
+      const method = isEditing ? 'put' : 'post';
       
       const response = await axios({
         method,
         url,
-        data: formDataToSend,
+        data: formData,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       });
       
-      alert(response.data.message || 'Blog saved successfully!');
-      navigate(`/blogs/${response.data.blog?._id || id}`);
+      alert(response.data.message || (isEditing ? 'Blog updated!' : 'Blog created!'));
+      navigate('/blogs');
+      console.log(response);
       
-    } catch (error: any) {
-      console.error('Error saving blog:', error);
-      alert(error.response?.data?.message || 'Failed to save blog. Please try again.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      alert(axiosError.response?.data?.message || 'Error saving blog');
+      console.log(error);
+      
     } finally {
       setSaving(false);
     }
   };
   
-  const handleStatusChange = (status: 'draft' | 'published') => {
-    setFormData(prev => ({ ...prev, status }));
-  };
-  
   if (loading) {
     return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.spinner}></div>
-        <p>Loading blog...</p>
+      <div className={styles.loading}>
+        <div className={styles.loadingSpinner}></div>
+        <p>Loading...</p>
       </div>
     );
   }
   
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>
-          {isEditing ? 'Edit Blog' : 'Create New Blog'}
-        </h1>
-        <p className={styles.subtitle}>
-          {isEditing ? 'Update your blog post' : 'Share your medical insights and research with the community'}
-        </p>
-      </div>
+      <h2 className={styles.title}>{isEditing ? 'Edit Blog' : 'Create Blog'}</h2>
       
-      <div className={styles.mainLayout}>
-        <form onSubmit={handleSubmit} className={styles.form}>
-          {/* Title Input */}
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
-              Blog Title *
-              <span className={styles.labelHint}>Catchy and descriptive</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Enter a compelling title..."
-              className={styles.input}
-              required
-              minLength={5}
-              maxLength={200}
-            />
-          </div>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label htmlFor="title-input" className={styles.label}>
+            Title *
+            <span className={styles.labelHint}>Enter a clear and descriptive title</span>
+          </label>
+          <input
+            type="text"
+            id="title-input"
+            value={title}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+            placeholder="e.g., Latest Advances in Cardiology"
+            required
+            className={styles.titleInput}
+            minLength={3}
+            maxLength={200}
+          />
+        </div>
+        
+        <div className={styles.formGroup}>
+          <label htmlFor="content-input" className={styles.label}>
+            Content *
+            <span className={styles.labelHint}>Write your blog content here</span>
+          </label>
+          <textarea
+            id="content-input"
+            value={content}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
+            placeholder="Start writing your blog content..."
+            rows={15}
+            required
+            className={styles.contentInput}
+            minLength={10}
+          />
+        </div>
+        
+        {/* Tags Section */}
+        <div className={styles.formGroup}>
+          <label className={styles.label}>
+            Tags (Optional, max 10)
+            <span className={styles.labelHint}>
+              Add relevant tags to help readers find your blog. Press Enter or comma to add.
+            </span>
+          </label>
           
-          {/* Content Editor */}
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
-              Content *
-              <span className={styles.labelHint}>Write your blog content here</span>
-            </label>
-            <div className={styles.editorContainer}>
-              <ReactQuill
-                theme="snow"
-                value={formData.content}
-                onChange={(value) => setFormData(prev => ({ ...prev, content: value }))}
-                modules={quillModules}
-                formats={quillFormats}
-                placeholder="Start writing your blog..."
-                className={styles.editor}
+          <div className={styles.tagsInputContainer}>
+            <div className={styles.tagsInputWrapper}>
+              <Tag size={18} className={styles.tagIcon} />
+              <input
+                type="text"
+                value={currentTag}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setCurrentTag(e.target.value)}
+                onKeyDown={handleTagKeyPress}
+                placeholder="Type a tag and press Enter..."
+                className={styles.tagsInput}
+                maxLength={30}
               />
+              {currentTag.trim() && (
+                <button
+                  type="button"
+                  onClick={() => addTag(currentTag)}
+                  className={styles.addTagButton}
+                  disabled={tags.includes(currentTag.trim()) || tags.length >= 10}
+                >
+                  <Plus size={16} />
+                </button>
+              )}
             </div>
-          </div>
-          
-          {/* Tags */}
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
-              Tags
-              <span className={styles.labelHint}>Help readers find your blog</span>
-            </label>
-            <div className={styles.tagsContainer}>
-              <div className={styles.tagsInputWrapper}>
-                <Tag className={styles.tagIcon} />
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addTag(tagInput);
-                    }
-                  }}
-                  placeholder="Add tags (press Enter or click suggestions)"
-                  className={styles.tagsInput}
-                />
-              </div>
-              
+            
+            {tags.length > 0 && (
               <div className={styles.selectedTags}>
-                {formData.tags.split(',').filter(tag => tag.trim()).map((tag, index) => (
-                  <span key={index} className={styles.selectedTag}>
-                    {tag.trim()}
+                {tags.map((tag, index) => (
+                  <div key={index} className={styles.tagItem}>
+                    <span className={styles.tagText}>{tag}</span>
                     <button
                       type="button"
-                      onClick={() => removeTag(tag.trim())}
+                      onClick={() => removeTag(tag)}
                       className={styles.removeTagButton}
+                      aria-label={`Remove tag ${tag}`}
                     >
                       <X size={12} />
                     </button>
-                  </span>
+                  </div>
                 ))}
-              </div>
-              
-              <div className={styles.suggestedTags}>
-                <span className={styles.suggestedLabel}>Suggested:</span>
-                {suggestedTags.map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => addTag(tag)}
-                    className={styles.suggestedTag}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          {/* Image Upload */}
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
-              Images (Max 5)
-              <span className={styles.labelHint}>Upload supporting images</span>
-            </label>
-            
-            {/* Existing Images */}
-            {formData.existingImages.length > 0 && (
-              <div className={styles.existingImages}>
-                <h4 className={styles.existingTitle}>
-                  Existing Images {isEditing && '(Click X to remove)'}:
-                </h4>
-                <div className={styles.imageGrid}>
-                  {formData.existingImages.map((url, index) => (
-                    <div key={index} className={styles.imagePreview}>
-                      <img 
-                        src={url} 
-                        alt={`Existing ${index}`} 
-                        className={styles.image}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Image+Not+Found';
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index, true)}
-                        className={styles.removeImageButton}
-                        title="Remove image"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
             
-            {/* Upload New Images */}
-            <div className={styles.uploadArea}>
-              <input
-                type="file"
-                id="image-upload"
-                multiple
-                accept="image/*"
-                onChange={handleImageUpload}
-                className={styles.uploadInput}
-                disabled={formData.images.length + formData.existingImages.length >= 5}
-              />
-              <label htmlFor="image-upload" className={styles.uploadLabel}>
-                <Upload className={styles.uploadIcon} />
-                <div>
-                  <span className={styles.uploadText}>
-                    Click to upload images
-                  </span>
-                  <span className={styles.uploadHint}>
-                    Max 5 images total • Max 5MB each • Supports JPG, PNG, WebP
-                  </span>
-                </div>
-              </label>
-              
-              {/* New Uploaded Images Preview */}
-              <div className={styles.uploadedImages}>
-                {formData.images.map((image, index) => (
-                  <div key={index} className={styles.uploadedImage}>
-                    <img 
-                      src={URL.createObjectURL(image)} 
-                      alt={`Upload ${index}`} 
-                      className={styles.uploadedImagePreview}
-                    />
-                    <div className={styles.uploadedImageInfo}>
-                      <span title={image.name}>
-                        {image.name.length > 20 
-                          ? `${image.name.substring(0, 20)}...` 
-                          : image.name}
-                      </span>
-                      <span>{(image.size / 1024).toFixed(1)} KB</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className={styles.removeUploadedButton}
-                      title="Remove image"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              
-              <div className={styles.imageCount}>
-                <ImageIcon className={styles.countIcon} />
-                <span>
-                  {formData.images.length + formData.existingImages.length} / 5 images
-                </span>
-              </div>
+            <div className={styles.tagCount}>
+              {tags.length} / 10 tags added
             </div>
           </div>
           
-          {/* Form Actions */}
-          <div className={styles.actions}>
-            <div className={styles.statusButtons}>
-              <button
-                type="button"
-                onClick={() => handleStatusChange('draft')}
-                className={`${styles.statusButton} ${formData.status === 'draft' ? styles.statusButtonActive : ''}`}
-              >
-                <Save size={16} />
-                Save as Draft
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => handleStatusChange('published')}
-                className={`${styles.statusButton} ${formData.status === 'published' ? styles.statusButtonActive : ''}`}
-              >
-                <Send size={16} />
-                Publish Now
-              </button>
-            </div>
-            
-            <div className={styles.actionButtons}>
-              <button
-                type="button"
-                onClick={() => setPreview(!preview)}
-                className={styles.previewButton}
-              >
-                <Eye size={16} />
-                {preview ? 'Hide Preview' : 'Show Preview'}
-              </button>
-              
-              <button
-                type="submit"
-                disabled={saving}
-                className={styles.submitButton}
-              >
-                {saving ? (
-                  <>
-                    <div className={styles.submitSpinner}></div>
-                    {isEditing ? 'Updating...' : 'Creating...'}
-                  </>
-                ) : (
-                  <>
-                    {formData.status === 'draft' ? (
-                      <>
-                        <Save size={16} />
-                        {isEditing ? 'Update Draft' : 'Save as Draft'}
-                      </>
-                    ) : (
-                      <>
-                        <Send size={16} />
-                        {isEditing ? 'Update & Publish' : 'Publish Blog'}
-                      </>
-                    )}
-                  </>
-                )}
-              </button>
+          <div className={styles.commonTags}>
+            <h4 className={styles.commonTagsTitle}>Common Medical Tags:</h4>
+            <div className={styles.commonTagsList}>
+              {commonTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleCommonTagClick(tag)}
+                  className={`${styles.commonTag} ${
+                    tags.includes(tag) ? styles.commonTagSelected : ''
+                  }`}
+                  disabled={tags.includes(tag) || tags.length >= 10}
+                >
+                  {tag}
+                  {tags.includes(tag) && <span className={styles.addedCheck}>✓</span>}
+                </button>
+              ))}
             </div>
           </div>
-        </form>
+        </div>
         
-        {/* Preview Panel */}
-        {preview && (
-          <div className={styles.previewPanel}>
-            <h3 className={styles.previewTitle}>Preview</h3>
-            <div className={styles.previewContent}>
-              <h2 className={styles.previewBlogTitle}>
-                {formData.title || 'Untitled Blog'}
-              </h2>
-              
-              <div className={styles.previewMeta}>
-                <span className={styles.previewStatus}>
-                  Status: <strong className={`${formData.status === 'published' ? styles.publishedStatus : styles.draftStatus}`}>
-                    {formData.status}
-                  </strong>
-                </span>
-                <span className={styles.previewWordCount}>
-                  Words: {formData.content.replace(/<[^>]*>/g, '').split(/\s+/).filter(w => w).length}
-                </span>
-              </div>
-              
-              {formData.existingImages.length > 0 || formData.images.length > 0 ? (
-                <div className={styles.previewImages}>
-                  {formData.existingImages.slice(0, 3).map((url, index) => (
+        {/* Images Section */}
+        <div className={styles.formGroup}>
+          <label className={styles.label}>
+            Images (Optional, max 5)
+            <span className={styles.labelHint}>Upload up to 5 images. Max 5MB each</span>
+          </label>
+          
+          {existingImages.length > 0 && (
+            <div className={styles.existingImages}>
+              <h4 className={styles.sectionTitle}>Current Images:</h4>
+              <div className={styles.imageList}>
+                {existingImages.map((url, index) => (
+                  <div key={`existing-${index}`} className={styles.imageItem}>
                     <img 
-                      key={`existing-${index}`} 
                       src={url} 
-                      alt={`Preview ${index}`} 
-                      className={styles.previewImage} 
+                      alt={`Current ${index}`}
+                      className={styles.image}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://via.placeholder.com/150?text=Image+Error';
+                      }}
                     />
-                  ))}
-                  {formData.images.slice(0, 3 - formData.existingImages.length).map((image, index) => (
-                    <img 
-                      key={`new-${index}`} 
-                      src={URL.createObjectURL(image)} 
-                      alt={`Upload Preview ${index}`} 
-                      className={styles.previewImage} 
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.noImagesPreview}>
-                  No images uploaded
-                </div>
-              )}
-              
-              <div 
-                className={styles.previewText}
-                dangerouslySetInnerHTML={{ 
-                  __html: formData.content || '<p class="preview-placeholder">Start writing to see preview...</p>' 
-                }}
-              />
-              
-              {formData.tags && (
-                <div className={styles.previewTags}>
-                  <strong>Tags:</strong>
-                  <div className={styles.previewTagsList}>
-                    {formData.tags.split(',').filter(tag => tag.trim()).map((tag, index) => (
-                      <span key={index} className={styles.previewTag}>
-                        #{tag.trim()}
-                      </span>
-                    ))}
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index, true)}
+                        className={styles.removeButton}
+                        aria-label={`Remove image ${index + 1}`}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
+          )}
+          
+          <div className={styles.uploadArea}>
+            <input
+              type="file"
+              id="file-upload"
+              multiple
+              accept="image/*"
+              onChange={handleImageUpload}
+              className={styles.fileInput}
+              disabled={images.length + existingImages.length >= 5}
+            />
+            <label htmlFor="file-upload" className={styles.uploadButton}>
+              <Upload size={18} className={styles.uploadIcon} />
+              <span className={styles.uploadText}>Add Images</span>
+            </label>
+            <span className={styles.imageCount}>
+              {images.length + existingImages.length} / 5
+            </span>
           </div>
-        )}
-      </div>
+          
+          {images.length > 0 && (
+            <div className={styles.newImages}>
+              <h4 className={styles.sectionTitle}>New Images to Upload:</h4>
+              <div className={styles.imageList}>
+                {images.map((image, index) => (
+                  <div key={`new-${index}`} className={styles.imageItem}>
+                    <img 
+                      src={URL.createObjectURL(image)} 
+                      alt={`New ${index}`}
+                      className={styles.image}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className={styles.removeButton}
+                      aria-label={`Remove new image ${index + 1}`}
+                    >
+                      <X size={14} />
+                    </button>
+                    <div className={styles.imageName} title={image.name}>
+                      {image.name.length > 15 
+                        ? `${image.name.substring(0, 15)}...` 
+                        : image.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className={styles.formActions}>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className={styles.cancelButton}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className={styles.submitButton}
+          >
+            {saving ? (
+              <>
+                <span className={styles.spinner}></span>
+                {isEditing ? 'Updating...' : 'Creating...'}
+              </>
+            ) : (
+              isEditing ? 'Update Blog' : 'Create Blog'
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

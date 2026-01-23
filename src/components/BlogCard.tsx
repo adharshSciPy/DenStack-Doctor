@@ -170,7 +170,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, onLike, onView, isLiking = fa
         <div className={styles.tags}>
           {blog?.tags?.slice(0, 3).map((tag) => (
             <span key={tag} className={styles.tag}>
-              #{tag}
+              {tag}
             </span>
           ))}
           {blog?.tags?.length > 3 && (
@@ -181,7 +181,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, onLike, onView, isLiking = fa
         </div>
 
         {/* Metadata */}
-        <div className={styles.metadata}>
+        {/* <div className={styles.metadata}>
           <div className={styles.metaItem}>
             <Calendar className={styles.metaIcon} />
             <span>{format(new Date(blog.createdAt), "MMM dd, yyyy")}</span>
@@ -211,7 +211,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, onLike, onView, isLiking = fa
             <MessageCircle className={styles.metaIcon} />
             <span>{blog.commentsCount}</span>
           </div>
-        </div>
+        </div> */}
 
         {/* Admin Review Status (for admins) */}
         {blog.adminReview?.status && (
