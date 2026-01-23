@@ -4304,48 +4304,48 @@ const handleClose = () => {
     return stats;
   };
 
-  const handleCreateTreatmentPlan = () => {
-    setShowTreatmentPlanForm(true);
-  };
+  // const handleCreateTreatmentPlan = () => {
+  //   setShowTreatmentPlanForm(true);
+  // };
 
-  const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
-    console.log("✅ Received plan from form WITH TEETH:", plan);
+  // const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
+  //   console.log("✅ Received plan from form WITH TEETH:", plan);
 
-    // Verify that teeth data exists
-    if (!plan.teeth || plan.teeth.length === 0) {
-      console.error("❌ Treatment plan has no teeth data!");
-      alert(
-        "Error: Treatment plan must include teeth procedures. Please add procedures to teeth.",
-      );
-      return;
-    }
+  //   // Verify that teeth data exists
+  //   if (!plan.teeth || plan.teeth.length === 0) {
+  //     console.error("❌ Treatment plan has no teeth data!");
+  //     alert(
+  //       "Error: Treatment plan must include teeth procedures. Please add procedures to teeth.",
+  //     );
+  //     return;
+  //   }
 
-    // CRITICAL FIX: Ensure stages have proper status from the plan
-    const enhancedPlan = {
-      ...plan,
-      stages: plan.stages.map((stage, index) => {
-        // Preserve the status from the form (which comes from the stage status toggle buttons)
-        const stageFromPlan = plan.stages[index];
-        return {
-          ...stage,
-          status: stageFromPlan?.status || "pending", // Use the status from the form
-          stageNumber: index + 1, // Ensure stage numbers are sequential
-        };
-      }),
-      teeth: plan.teeth,
-    };
+  //   // CRITICAL FIX: Ensure stages have proper status from the plan
+  //   const enhancedPlan = {
+  //     ...plan,
+  //     stages: plan.stages.map((stage, index) => {
+  //       // Preserve the status from the form (which comes from the stage status toggle buttons)
+  //       const stageFromPlan = plan.stages[index];
+  //       return {
+  //         ...stage,
+  //         status: stageFromPlan?.status || "pending", // Use the status from the form
+  //         stageNumber: index + 1, // Ensure stage numbers are sequential
+  //       };
+  //     }),
+  //     teeth: plan.teeth,
+  //   };
 
-    console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
-    console.log("📊 Stage Statuses:");
-    enhancedPlan.stages.forEach((stage, index) => {
-      console.log(
-        `  Stage ${index + 1}: ${stage.stageName} - Status: ${stage.status}`,
-      );
-    });
+  //   console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
+  //   console.log("📊 Stage Statuses:");
+  //   enhancedPlan.stages.forEach((stage, index) => {
+  //     console.log(
+  //       `  Stage ${index + 1}: ${stage.stageName} - Status: ${stage.status}`,
+  //     );
+  //   });
 
-    setTreatmentPlan(enhancedPlan);
-    setShowTreatmentPlanForm(false);
-  };
+  //   setTreatmentPlan(enhancedPlan);
+  //   setShowTreatmentPlanForm(false);
+  // };
 
   const stats = getConditionSummary();
 
@@ -4886,30 +4886,37 @@ const renderTeethTab = () => (
   )}
 
   {/* Quadrant Labels - with adjusted bottom padding */}
-  {selectedQuadrant === "all" && (
-    <>
-      <div className="absolute top-2 left-2">
-        <Badge className="bg-blue-50 text-blue-700 text-xs border border-blue-200">
-          Q1(UL)
-        </Badge>
-      </div>
-      <div className="absolute top-2 right-2">
-        <Badge className="bg-green-50 text-green-700 text-xs border border-green-200">
-          Q2(UR)
-        </Badge>
-      </div>
-      <div className="absolute bottom-12 sm:bottom-10 right-2">
-        <Badge className="bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">
-          Q3(LL)    
-        </Badge>
-      </div>
-      <div className="absolute bottom-12 sm:bottom-10 left-2">
-        <Badge className="bg-red-50 text-red-700 text-xs border border-red-200">
-          Q4(LR)
-        </Badge>
-      </div>
-    </>
-  )}
+{selectedQuadrant === "all" && (
+  <>
+    {/* Upper Left - Q1 */}
+    <div className="absolute top-2 left-2">
+      <Badge className="bg-blue-50 text-blue-700 text-xs border border-blue-200">
+        Q1(UL)
+      </Badge>
+    </div>
+    
+    {/* Upper Right - Q2 */}
+    <div className="absolute top-2 right-2">
+      <Badge className="bg-green-50 text-green-700 text-xs border border-green-200">
+        Q2(UR)
+      </Badge>
+    </div>
+    
+    {/* Lower Left - Q3 */}
+    <div className="absolute bottom-2 left-2">
+      <Badge className="bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">
+        Q3(LL)
+      </Badge>
+    </div>
+    
+    {/* Lower Right - Q4 */}
+    <div className="absolute bottom-2 right-2">
+      <Badge className="bg-red-50 text-red-700 text-xs border border-red-200">
+        Q4(LR)
+      </Badge>
+    </div>
+  </>
+)}
 </div>
 
     {/* Teeth Color Legend - simplified */}
@@ -5525,7 +5532,7 @@ const renderTeethTab = () => (
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Treatment Plan</CardTitle>
                 </CardHeader>
@@ -5585,9 +5592,9 @@ const renderTeethTab = () => (
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </Card> */}
 
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Quick Actions</CardTitle>
                 </CardHeader>
@@ -5612,7 +5619,7 @@ const renderTeethTab = () => (
                       )}
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           )}
         </CardContent>
@@ -5665,7 +5672,7 @@ const renderTeethTab = () => (
       )}
 
       {/* Treatment Plan Form */}
-      {showTreatmentPlanForm && (
+      {/* {showTreatmentPlanForm && (
         <TreatmentPlanForm
           patientId={patientId}
           existingConditions={toothConditions}
@@ -5673,7 +5680,7 @@ const renderTeethTab = () => (
           onSave={handleSaveTreatmentPlan}
           initialData={treatmentPlan}
         />
-      )}
+      )} */}
 
       {/* Quick Add Procedure Modal */}
       {showQuickAddModal && (
@@ -5793,925 +5800,925 @@ const renderTeethTab = () => (
 }
 
 // Treatment Plan Form Component (Remains the same as before)
-interface TreatmentPlanFormProps {
-  patientId: string;
-  existingConditions: ToothCondition[];
-  onClose: () => void;
-  onSave: (plan: TreatmentPlanData) => void;
-  initialData?: TreatmentPlanData | null;
-}
+// interface TreatmentPlanFormProps {
+//   patientId: string;
+//   existingConditions: ToothCondition[];
+//   onClose: () => void;
+//   onSave: (plan: TreatmentPlanData) => void;
+//   initialData?: TreatmentPlanData | null;
+// }
 
-const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
-  patientId,
-  existingConditions,
-  onClose,
-  onSave,
-  initialData,
-}) => {
-  const [planName, setPlanName] = useState(
-    initialData?.planName || "Treatment Plan",
-  );
-  const [description, setDescription] = useState(
-    initialData?.description || "",
-  );
-  const [stages, setStages] = useState<TreatmentPlanStage[]>(
-    initialData?.stages || [
-      {
-        stageName: "Initial Treatment",
-        description: "Primary procedures",
-        procedureRefs: [],
-        status: "pending",
-        scheduledDate: new Date().toISOString().split("T")[0],
-      },
-      {
-        stageName: "Follow-up",
-        description: "Secondary procedures",
-        procedureRefs: [],
-        status: "pending",
-        scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-      },
-    ],
-  );
-  const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
-  const [selectedProcedure, setSelectedProcedure] = useState("");
-  const [selectedSurface, setSelectedSurface] = useState("");
-  const [estimatedCost, setEstimatedCost] = useState<number>(0);
-  const [notes, setNotes] = useState("");
-  const [teethPlans, setTeethPlans] = useState<
-    {
-      toothNumber: number;
-      procedures: any[];
-      priority: "urgent" | "high" | "medium" | "low";
-    }[]
-  >(
-    initialData?.teeth.map((t) => ({
-      toothNumber: t.toothNumber,
-      priority: t.priority || "medium",
-      procedures: t.procedures.map((p) => ({
-        name: p.name,
-        surface: p.surface || "occlusal",
-        stage: p.stage || 1,
-        estimatedCost: p.estimatedCost || 0,
-        notes: p.notes || "",
-      })),
-    })) || [],
-  );
-  const [selectedPriority, setSelectedPriority] = useState<
-    "urgent" | "high" | "medium" | "low"
-  >("medium");
-  const [selectedStage, setSelectedStage] = useState<number>(1);
+// const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
+//   patientId,
+//   existingConditions,
+//   onClose,
+//   onSave,
+//   initialData,
+// }) => {
+//   const [planName, setPlanName] = useState(
+//     initialData?.planName || "Treatment Plan",
+//   );
+//   const [description, setDescription] = useState(
+//     initialData?.description || "",
+//   );
+//   const [stages, setStages] = useState<TreatmentPlanStage[]>(
+//     initialData?.stages || [
+//       {
+//         stageName: "Initial Treatment",
+//         description: "Primary procedures",
+//         procedureRefs: [],
+//         status: "pending",
+//         scheduledDate: new Date().toISOString().split("T")[0],
+//       },
+//       {
+//         stageName: "Follow-up",
+//         description: "Secondary procedures",
+//         procedureRefs: [],
+//         status: "pending",
+//         scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+//           .toISOString()
+//           .split("T")[0],
+//       },
+//     ],
+//   );
+//   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
+//   const [selectedProcedure, setSelectedProcedure] = useState("");
+//   const [selectedSurface, setSelectedSurface] = useState("");
+//   const [estimatedCost, setEstimatedCost] = useState<number>(0);
+//   const [notes, setNotes] = useState("");
+//   const [teethPlans, setTeethPlans] = useState<
+//     {
+//       toothNumber: number;
+//       procedures: any[];
+//       priority: "urgent" | "high" | "medium" | "low";
+//     }[]
+//   >(
+//     initialData?.teeth.map((t) => ({
+//       toothNumber: t.toothNumber,
+//       priority: t.priority || "medium",
+//       procedures: t.procedures.map((p) => ({
+//         name: p.name,
+//         surface: p.surface || "occlusal",
+//         stage: p.stage || 1,
+//         estimatedCost: p.estimatedCost || 0,
+//         notes: p.notes || "",
+//       })),
+//     })) || [],
+//   );
+//   const [selectedPriority, setSelectedPriority] = useState<
+//     "urgent" | "high" | "medium" | "low"
+//   >("medium");
+//   const [selectedStage, setSelectedStage] = useState<number>(1);
 
-  useEffect(() => {
-    if (initialData) {
-      console.log("📋 TreatmentPlanForm received initial data:", initialData);
-      console.log("- Teeth:", initialData.teeth?.length || 0);
-      console.log("- Stages:", initialData.stages?.length || 0);
-      console.log(
-        "- Procedures count:",
-        initialData.teeth?.reduce((sum, t) => sum + t.procedures.length, 0) ||
-          0,
-      );
-    }
-  }, [initialData]);
+//   useEffect(() => {
+//     if (initialData) {
+//       console.log("📋 TreatmentPlanForm received initial data:", initialData);
+//       console.log("- Teeth:", initialData.teeth?.length || 0);
+//       console.log("- Stages:", initialData.stages?.length || 0);
+//       console.log(
+//         "- Procedures count:",
+//         initialData.teeth?.reduce((sum, t) => sum + t.procedures.length, 0) ||
+//           0,
+//       );
+//     }
+//   }, [initialData]);
 
-  const handleAddProcedure = () => {
-    if (!selectedTooth || !selectedProcedure || !selectedSurface) {
-      alert("Please select tooth, procedure, and surface");
-      return;
-    }
+//   const handleAddProcedure = () => {
+//     if (!selectedTooth || !selectedProcedure || !selectedSurface) {
+//       alert("Please select tooth, procedure, and surface");
+//       return;
+//     }
 
-    const toothIndex = teethPlans.findIndex(
-      (tp) => tp.toothNumber === selectedTooth,
-    );
-    const newProcedure = {
-      name: selectedProcedure,
-      surface: selectedSurface,
-      stage: selectedStage,
-      estimatedCost: estimatedCost || 0,
-      notes,
-    };
+//     const toothIndex = teethPlans.findIndex(
+//       (tp) => tp.toothNumber === selectedTooth,
+//     );
+//     const newProcedure = {
+//       name: selectedProcedure,
+//       surface: selectedSurface,
+//       stage: selectedStage,
+//       estimatedCost: estimatedCost || 0,
+//       notes,
+//     };
 
-    if (toothIndex === -1) {
-      setTeethPlans([
-        ...teethPlans,
-        {
-          toothNumber: selectedTooth,
-          procedures: [newProcedure],
-          priority: selectedPriority,
-        },
-      ]);
-    } else {
-      const updated = [...teethPlans];
-      updated[toothIndex].procedures.push(newProcedure);
-      setTeethPlans(updated);
-    }
+//     if (toothIndex === -1) {
+//       setTeethPlans([
+//         ...teethPlans,
+//         {
+//           toothNumber: selectedTooth,
+//           procedures: [newProcedure],
+//           priority: selectedPriority,
+//         },
+//       ]);
+//     } else {
+//       const updated = [...teethPlans];
+//       updated[toothIndex].procedures.push(newProcedure);
+//       setTeethPlans(updated);
+//     }
 
-    // Reset form
-    setSelectedProcedure("");
-    setSelectedSurface("");
-    setEstimatedCost(0);
-    setNotes("");
-  };
+//     // Reset form
+//     setSelectedProcedure("");
+//     setSelectedSurface("");
+//     setEstimatedCost(0);
+//     setNotes("");
+//   };
 
-  const handleSavePlan = () => {
-    if (teethPlans.length === 0) {
-      alert(
-        "Please add at least one tooth procedure before saving the treatment plan",
-      );
-      return;
-    }
+//   const handleSavePlan = () => {
+//     if (teethPlans.length === 0) {
+//       alert(
+//         "Please add at least one tooth procedure before saving the treatment plan",
+//       );
+//       return;
+//     }
 
-    // Format teeth data properly
-    const formattedTeeth = teethPlans.map((toothPlan) => ({
-      toothNumber: toothPlan.toothNumber,
-      priority: toothPlan.priority || "medium",
-      procedures: toothPlan.procedures.map((proc) => ({
-        name: proc.name,
-        surface: proc.surface || "occlusal",
-        stage: proc.stage || 1,
-        estimatedCost: proc.estimatedCost || 0,
-        notes: proc.notes || "",
-      })),
-    }));
+//     // Format teeth data properly
+//     const formattedTeeth = teethPlans.map((toothPlan) => ({
+//       toothNumber: toothPlan.toothNumber,
+//       priority: toothPlan.priority || "medium",
+//       procedures: toothPlan.procedures.map((proc) => ({
+//         name: proc.name,
+//         surface: proc.surface || "occlusal",
+//         stage: proc.stage || 1,
+//         estimatedCost: proc.estimatedCost || 0,
+//         notes: proc.notes || "",
+//       })),
+//     }));
 
-    // Format stages with procedureRefs
-    const formattedStages = stages.map((stage, index) => {
-      const stageNumber = index + 1;
+//     // Format stages with procedureRefs
+//     const formattedStages = stages.map((stage, index) => {
+//       const stageNumber = index + 1;
 
-      const proceduresInStage = teethPlans.flatMap((toothPlan) =>
-        toothPlan.procedures
-          .filter((proc) => proc.stage === stageNumber)
-          .map((proc) => ({
-            toothNumber: toothPlan.toothNumber,
-            procedureName: proc.name,
-          })),
-      );
+//       const proceduresInStage = teethPlans.flatMap((toothPlan) =>
+//         toothPlan.procedures
+//           .filter((proc) => proc.stage === stageNumber)
+//           .map((proc) => ({
+//             toothNumber: toothPlan.toothNumber,
+//             procedureName: proc.name,
+//           })),
+//       );
 
-      const stageStatus = stage.status || "pending";
+//       const stageStatus = stage.status || "pending";
 
-      return {
-        stageName: stage.stageName || `Stage ${stageNumber}`,
-        description: stage.description || "",
-        procedureRefs: proceduresInStage,
-        status: stageStatus,
-        scheduledDate:
-          stage.scheduledDate ||
-          new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
-        notes: stage.notes || "",
-        ...(stageStatus === "in-progress" && {
-          startedAt: new Date().toISOString(),
-        }),
-        ...(stageStatus === "completed" && {
-          completedAt: new Date().toISOString(),
-        }),
-      };
-    });
+//       return {
+//         stageName: stage.stageName || `Stage ${stageNumber}`,
+//         description: stage.description || "",
+//         procedureRefs: proceduresInStage,
+//         status: stageStatus,
+//         scheduledDate:
+//           stage.scheduledDate ||
+//           new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
+//             .toISOString()
+//             .split("T")[0],
+//         notes: stage.notes || "",
+//         ...(stageStatus === "in-progress" && {
+//           startedAt: new Date().toISOString(),
+//         }),
+//         ...(stageStatus === "completed" && {
+//           completedAt: new Date().toISOString(),
+//         }),
+//       };
+//     });
 
-    console.log("📊 Stage Statuses being sent to backend:");
-    formattedStages.forEach((stage, idx) => {
-      console.log(
-        `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
-      );
-    });
+//     console.log("📊 Stage Statuses being sent to backend:");
+//     formattedStages.forEach((stage, idx) => {
+//       console.log(
+//         `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
+//       );
+//     });
 
-    const plan: TreatmentPlanData = {
-      planName,
-      description,
-      teeth: formattedTeeth,
-      stages: formattedStages,
-    };
+//     const plan: TreatmentPlanData = {
+//       planName,
+//       description,
+//       teeth: formattedTeeth,
+//       stages: formattedStages,
+//     };
 
-    console.log("✅ Saving treatment plan:");
-    console.log("- Stages count:", formattedStages.length);
+//     console.log("✅ Saving treatment plan:");
+//     console.log("- Stages count:", formattedStages.length);
 
-    onSave(plan);
-  };
+//     onSave(plan);
+//   };
 
-  const handleAddStage = () => {
-    const newStageNumber = stages.length + 1;
-    setStages([
-      ...stages,
-      {
-        stageName: `Stage ${newStageNumber}`,
-        description: "",
-        procedureRefs: [],
-        status: "pending",
-        scheduledDate: new Date(
-          Date.now() + (newStageNumber - 1) * 7 * 24 * 60 * 60 * 1000,
-        )
-          .toISOString()
-          .split("T")[0],
-      },
-    ]);
-  };
+//   const handleAddStage = () => {
+//     const newStageNumber = stages.length + 1;
+//     setStages([
+//       ...stages,
+//       {
+//         stageName: `Stage ${newStageNumber}`,
+//         description: "",
+//         procedureRefs: [],
+//         status: "pending",
+//         scheduledDate: new Date(
+//           Date.now() + (newStageNumber - 1) * 7 * 24 * 60 * 60 * 1000,
+//         )
+//           .toISOString()
+//           .split("T")[0],
+//       },
+//     ]);
+//   };
 
-  const handleRemoveStage = (index: number) => {
-    if (stages.length <= 1) {
-      alert("At least one stage is required");
-      return;
-    }
+//   const handleRemoveStage = (index: number) => {
+//     if (stages.length <= 1) {
+//       alert("At least one stage is required");
+//       return;
+//     }
 
-    // Check if any procedures are assigned to this stage
-    const proceduresInStage = teethPlans.reduce((count, tooth) => {
-      return (
-        count + tooth.procedures.filter((p) => p.stage === index + 1).length
-      );
-    }, 0);
+//     // Check if any procedures are assigned to this stage
+//     const proceduresInStage = teethPlans.reduce((count, tooth) => {
+//       return (
+//         count + tooth.procedures.filter((p) => p.stage === index + 1).length
+//       );
+//     }, 0);
 
-    if (proceduresInStage > 0) {
-      if (
-        !confirm(
-          `Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`,
-        )
-      ) {
-        return;
-      }
+//     if (proceduresInStage > 0) {
+//       if (
+//         !confirm(
+//           `Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`,
+//         )
+//       ) {
+//         return;
+//       }
 
-      // Remove procedures assigned to this stage completely
-      const updatedTeethPlans = teethPlans
-        .map((tooth) => ({
-          ...tooth,
-          procedures: tooth.procedures.filter(
-            (proc) => proc.stage !== index + 1,
-          ),
-        }))
-        .filter((tooth) => tooth.procedures.length > 0); // Remove teeth with no procedures
+//       // Remove procedures assigned to this stage completely
+//       const updatedTeethPlans = teethPlans
+//         .map((tooth) => ({
+//           ...tooth,
+//           procedures: tooth.procedures.filter(
+//             (proc) => proc.stage !== index + 1,
+//           ),
+//         }))
+//         .filter((tooth) => tooth.procedures.length > 0); // Remove teeth with no procedures
 
-      setTeethPlans(updatedTeethPlans);
-    }
+//       setTeethPlans(updatedTeethPlans);
+//     }
 
-    // Remove the stage
-    const updatedStages = stages.filter((_, i) => i !== index);
+//     // Remove the stage
+//     const updatedStages = stages.filter((_, i) => i !== index);
 
-    // Renumber remaining stages to maintain order
-    const renumberedStages = updatedStages.map((stage, idx) => ({
-      ...stage,
-      stageName: stage.stageName.replace(/\d+$/, String(idx + 1)),
-    }));
+//     // Renumber remaining stages to maintain order
+//     const renumberedStages = updatedStages.map((stage, idx) => ({
+//       ...stage,
+//       stageName: stage.stageName.replace(/\d+$/, String(idx + 1)),
+//     }));
 
-    setStages(renumberedStages);
+//     setStages(renumberedStages);
 
-    // Adjust selected stage if needed
-    if (selectedStage > renumberedStages.length) {
-      setSelectedStage(renumberedStages.length);
-    } else if (selectedStage === index + 1) {
-      setSelectedStage(1);
-    }
-  };
+//     // Adjust selected stage if needed
+//     if (selectedStage > renumberedStages.length) {
+//       setSelectedStage(renumberedStages.length);
+//     } else if (selectedStage === index + 1) {
+//       setSelectedStage(1);
+//     }
+//   };
 
-  const handleUpdateStageStatus = (
-    stageIndex: number,
-    newStatus: "pending" | "completed" | "in-progress",
-  ) => {
-    const updatedStages = [...stages];
-    updatedStages[stageIndex].status = newStatus;
-    setStages(updatedStages);
-  };
+//   const handleUpdateStageStatus = (
+//     stageIndex: number,
+//     newStatus: "pending" | "completed" | "in-progress",
+//   ) => {
+//     const updatedStages = [...stages];
+//     updatedStages[stageIndex].status = newStatus;
+//     setStages(updatedStages);
+//   };
 
-  const getProceduresByStage = (stageNumber: number) => {
-    return teethPlans.flatMap((tooth) =>
-      tooth.procedures
-        .filter((proc) => proc.stage === stageNumber)
-        .map((proc) => ({
-          toothNumber: tooth.toothNumber,
-          ...proc,
-        })),
-    );
-  };
+//   const getProceduresByStage = (stageNumber: number) => {
+//     return teethPlans.flatMap((tooth) =>
+//       tooth.procedures
+//         .filter((proc) => proc.stage === stageNumber)
+//         .map((proc) => ({
+//           toothNumber: tooth.toothNumber,
+//           ...proc,
+//         })),
+//     );
+//   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
-        <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Create Treatment Plan</h3>
-            <p className="text-sm text-muted-foreground">
-              Patient ID: {patientId}
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+//   return (
+//     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+//       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
+//         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
+//           <div>
+//             <h3 className="text-lg font-semibold">Create Treatment Plan</h3>
+//             <p className="text-sm text-muted-foreground">
+//               Patient ID: {patientId}
+//             </p>
+//           </div>
+//           <Button variant="ghost" size="sm" onClick={onClose}>
+//             <X className="h-4 w-4" />
+//           </Button>
+//         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            {/* Plan Basic Info */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Plan Name
-              </label>
-              <input
-                type="text"
-                className="w-full border rounded-lg p-2"
-                value={planName}
-                onChange={(e) => setPlanName(e.target.value)}
-                placeholder="Enter plan name"
-              />
-            </div>
+//         <div className="flex-1 overflow-y-auto p-6">
+//           <div className="space-y-6">
+//             {/* Plan Basic Info */}
+//             <div>
+//               <label className="block text-sm font-medium mb-2">
+//                 Plan Name
+//               </label>
+//               <input
+//                 type="text"
+//                 className="w-full border rounded-lg p-2"
+//                 value={planName}
+//                 onChange={(e) => setPlanName(e.target.value)}
+//                 placeholder="Enter plan name"
+//               />
+//             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Description
-              </label>
-              <textarea
-                className="w-full border rounded-lg p-2"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter description"
-                rows={3}
-              />
-            </div>
+//             <div>
+//               <label className="block text-sm font-medium mb-2">
+//                 Description
+//               </label>
+//               <textarea
+//                 className="w-full border rounded-lg p-2"
+//                 value={description}
+//                 onChange={(e) => setDescription(e.target.value)}
+//                 placeholder="Enter description"
+//                 rows={3}
+//               />
+//             </div>
 
-            {/* Stages Management - WITHOUT REMOVE BUTTON */}
-            <div className="border rounded-lg p-4">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-medium">Stages Management</h4>
-                <Button variant="outline" size="sm" onClick={handleAddStage}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Stage
-                </Button>
-              </div>
+//             {/* Stages Management - WITHOUT REMOVE BUTTON */}
+//             <div className="border rounded-lg p-4">
+//               <div className="flex justify-between items-center mb-4">
+//                 <h4 className="font-medium">Stages Management</h4>
+//                 <Button variant="outline" size="sm" onClick={handleAddStage}>
+//                   <Plus className="h-4 w-4 mr-2" />
+//                   Add Stage
+//                 </Button>
+//               </div>
 
-              <div className="space-y-3">
-                {stages.map((stage, index) => {
-                  const stageNumber = index + 1;
-                  const proceduresInStage = getProceduresByStage(stageNumber);
+//               <div className="space-y-3">
+//                 {stages.map((stage, index) => {
+//                   const stageNumber = index + 1;
+//                   const proceduresInStage = getProceduresByStage(stageNumber);
 
-                  return (
-                    <div key={index} className="border rounded p-4 bg-white">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="bg-blue-50 text-blue-700"
-                          >
-                            Stage {stageNumber}
-                          </Badge>
-                          <span className="font-medium">{stage.stageName}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {proceduresInStage.length} procedure(s)
-                          </Badge>
-                        </div>
-                      </div>
+//                   return (
+//                     <div key={index} className="border rounded p-4 bg-white">
+//                       <div className="flex justify-between items-center mb-3">
+//                         <div className="flex items-center gap-2">
+//                           <Badge
+//                             variant="outline"
+//                             className="bg-blue-50 text-blue-700"
+//                           >
+//                             Stage {stageNumber}
+//                           </Badge>
+//                           <span className="font-medium">{stage.stageName}</span>
+//                           <Badge variant="secondary" className="text-xs">
+//                             {proceduresInStage.length} procedure(s)
+//                           </Badge>
+//                         </div>
+//                       </div>
 
-                      {/* Stage Status Badge */}
-                      <div className="mb-3">
-                        <Badge
-                          className={`text-xs ${
-                            stage.status === "completed"
-                              ? "bg-green-100 text-green-700"
-                              : stage.status === "in-progress"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          Status: {stage.status}
-                        </Badge>
-                      </div>
+//                       {/* Stage Status Badge */}
+//                       <div className="mb-3">
+//                         <Badge
+//                           className={`text-xs ${
+//                             stage.status === "completed"
+//                               ? "bg-green-100 text-green-700"
+//                               : stage.status === "in-progress"
+//                                 ? "bg-blue-100 text-blue-700"
+//                                 : "bg-gray-100 text-gray-700"
+//                           }`}
+//                         >
+//                           Status: {stage.status}
+//                         </Badge>
+//                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            Stage Name
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full border rounded p-2 text-sm"
-                            value={stage.stageName}
-                            onChange={(e) => {
-                              const updated = [...stages];
-                              updated[index].stageName = e.target.value;
-                              setStages(updated);
-                            }}
-                          />
-                        </div>
+//                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+//                         <div>
+//                           <label className="block text-xs text-gray-500 mb-1">
+//                             Stage Name
+//                           </label>
+//                           <input
+//                             type="text"
+//                             className="w-full border rounded p-2 text-sm"
+//                             value={stage.stageName}
+//                             onChange={(e) => {
+//                               const updated = [...stages];
+//                               updated[index].stageName = e.target.value;
+//                               setStages(updated);
+//                             }}
+//                           />
+//                         </div>
 
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            Scheduled Date
-                          </label>
-                          <input
-                            type="date"
-                            className="w-full border rounded p-2 text-sm"
-                            value={stage.scheduledDate || ""}
-                            onChange={(e) => {
-                              const updated = [...stages];
-                              updated[index].scheduledDate = e.target.value;
-                              setStages(updated);
-                            }}
-                          />
-                        </div>
+//                         <div>
+//                           <label className="block text-xs text-gray-500 mb-1">
+//                             Scheduled Date
+//                           </label>
+//                           <input
+//                             type="date"
+//                             className="w-full border rounded p-2 text-sm"
+//                             value={stage.scheduledDate || ""}
+//                             onChange={(e) => {
+//                               const updated = [...stages];
+//                               updated[index].scheduledDate = e.target.value;
+//                               setStages(updated);
+//                             }}
+//                           />
+//                         </div>
 
-                        <div className="md:col-span-2">
-                          <label className="block text-xs text-gray-500 mb-1">
-                            Description
-                          </label>
-                          <textarea
-                            className="w-full border rounded p-2 text-sm"
-                            value={stage.description || ""}
-                            onChange={(e) => {
-                              const updated = [...stages];
-                              updated[index].description = e.target.value;
-                              setStages(updated);
-                            }}
-                            rows={2}
-                            placeholder="Describe what will be done in this stage"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+//                         <div className="md:col-span-2">
+//                           <label className="block text-xs text-gray-500 mb-1">
+//                             Description
+//                           </label>
+//                           <textarea
+//                             className="w-full border rounded p-2 text-sm"
+//                             value={stage.description || ""}
+//                             onChange={(e) => {
+//                               const updated = [...stages];
+//                               updated[index].description = e.target.value;
+//                               setStages(updated);
+//                             }}
+//                             rows={2}
+//                             placeholder="Describe what will be done in this stage"
+//                           />
+//                         </div>
+//                       </div>
+//                     </div>
+//                   );
+//                 })}
+//               </div>
+//             </div>
 
-            {/* Add Procedures */}
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-4">Add Procedures</h4>
+//             {/* Add Procedures */}
+//             <div className="border rounded-lg p-4">
+//               <h4 className="font-medium mb-4">Add Procedures</h4>
 
-              {/* Stage Selection */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">
-                  Assign to Stage
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {stages.map((stage, index) => {
-                    const stageNumber = index + 1;
-                    const proceduresInStage =
-                      getProceduresByStage(stageNumber).length;
+//               {/* Stage Selection */}
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium mb-2">
+//                   Assign to Stage
+//                 </label>
+//                 <div className="flex flex-wrap gap-2">
+//                   {stages.map((stage, index) => {
+//                     const stageNumber = index + 1;
+//                     const proceduresInStage =
+//                       getProceduresByStage(stageNumber).length;
 
-                    return (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => setSelectedStage(stageNumber)}
-                        className={`px-3 py-2 border rounded-lg flex items-center gap-2 ${
-                          selectedStage === stageNumber
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-white border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        <span>Stage {stageNumber}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {proceduresInStage}
-                        </Badge>
-                        <Badge
-                          className={`text-[10px] ${
-                            stage.status === "completed"
-                              ? "bg-green-100 text-green-700"
-                              : stage.status === "in-progress"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {stage.status}
-                        </Badge>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+//                     return (
+//                       <button
+//                         key={index}
+//                         type="button"
+//                         onClick={() => setSelectedStage(stageNumber)}
+//                         className={`px-3 py-2 border rounded-lg flex items-center gap-2 ${
+//                           selectedStage === stageNumber
+//                             ? "bg-primary text-primary-foreground border-primary"
+//                             : "bg-white border-gray-300 hover:bg-gray-50"
+//                         }`}
+//                       >
+//                         <span>Stage {stageNumber}</span>
+//                         <Badge variant="secondary" className="text-xs">
+//                           {proceduresInStage}
+//                         </Badge>
+//                         <Badge
+//                           className={`text-[10px] ${
+//                             stage.status === "completed"
+//                               ? "bg-green-100 text-green-700"
+//                               : stage.status === "in-progress"
+//                                 ? "bg-blue-100 text-blue-700"
+//                                 : "bg-gray-100 text-gray-700"
+//                           }`}
+//                         >
+//                           {stage.status}
+//                         </Badge>
+//                       </button>
+//                     );
+//                   })}
+//                 </div>
+//               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Tooth Number
-                  </label>
-                  <select
-                    className="w-full border rounded-lg p-2"
-                    value={selectedTooth || ""}
-                    onChange={(e) =>
-                      setSelectedTooth(
-                        e.target.value ? Number(e.target.value) : null,
-                      )
-                    }
-                  >
-                    <option value="">Select tooth...</option>
-                    {[...ADULT_TOOTH_DATA, ...PEDIATRIC_TOOTH_DATA]
-                      .filter(
-                        (tooth, index, self) =>
-                          index ===
-                          self.findIndex((t) => t.number === tooth.number),
-                      )
-                      .sort((a, b) => a.number - b.number)
-                      .map((tooth) => (
-                        <option key={tooth.number} value={tooth.number}>
-                          Tooth #{tooth.number} ({tooth.name})
-                        </option>
-                      ))}
-                  </select>
-                </div>
+//               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+//                 <div>
+//                   <label className="block text-sm font-medium mb-1">
+//                     Tooth Number
+//                   </label>
+//                   <select
+//                     className="w-full border rounded-lg p-2"
+//                     value={selectedTooth || ""}
+//                     onChange={(e) =>
+//                       setSelectedTooth(
+//                         e.target.value ? Number(e.target.value) : null,
+//                       )
+//                     }
+//                   >
+//                     <option value="">Select tooth...</option>
+//                     {[...ADULT_TOOTH_DATA, ...PEDIATRIC_TOOTH_DATA]
+//                       .filter(
+//                         (tooth, index, self) =>
+//                           index ===
+//                           self.findIndex((t) => t.number === tooth.number),
+//                       )
+//                       .sort((a, b) => a.number - b.number)
+//                       .map((tooth) => (
+//                         <option key={tooth.number} value={tooth.number}>
+//                           Tooth #{tooth.number} ({tooth.name})
+//                         </option>
+//                       ))}
+//                   </select>
+//                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Procedure
-                  </label>
-                  <select
-                    className="w-full border rounded-lg p-2"
-                    value={selectedProcedure}
-                    onChange={(e) => setSelectedProcedure(e.target.value)}
-                  >
-                    <option value="">Select procedure...</option>
-                    {DENTAL_PROCEDURES.map((proc) => (
-                      <option key={proc} value={proc}>
-                        {proc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+//                 <div>
+//                   <label className="block text-sm font-medium mb-1">
+//                     Procedure
+//                   </label>
+//                   <select
+//                     className="w-full border rounded-lg p-2"
+//                     value={selectedProcedure}
+//                     onChange={(e) => setSelectedProcedure(e.target.value)}
+//                   >
+//                     <option value="">Select procedure...</option>
+//                     {DENTAL_PROCEDURES.map((proc) => (
+//                       <option key={proc} value={proc}>
+//                         {proc}
+//                       </option>
+//                     ))}
+//                   </select>
+//                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Surface
-                  </label>
-                  <select
-                    className="w-full border rounded-lg p-2"
-                    value={selectedSurface}
-                    onChange={(e) => setSelectedSurface(e.target.value)}
-                  >
-                    <option value="">Select surface...</option>
-                    <option value="mesial">Mesial</option>
-                    <option value="distal">Distal</option>
-                    <option value="buccal">Buccal</option>
-                    <option value="lingual">Lingual</option>
-                    <option value="occlusal">Occlusal</option>
-                    <option value="entire">Entire Tooth</option>
-                  </select>
-                </div>
+//                 <div>
+//                   <label className="block text-sm font-medium mb-1">
+//                     Surface
+//                   </label>
+//                   <select
+//                     className="w-full border rounded-lg p-2"
+//                     value={selectedSurface}
+//                     onChange={(e) => setSelectedSurface(e.target.value)}
+//                   >
+//                     <option value="">Select surface...</option>
+//                     <option value="mesial">Mesial</option>
+//                     <option value="distal">Distal</option>
+//                     <option value="buccal">Buccal</option>
+//                     <option value="lingual">Lingual</option>
+//                     <option value="occlusal">Occlusal</option>
+//                     <option value="entire">Entire Tooth</option>
+//                   </select>
+//                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Estimated Cost (₹)
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full border rounded-lg p-2"
-                    value={estimatedCost}
-                    onChange={(e) => setEstimatedCost(Number(e.target.value))}
-                    min="0"
-                    step="100"
-                  />
-                </div>
-              </div>
+//                 <div>
+//                   <label className="block text-sm font-medium mb-1">
+//                     Estimated Cost (₹)
+//                   </label>
+//                   <input
+//                     type="number"
+//                     className="w-full border rounded-lg p-2"
+//                     value={estimatedCost}
+//                     onChange={(e) => setEstimatedCost(Number(e.target.value))}
+//                     min="0"
+//                     step="100"
+//                   />
+//                 </div>
+//               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Priority
-                </label>
-                <div className="flex gap-2">
-                  {(["urgent", "high", "medium", "low"] as const).map(
-                    (priority) => (
-                      <button
-                        key={priority}
-                        type="button"
-                        onClick={() => setSelectedPriority(priority)}
-                        className={`px-3 py-1 border rounded capitalize ${
-                          selectedPriority === priority
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-white border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {priority}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium mb-1">
+//                   Priority
+//                 </label>
+//                 <div className="flex gap-2">
+//                   {(["urgent", "high", "medium", "low"] as const).map(
+//                     (priority) => (
+//                       <button
+//                         key={priority}
+//                         type="button"
+//                         onClick={() => setSelectedPriority(priority)}
+//                         className={`px-3 py-1 border rounded capitalize ${
+//                           selectedPriority === priority
+//                             ? "bg-primary text-primary-foreground border-primary"
+//                             : "bg-white border-gray-300 hover:bg-gray-50"
+//                         }`}
+//                       >
+//                         {priority}
+//                       </button>
+//                     ),
+//                   )}
+//                 </div>
+//               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Notes</label>
-                <textarea
-                  className="w-full border rounded-lg p-2"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add notes about this procedure"
-                  rows={2}
-                />
-              </div>
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium mb-1">Notes</label>
+//                 <textarea
+//                   className="w-full border rounded-lg p-2"
+//                   value={notes}
+//                   onChange={(e) => setNotes(e.target.value)}
+//                   placeholder="Add notes about this procedure"
+//                   rows={2}
+//                 />
+//               </div>
 
-              <Button
-                onClick={handleAddProcedure}
-                disabled={
-                  !selectedTooth || !selectedProcedure || !selectedSurface
-                }
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Procedure to Stage {selectedStage}
-              </Button>
-            </div>
+//               <Button
+//                 onClick={handleAddProcedure}
+//                 disabled={
+//                   !selectedTooth || !selectedProcedure || !selectedSurface
+//                 }
+//                 className="w-full"
+//               >
+//                 <Plus className="h-4 w-4 mr-2" />
+//                 Add Procedure to Stage {selectedStage}
+//               </Button>
+//             </div>
 
-            {/* Added Procedures */}
-            {teethPlans.length > 0 && (
-              <div className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-medium">Added Procedures</h4>
-                  <div className="text-sm text-gray-500">
-                    Total:{" "}
-                    {teethPlans.reduce(
-                      (sum, tp) => sum + tp.procedures.length,
-                      0,
-                    )}{" "}
-                    procedures
-                  </div>
-                </div>
+//             {/* Added Procedures */}
+//             {teethPlans.length > 0 && (
+//               <div className="border rounded-lg p-4">
+//                 <div className="flex justify-between items-center mb-4">
+//                   <h4 className="font-medium">Added Procedures</h4>
+//                   <div className="text-sm text-gray-500">
+//                     Total:{" "}
+//                     {teethPlans.reduce(
+//                       (sum, tp) => sum + tp.procedures.length,
+//                       0,
+//                     )}{" "}
+//                     procedures
+//                   </div>
+//                 </div>
 
-                {/* Summary by Stage WITH STATUS TOGGLE BUTTONS AND REMOVE BUTTON */}
-                <div className="mb-6">
-                  <h5 className="text-sm font-medium mb-3 text-gray-700">
-                    Stage Status Management
-                  </h5>
-                  <div className="space-y-3">
-                    {stages.map((stage, index) => {
-                      const stageNumber = index + 1;
-                      const proceduresInStage =
-                        getProceduresByStage(stageNumber);
+//                 {/* Summary by Stage WITH STATUS TOGGLE BUTTONS AND REMOVE BUTTON */}
+//                 <div className="mb-6">
+//                   <h5 className="text-sm font-medium mb-3 text-gray-700">
+//                     Stage Status Management
+//                   </h5>
+//                   <div className="space-y-3">
+//                     {stages.map((stage, index) => {
+//                       const stageNumber = index + 1;
+//                       const proceduresInStage =
+//                         getProceduresByStage(stageNumber);
 
-                      return (
-                        <div
-                          key={index}
-                          className="border rounded-lg p-4 bg-white"
-                        >
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant="outline"
-                                className="bg-blue-50 text-blue-700"
-                              >
-                                Stage {stageNumber}
-                              </Badge>
-                              <span className="font-medium">
-                                {stage.stageName}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {proceduresInStage.length} procedure(s)
-                              </Badge>
-                            </div>
+//                       return (
+//                         <div
+//                           key={index}
+//                           className="border rounded-lg p-4 bg-white"
+//                         >
+//                           <div className="flex justify-between items-center mb-2">
+//                             <div className="flex items-center gap-2">
+//                               <Badge
+//                                 variant="outline"
+//                                 className="bg-blue-50 text-blue-700"
+//                               >
+//                                 Stage {stageNumber}
+//                               </Badge>
+//                               <span className="font-medium">
+//                                 {stage.stageName}
+//                               </span>
+//                               <Badge variant="outline" className="text-xs">
+//                                 {proceduresInStage.length} procedure(s)
+//                               </Badge>
+//                             </div>
 
-                            <div className="flex items-center gap-2">
-                              {/* Current Status Badge */}
-                              <Badge
-                                className={`text-xs ${
-                                  stage.status === "completed"
-                                    ? "bg-green-100 text-green-700"
-                                    : stage.status === "in-progress"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-gray-100 text-gray-700"
-                                }`}
-                              >
-                                {stage.status}
-                              </Badge>
+//                             <div className="flex items-center gap-2">
+//                               {/* Current Status Badge */}
+//                               <Badge
+//                                 className={`text-xs ${
+//                                   stage.status === "completed"
+//                                     ? "bg-green-100 text-green-700"
+//                                     : stage.status === "in-progress"
+//                                       ? "bg-blue-100 text-blue-700"
+//                                       : "bg-gray-100 text-gray-700"
+//                                 }`}
+//                               >
+//                                 {stage.status}
+//                               </Badge>
 
-                              {/* Remove Stage Button - Only show if more than 1 stage */}
-                              {stages.length > 1 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveStage(index)}
-                                  className="text-red-500 hover:text-red-700"
-                                  title="Remove this stage"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+//                               {/* Remove Stage Button - Only show if more than 1 stage */}
+//                               {stages.length > 1 && (
+//                                 <Button
+//                                   variant="ghost"
+//                                   size="sm"
+//                                   onClick={() => handleRemoveStage(index)}
+//                                   className="text-red-500 hover:text-red-700"
+//                                   title="Remove this stage"
+//                                 >
+//                                   <X className="h-4 w-4" />
+//                                 </Button>
+//                               )}
+//                             </div>
+//                           </div>
 
-                          {/* Stage Status Toggle Buttons */}
-                          <div className="mt-3 flex items-center gap-2">
-                            <span className="text-xs text-gray-500">
-                              Update Status:
-                            </span>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleUpdateStageStatus(index, "pending")
-                                }
-                                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                                  stage.status === "pending"
-                                    ? "bg-gray-100 text-gray-700 border-gray-300"
-                                    : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-                                }`}
-                                title="Mark as Pending"
-                              >
-                                Pending
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleUpdateStageStatus(index, "in-progress")
-                                }
-                                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                                  stage.status === "in-progress"
-                                    ? "bg-blue-100 text-blue-700 border-blue-300"
-                                    : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-                                }`}
-                                title="Mark as In Progress"
-                              >
-                                In Progress
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleUpdateStageStatus(index, "completed")
-                                }
-                                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                                  stage.status === "completed"
-                                    ? "bg-green-100 text-green-700 border-green-300"
-                                    : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-                                }`}
-                                title="Mark as Completed"
-                              >
-                                Completed
-                              </button>
-                            </div>
-                          </div>
+//                           {/* Stage Status Toggle Buttons */}
+//                           <div className="mt-3 flex items-center gap-2">
+//                             <span className="text-xs text-gray-500">
+//                               Update Status:
+//                             </span>
+//                             <div className="flex gap-1">
+//                               <button
+//                                 type="button"
+//                                 onClick={() =>
+//                                   handleUpdateStageStatus(index, "pending")
+//                                 }
+//                                 className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+//                                   stage.status === "pending"
+//                                     ? "bg-gray-100 text-gray-700 border-gray-300"
+//                                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
+//                                 }`}
+//                                 title="Mark as Pending"
+//                               >
+//                                 Pending
+//                               </button>
+//                               <button
+//                                 type="button"
+//                                 onClick={() =>
+//                                   handleUpdateStageStatus(index, "in-progress")
+//                                 }
+//                                 className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+//                                   stage.status === "in-progress"
+//                                     ? "bg-blue-100 text-blue-700 border-blue-300"
+//                                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
+//                                 }`}
+//                                 title="Mark as In Progress"
+//                               >
+//                                 In Progress
+//                               </button>
+//                               <button
+//                                 type="button"
+//                                 onClick={() =>
+//                                   handleUpdateStageStatus(index, "completed")
+//                                 }
+//                                 className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+//                                   stage.status === "completed"
+//                                     ? "bg-green-100 text-green-700 border-green-300"
+//                                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
+//                                 }`}
+//                                 title="Mark as Completed"
+//                               >
+//                                 Completed
+//                               </button>
+//                             </div>
+//                           </div>
 
-                          {/* Optional: Show procedures in this stage */}
-                          {proceduresInStage.length > 0 && (
-                            <div className="mt-3 pt-3 border-t">
-                              <p className="text-xs text-gray-500 mb-1">
-                                Procedures in this stage:
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                {proceduresInStage
-                                  .slice(0, 3)
-                                  .map((proc, procIdx) => (
-                                    <Badge
-                                      key={procIdx}
-                                      variant="outline"
-                                      className="text-[10px]"
-                                    >
-                                      T{proc.toothNumber}: {proc.name}
-                                    </Badge>
-                                  ))}
-                                {proceduresInStage.length > 3 && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px]"
-                                  >
-                                    +{proceduresInStage.length - 3} more
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+//                           {/* Optional: Show procedures in this stage */}
+//                           {proceduresInStage.length > 0 && (
+//                             <div className="mt-3 pt-3 border-t">
+//                               <p className="text-xs text-gray-500 mb-1">
+//                                 Procedures in this stage:
+//                               </p>
+//                               <div className="flex flex-wrap gap-1">
+//                                 {proceduresInStage
+//                                   .slice(0, 3)
+//                                   .map((proc, procIdx) => (
+//                                     <Badge
+//                                       key={procIdx}
+//                                       variant="outline"
+//                                       className="text-[10px]"
+//                                     >
+//                                       T{proc.toothNumber}: {proc.name}
+//                                     </Badge>
+//                                   ))}
+//                                 {proceduresInStage.length > 3 && (
+//                                   <Badge
+//                                     variant="outline"
+//                                     className="text-[10px]"
+//                                   >
+//                                     +{proceduresInStage.length - 3} more
+//                                   </Badge>
+//                                 )}
+//                               </div>
+//                             </div>
+//                           )}
+//                         </div>
+//                       );
+//                     })}
+//                   </div>
+//                 </div>
 
-                <div className="space-y-3">
-                  {teethPlans.map((toothPlan, idx) => (
-                    <div key={idx} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-gray-100">
-                            Tooth #{toothPlan.toothNumber}
-                          </Badge>
-                          {toothPlan.priority &&
-                            toothPlan.priority !== "medium" && (
-                              <Badge
-                                className={`text-xs ${
-                                  toothPlan.priority === "urgent"
-                                    ? "bg-red-100 text-red-700"
-                                    : toothPlan.priority === "high"
-                                      ? "bg-orange-100 text-orange-700"
-                                      : "bg-green-100 text-green-700"
-                                }`}
-                              >
-                                {toothPlan.priority}
-                              </Badge>
-                            )}
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {toothPlan.procedures.length} procedure(s)
-                        </span>
-                      </div>
+//                 <div className="space-y-3">
+//                   {teethPlans.map((toothPlan, idx) => (
+//                     <div key={idx} className="border rounded-lg p-4">
+//                       <div className="flex justify-between items-center mb-3">
+//                         <div className="flex items-center gap-2">
+//                           <Badge variant="outline" className="bg-gray-100">
+//                             Tooth #{toothPlan.toothNumber}
+//                           </Badge>
+//                           {toothPlan.priority &&
+//                             toothPlan.priority !== "medium" && (
+//                               <Badge
+//                                 className={`text-xs ${
+//                                   toothPlan.priority === "urgent"
+//                                     ? "bg-red-100 text-red-700"
+//                                     : toothPlan.priority === "high"
+//                                       ? "bg-orange-100 text-orange-700"
+//                                       : "bg-green-100 text-green-700"
+//                                 }`}
+//                               >
+//                                 {toothPlan.priority}
+//                               </Badge>
+//                             )}
+//                         </div>
+//                         <span className="text-sm text-gray-500">
+//                           {toothPlan.procedures.length} procedure(s)
+//                         </span>
+//                       </div>
 
-                      {/* Group procedures by stage */}
-                      {(() => {
-                        const proceduresByStage: Record<number, any[]> = {};
-                        toothPlan.procedures.forEach((proc) => {
-                          const stage = proc.stage || 1;
-                          if (!proceduresByStage[stage]) {
-                            proceduresByStage[stage] = [];
-                          }
-                          proceduresByStage[stage].push(proc);
-                        });
+//                       {/* Group procedures by stage */}
+//                       {(() => {
+//                         const proceduresByStage: Record<number, any[]> = {};
+//                         toothPlan.procedures.forEach((proc) => {
+//                           const stage = proc.stage || 1;
+//                           if (!proceduresByStage[stage]) {
+//                             proceduresByStage[stage] = [];
+//                           }
+//                           proceduresByStage[stage].push(proc);
+//                         });
 
-                        return Object.entries(proceduresByStage).map(
-                          ([stageNum, procs]) => (
-                            <div key={stageNum} className="mb-3 last:mb-0">
-                              <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                                <span>Stage {stageNum}</span>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px]"
-                                >
-                                  {procs.length} procedure(s)
-                                </Badge>
-                                {/* Show stage status */}
-                                <Badge
-                                  className={`text-[10px] ${
-                                    stages[parseInt(stageNum) - 1]?.status ===
-                                    "completed"
-                                      ? "bg-green-100 text-green-700"
-                                      : stages[parseInt(stageNum) - 1]
-                                            ?.status === "in-progress"
-                                        ? "bg-blue-100 text-blue-700"
-                                        : "bg-gray-100 text-gray-700"
-                                  }`}
-                                >
-                                  {stages[parseInt(stageNum) - 1]?.status ||
-                                    "pending"}
-                                </Badge>
-                              </div>
-                              <div className="space-y-2">
-                                {procs.map((proc, procIdx) => (
-                                  <div
-                                    key={procIdx}
-                                    className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border"
-                                  >
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium">
-                                          {proc.name}
-                                        </span>
-                                        <Badge
-                                          variant="outline"
-                                          className="text-xs"
-                                        >
-                                          {proc.surface}
-                                        </Badge>
-                                      </div>
-                                      {proc.notes && (
-                                        <div className="text-sm text-gray-600 mt-1">
-                                          {proc.notes}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-sm font-medium">
-                                        ₹{proc.estimatedCost}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ),
-                        );
-                      })()}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+//                         return Object.entries(proceduresByStage).map(
+//                           ([stageNum, procs]) => (
+//                             <div key={stageNum} className="mb-3 last:mb-0">
+//                               <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+//                                 <span>Stage {stageNum}</span>
+//                                 <Badge
+//                                   variant="outline"
+//                                   className="text-[10px]"
+//                                 >
+//                                   {procs.length} procedure(s)
+//                                 </Badge>
+//                                 {/* Show stage status */}
+//                                 <Badge
+//                                   className={`text-[10px] ${
+//                                     stages[parseInt(stageNum) - 1]?.status ===
+//                                     "completed"
+//                                       ? "bg-green-100 text-green-700"
+//                                       : stages[parseInt(stageNum) - 1]
+//                                             ?.status === "in-progress"
+//                                         ? "bg-blue-100 text-blue-700"
+//                                         : "bg-gray-100 text-gray-700"
+//                                   }`}
+//                                 >
+//                                   {stages[parseInt(stageNum) - 1]?.status ||
+//                                     "pending"}
+//                                 </Badge>
+//                               </div>
+//                               <div className="space-y-2">
+//                                 {procs.map((proc, procIdx) => (
+//                                   <div
+//                                     key={procIdx}
+//                                     className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border"
+//                                   >
+//                                     <div className="flex-1">
+//                                       <div className="flex items-center gap-2">
+//                                         <span className="font-medium">
+//                                           {proc.name}
+//                                         </span>
+//                                         <Badge
+//                                           variant="outline"
+//                                           className="text-xs"
+//                                         >
+//                                           {proc.surface}
+//                                         </Badge>
+//                                       </div>
+//                                       {proc.notes && (
+//                                         <div className="text-sm text-gray-600 mt-1">
+//                                           {proc.notes}
+//                                         </div>
+//                                       )}
+//                                     </div>
+//                                     <div className="flex items-center gap-3">
+//                                       <span className="text-sm font-medium">
+//                                         ₹{proc.estimatedCost}
+//                                       </span>
+//                                     </div>
+//                                   </div>
+//                                 ))}
+//                               </div>
+//                             </div>
+//                           ),
+//                         );
+//                       })()}
+//                     </div>
+//                   ))}
+//                 </div>
+//               </div>
+//             )}
+//           </div>
+//         </div>
 
-        <div className="border-t px-6 py-4 flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {teethPlans.length > 0 ? (
-              <>
-                {teethPlans.length} teeth,{" "}
-                {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)}{" "}
-                procedures
-                <div className="mt-1">
-                  Stages:{" "}
-                  {stages.filter((s) => s.status === "completed").length}{" "}
-                  completed,
-                  {stages.filter((s) => s.status === "in-progress").length}{" "}
-                  in-progress,
-                  {stages.filter((s) => s.status === "pending").length} pending
-                </div>
-              </>
-            ) : (
-              "No procedures added yet"
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSavePlan}
-              disabled={teethPlans.length === 0}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              Save Treatment Plan
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+//         <div className="border-t px-6 py-4 flex justify-between items-center">
+//           <div className="text-sm text-gray-500">
+//             {teethPlans.length > 0 ? (
+//               <>
+//                 {teethPlans.length} teeth,{" "}
+//                 {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)}{" "}
+//                 procedures
+//                 <div className="mt-1">
+//                   Stages:{" "}
+//                   {stages.filter((s) => s.status === "completed").length}{" "}
+//                   completed,
+//                   {stages.filter((s) => s.status === "in-progress").length}{" "}
+//                   in-progress,
+//                   {stages.filter((s) => s.status === "pending").length} pending
+//                 </div>
+//               </>
+//             ) : (
+//               "No procedures added yet"
+//             )}
+//           </div>
+//           <div className="flex gap-2">
+//             <Button variant="outline" onClick={onClose}>
+//               Cancel
+//             </Button>
+//             <Button
+//               onClick={handleSavePlan}
+//               disabled={teethPlans.length === 0}
+//               className="bg-primary text-primary-foreground hover:bg-primary/90"
+//             >
+//               Save Treatment Plan
+//             </Button>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
