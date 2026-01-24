@@ -4,9 +4,6 @@ import {
   Bar,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -14,45 +11,141 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, Users, Calendar, CheckCircle } from "lucide-react";
+import {
+  TrendingUp,
+  Users,
+  Calendar,
+  CheckCircle,
+  DollarSign,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import axios from "axios";
+interface WeeklyStat {
+  day: string;
+  appointments: number;
+  patients: number;
+}
 
-const weeklyData = [
-  { day: "Mon", patients: 12, appointments: 15 },
-  { day: "Tue", patients: 15, appointments: 18 },
-  { day: "Wed", patients: 10, appointments: 12 },
-  { day: "Thu", patients: 18, appointments: 20 },
-  { day: "Fri", patients: 14, appointments: 16 },
-  { day: "Sat", patients: 8, appointments: 10 },
-];
+interface MonthlyRevenue {
+  month: string;
+  revenue: number;
+}
 
-const treatmentData = [
-  { name: "Checkups", value: 35, color: "#1E4D2B" },
-  { name: "Cleaning", value: 25, color: "#3FA796" },
-  { name: "Fillings", value: 20, color: "#6B7280" },
-  { name: "Root Canal", value: 12, color: "#D1FAE5" },
-  { name: "Others", value: 8, color: "#F9FAF9" },
-];
+interface AnalyticsData {
+  cards: {
+    totalAppointments: number;
+    completedAppointments: number;
+    totalRevenue: number;
+    totalPatients: number;
+    totalVisits: number;
+  };
+  weeklyStats: WeeklyStat[];
+  monthlyRevenue: MonthlyRevenue[];
+}
 
-const monthlyRevenue = [
-  { month: "Jul", revenue: 45000 },
-  { month: "Aug", revenue: 52000 },
-  { month: "Sep", revenue: 48000 },
-  { month: "Oct", revenue: 61000 },
-];
+const API_URL =
+  "http://localhost:8002/api/v1/patient-service/consultation/analytics";
 
 export function ProductivityCharts() {
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(
+    null,
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const token = localStorage.getItem("authToken");
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (response.status !== 200) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        console.log("Response:", response);
+        const data = response.data as AnalyticsData;
+        setAnalyticsData(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch analytics data",
+        );
+        console.error("Error fetching analytics:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-1/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="text-center py-10">Loading analytics data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-10 text-red-500">
+          Error loading analytics: {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-10">No analytics data available</div>
+      </div>
+    );
+  }
+
+  const { cards, weeklyStats, monthlyRevenue } = analyticsData;
+
+  // Calculate completion rate percentage
+  const completionRate =
+    cards.totalAppointments > 0
+      ? Math.round(
+          (cards.completedAppointments / cards.totalAppointments) * 100,
+        )
+      : 0;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-4 gap-4">
+        {/* Total Patients Card */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Patients</p>
-                <h3 className="text-2xl font-medium mt-1">247</h3>
+                <h3 className="text-2xl font-medium mt-1">
+                  {cards.totalPatients}
+                </h3>
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" />
-                  +12% from last month
+                  {/* Since we don't have historical comparison, show a static message */}
+                  Total registered patients
                 </p>
               </div>
               <Users className="h-8 w-8 text-primary" />
@@ -60,15 +153,18 @@ export function ProductivityCharts() {
           </CardContent>
         </Card>
 
+        {/* Appointments Card */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Appointments</p>
-                <h3 className="text-2xl font-medium mt-1">91</h3>
+                <h3 className="text-2xl font-medium mt-1">
+                  {cards.totalAppointments}
+                </h3>
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" />
-                  +8% this week
+                  Total scheduled appointments
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-secondary" />
@@ -76,14 +172,17 @@ export function ProductivityCharts() {
           </CardContent>
         </Card>
 
+        {/* Completed Appointments Card */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Completed</p>
-                <h3 className="text-2xl font-medium mt-1">68</h3>
+                <h3 className="text-2xl font-medium mt-1">
+                  {cards.completedAppointments}
+                </h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  74.7% completion rate
+                  {completionRate}% completion rate
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -91,84 +190,68 @@ export function ProductivityCharts() {
           </CardContent>
         </Card>
 
+        {/* Revenue Card */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Revenue</p>
-                <h3 className="text-2xl font-medium mt-1">$61k</h3>
+                <h3 className="text-2xl font-medium mt-1">
+                  ${cards.totalRevenue}
+                </h3>
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" />
-                  +27% this month
+                  Total revenue generated
                 </p>
               </div>
-              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                $
-              </div>
+              <DollarSign className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="patients" fill="#1E4D2B" name="Patients Seen" />
-                <Bar dataKey="appointments" fill="#3FA796" name="Total Appointments" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Weekly Performance Chart - Now takes full width */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Weekly Performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={weeklyStats}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="day" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar
+                dataKey="patients"
+                fill="#1E4D2B"
+                name="Patients"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="appointments"
+                fill="#3FA796"
+                name="Appointments"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Treatment Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={treatmentData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {treatmentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Monthly Revenue Trend Chart */}
       <Card>
         <CardHeader>
           <CardTitle>Monthly Revenue Trend</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={350}>
             <LineChart data={monthlyRevenue}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip formatter={(value) => `$${value}`} />
+              <Tooltip formatter={(value) => [`$${value}`, "Revenue"]} />
               <Legend />
               <Line
                 type="monotone"
@@ -176,6 +259,8 @@ export function ProductivityCharts() {
                 stroke="#1E4D2B"
                 strokeWidth={2}
                 name="Revenue"
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>

@@ -10,6 +10,7 @@ import {
   MessageCircle,
   TrendingUp,
   Clock,
+  Edit,
 } from "lucide-react";
 import { format } from "date-fns";
 import BlogCard from "./BlogCard";
@@ -46,6 +47,7 @@ interface AdminReview {
 interface Blog {
   _id: string;
   doctorId: Doctor;
+  doctor: Doctor;
   title: string;
   content: string;
   imageUrl: string[];
@@ -107,11 +109,17 @@ export function MyBlogList() {
   const calculateStats = (blogList: Blog[]) => {
     const stats: BlogStats = {
       totalBlogs: blogList.length,
-      draftBlogs: blogList.filter(b => b.status === 'draft').length,
-      rejectedBlogs: blogList.filter(b => b.status === 'rejected').length,
-      totalLikes: blogList.reduce((sum, blog) => sum + (blog.likesCount || 0), 0),
-      totalViews: blogList.reduce((sum, blog) => sum + (blog.viewCount || 0), 0),
-      featuredBlogs: blogList.filter(b => b.isFeatured).length
+      draftBlogs: blogList.filter((b) => b.status === "draft").length,
+      rejectedBlogs: blogList.filter((b) => b.status === "rejected").length,
+      totalLikes: blogList.reduce(
+        (sum, blog) => sum + (blog.likesCount || 0),
+        0,
+      ),
+      totalViews: blogList.reduce(
+        (sum, blog) => sum + (blog.viewCount || 0),
+        0,
+      ),
+      featuredBlogs: blogList.filter((b) => b.isFeatured).length,
     };
     return stats;
   };
@@ -120,58 +128,64 @@ export function MyBlogList() {
   const sortBlogs = (blogList: Blog[], sortBy: string, sortOrder: string) => {
     return [...blogList].sort((a, b) => {
       let aValue, bValue;
-      
+
       switch (sortBy) {
-        case 'likesCount':
+        case "likesCount":
           aValue = a.likesCount || 0;
           bValue = b.likesCount || 0;
           break;
-        case 'viewCount':
+        case "viewCount":
           aValue = a.viewCount || 0;
           bValue = b.viewCount || 0;
           break;
-        case 'commentsCount':
+        case "commentsCount":
           aValue = a.commentsCount || 0;
           bValue = b.commentsCount || 0;
           break;
-        case 'createdAt':
+        case "createdAt":
         default:
           aValue = new Date(a.createdAt).getTime();
           bValue = new Date(b.createdAt).getTime();
           break;
       }
-      
-      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+
+      return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
     });
   };
 
   // Filter blogs locally
-  const filterBlogs = (blogList: Blog[], searchTerm: string, statusFilter: string, selectedTags: string[]) => {
+  const filterBlogs = (
+    blogList: Blog[],
+    searchTerm: string,
+    statusFilter: string,
+    selectedTags: string[],
+  ) => {
     let filtered = blogList;
-    
+
     // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(blog => blog.status === statusFilter);
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((blog) => blog.status === statusFilter);
     }
-    
+
     // Apply search filter
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(blog => 
-        blog.title.toLowerCase().includes(searchLower) ||
-        blog.content.toLowerCase().includes(searchLower) ||
-        blog.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
-        blog.doctorId.name.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(
+        (blog) =>
+          blog.title.toLowerCase().includes(searchLower) ||
+          blog.content.toLowerCase().includes(searchLower) ||
+          blog.tags.some((tag) => tag.toLowerCase().includes(searchLower)) ||
+          blog.doctorId.name.toLowerCase().includes(searchLower),
       );
     }
-    
+
     // Apply tag filter
     if (selectedTags.length > 0) {
-      filtered = filtered.filter(blog =>
-        selectedTags.every(tag => blog.tags.includes(tag))
+      filtered = filtered.filter((blog) =>
+        selectedTags.every((tag) => blog.tags.includes(tag)),
       );
     }
-    
+
     return filtered;
   };
 
@@ -180,7 +194,7 @@ export function MyBlogList() {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("No authentication token found");
       setLoading(true);
-      
+
       // Get all blogs for the current doctor
       const response = await axios.get(
         `${blogServiceUrl}/api/v1/blog/my-blogs`,
@@ -188,26 +202,31 @@ export function MyBlogList() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
-      
+
       if (response.data.success) {
         const allBlogs: Blog[] = response.data.blogs;
         const totalCount = response.data.total;
-        
+
         // Apply local filters and sorting
-        let filteredBlogs = filterBlogs(allBlogs, searchTerm, statusFilter, selectedTags);
+        let filteredBlogs = filterBlogs(
+          allBlogs,
+          searchTerm,
+          statusFilter,
+          selectedTags,
+        );
         filteredBlogs = sortBlogs(filteredBlogs, sortBy, sortOrder);
-        
+
         // Calculate pagination
         const itemsPerPage = 12;
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const paginatedBlogs = filteredBlogs.slice(startIndex, endIndex);
-        
+
         // Calculate local stats
         const localStats = calculateStats(allBlogs);
-        
+
         // Update state
         setBlogs(paginatedBlogs);
         setTotalBlogs(filteredBlogs.length);
@@ -234,7 +253,7 @@ export function MyBlogList() {
 
   const handleTagToggle = (tag: string) => {
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
     setCurrentPage(1); // Reset to first page when tags change
   };
@@ -249,7 +268,7 @@ export function MyBlogList() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       fetchBlogs(); // Refresh the list
     } catch (error) {
@@ -282,7 +301,6 @@ export function MyBlogList() {
         </div>
 
         {/* Stats Bar */}
-        
       </header>
 
       {/* Controls Section */}
@@ -360,36 +378,49 @@ export function MyBlogList() {
         <div className={styles.tagsContainer}>
           <span className={styles.tagsLabel}>Filter by tags:</span>
           <div className={styles.tagsList}>
-            {["Research", "Clinical", "Case Study", "Education", "Technology", "Wellness"]
-              .map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => handleTagToggle(tag)}
-                  className={`${styles.tag} ${
-                    selectedTags.includes(tag) ? styles.tagActive : ""
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
+            {[
+              "Research",
+              "Clinical",
+              "Case Study",
+              "Education",
+              "Technology",
+              "Wellness",
+            ].map((tag) => (
+              <button
+                key={tag}
+                onClick={() => handleTagToggle(tag)}
+                className={`${styles.tag} ${
+                  selectedTags.includes(tag) ? styles.tagActive : ""
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
           </div>
         </div>
       </div>
-
-      
 
       {/* Main Blog Grid */}
       <section className={styles.blogGridSection}>
         <div className={styles.blogGrid}>
           {blogs?.map((blog) => (
-            <BlogCard
-              key={blog._id}
-              blog={blog}
-              onLike={handleLike}
-              onView={() => navigate(`/blogs/${blog._id}`)}
-              // onEdit={() => navigate(`/blogs/edit/${blog._id}`)}
-              // showActions={true}
-            />
+            <div key={blog._id} className={styles.blogCardWithActions}>
+              {/* Edit button positioned at top-right */}
+              <button
+                onClick={() => navigate(`/blogs/edit/${blog._id}`)}
+                className={styles.editButton}
+                title="Edit Blog"
+              >
+                <Edit size={16} />
+              </button>
+
+              {/* Your existing BlogCard */}
+              <BlogCard
+                blog={blog}
+                onLike={handleLike}
+                onView={() => navigate(`/blogs/${blog._id}`)}
+              />
+            </div>
           ))}
         </div>
       </section>

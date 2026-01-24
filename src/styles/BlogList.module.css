@@ -688,6 +688,35 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+/* Edit button styles */
+.blogCardWithActions {
+  position: relative;
+  width: 100%;
+}
+
+.editButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.editButton:hover {
+  background: #f8f9fa;
+  border-color: #007bff;
+  color: #007bff;
+  transform: scale(1.05);
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);

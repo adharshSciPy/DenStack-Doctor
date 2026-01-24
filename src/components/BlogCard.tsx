@@ -43,6 +43,7 @@ interface AdminReview {
 interface Blog {
   _id: string;
   doctorId: Doctor;
+  doctor: Doctor;
   title: string;
   content: string;
   imageUrl: string[];
@@ -147,7 +148,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, onLike, onView, isLiking = fa
             />
           )}
           <div>
-            <span className={styles.doctorName}>Dr. {blog.doctorId.name}</span>
+            <span className={styles.doctorName}>Dr. {blog.doctor?.name}</span>
             {blog.doctorId.specialty && (
               <span className={styles.specialty}>
                 {blog.doctorId.specialty}
