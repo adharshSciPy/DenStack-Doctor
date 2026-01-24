@@ -18,32 +18,33 @@ import {
 import { format } from "date-fns";
 import CommentSection from "./CommentSection";
 import styles from "../styles/BlogDetail.module.css";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import blogServiceUrl from "../blogServiceUrl";
-import { jwtDecode } from "jwt-decode";
 
-interface DecodedToken {
-  doctorId: string;
-  name: string;
-  email: string;
-  role: string;
-  iat: number;
-  exp: number;
-}
+
 
 interface Doctor {
   _id: string;
   name: string;
   email: string;
-  profileImage?: string;
+  profilePicture?: string; // Changed from profileImage
   specialty?: string;
+}
+
+interface Reply {
+  _id: string;
+  doctorId: Doctor;
+  text: string; // Changed from reply
+  createdAt: string;
 }
 
 interface BlogComment {
   _id: string;
   doctorId: Doctor;
-  comment: string;
-  commentedAt: string;
+  text: string; // Changed from comment
+  createdAt: string;
+  replies: Reply[];
+  parentCommentId?: string;
 }
 
 interface Like {
@@ -60,7 +61,7 @@ interface AdminReview {
 
 interface Blog {
   _id: string;
-  doctorId: Doctor;
+  doctorId: Doctor | string;
   title: string;
   content: string;
   imageUrl: string[];
@@ -69,17 +70,18 @@ interface Blog {
   likes: Like[];
   likesCount: number;
   comments: BlogComment[];
-  commentsCount: number;
+  commentCount: number; // Changed from commentsCount
   viewCount: number;
   isFeatured: boolean;
   adminReview: AdminReview;
   createdAt: string;
   updatedAt: string;
   isLiked?: boolean;
+  doctor?: Doctor; // Added for populated doctor data
 }
 
 const BlogDetail: React.FC = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,89 +90,112 @@ const BlogDetail: React.FC = () => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(true);
   const [userRole, setUserRole] = useState<string>("");
-  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentDoctorId, setCurrentDoctorId] = useState<string>("");
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
-  
+
   const token = localStorage.getItem("authToken");
+  const doctorId = localStorage.getItem("doctorId");
+  // useEffect(() => {
+  //   const doctorId = localStorage.getItem("doctorId");
+  //   const role = localStorage.getItem("userRole");
 
-  useEffect(() => {
-    const userId = localStorage.getItem("doctorId");
-    const role = localStorage.getItem("userRole");
+  //   if (doctorId) {
+  //     setCurrentDoctorId(doctorId);
+  //   }
 
-    if (userId) {
-      setCurrentUserId(userId);
-    }
+  //   if (role) {
+  //     setUserRole(role);
+  //   } else if (token) {
+  //     // Try to get role from token
+  //     try {
+  //       const decoded = jwtDecode<DecodedToken>(token);
+  //       if (decoded.role) {
+  //         setUserRole(decoded.role);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error decoding token:", error);
+  //     }
+  //   }
+  // }, [token]);
 
-    if (role) {
-      setUserRole(role);
-    }
-  }, []);
+const fetchBlog = async () => {
+  if (!id) return;
 
-  let doctorId: string | null = null;
-  if (token) {
-    try {
-      const decoded = jwtDecode<DecodedToken>(token);
-      doctorId = decoded.doctorId;
-    } catch (error) {
-      console.error("Error decoding token:", error);
-    }
-  }
-
-  const isLikedByCurrentDoctor = blog?.likes?.some(
-    (like) => {
-      if (typeof like.doctorId === "object") {
-        return like.doctorId._id === doctorId;
+  try {
+    setLoading(true);
+    
+    // Fetch blog data
+    const response = await axios.get(
+      `${blogServiceUrl}/api/v1/blog/blog/${id}`,
+      {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
       }
-      return like.doctorId === doctorId;
-    }
-  );
+    );
 
-  const calculateIsLiked = (blogData: Blog, userId: string): boolean => {
-    if (!blogData || !blogData.likes || !userId) return false;
+    const blogData = response.data.blog || response.data;
 
-    return blogData.likes.some((like) => {
-      if (typeof like.doctorId === "object") {
-        return like.doctorId._id === userId;
+    // Fetch like status separately if user is logged in
+    let isLiked = false;
+    if (token) {
+      try {
+        const likeResponse = await axios.get(
+          `${blogServiceUrl}/api/v1/blog/like-status/${blogData._id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        isLiked = likeResponse.data.liked || false;
+      } catch (error) {
+        console.error("Error fetching like status:", error);
       }
-      return like.doctorId === userId;
-    });
-  };
-
-  useEffect(() => {
-    if (id) {
-      fetchBlog();
     }
-  }, [id, currentUserId]);
 
-  const fetchBlog = async () => {
+    // Fetch comments for this blog
+    let comments: BlogComment[] = [];
     try {
-      setLoading(true);
-      const response = await axios.get(
-        `${blogServiceUrl}/api/v1/blog/blog/${id}`,
+      const commentsResponse = await axios.get(
+        `${blogServiceUrl}/api/v1/blog/comments/${blogData._id}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+            Authorization: token ? `Bearer ${token}` : undefined,
           },
         }
       );
-
-      const blogData = response.data;
-      const isLiked = calculateIsLiked(blogData, currentUserId);
-
-      setBlog({
-        ...blogData,
-        isLiked,
-      });
+      console.log(commentsResponse);
+      
+      comments = commentsResponse.data.comments || commentsResponse.data || [];
     } catch (error) {
-      console.error("Error fetching blog:", error);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching comments:", error);
     }
-  };
 
-  const handleLike = async () => {
+    setBlog({
+      ...blogData,
+      isLiked,
+      comments,
+      commentCount: comments.length, // Update comment count
+    });
+
+  } catch (error) {
+    console.error("Error fetching blog:", error);
+    const axiosError = error as AxiosError<{ message: string }>;
+    alert(axiosError.response?.data?.message || "Failed to load blog");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  useEffect(() => {
+    fetchBlog();
+  }, [doctorId]);
+
+  const handleLike = async (blogId: string) => {
     if (!blog || liking || !token) {
       if (!token) {
         alert("Please login to like blogs");
@@ -186,6 +211,7 @@ const BlogDetail: React.FC = () => {
         ? blog.likesCount - 1
         : blog.likesCount + 1;
 
+      // Optimistic update
       setBlog((prev) =>
         prev
           ? {
@@ -193,24 +219,28 @@ const BlogDetail: React.FC = () => {
               isLiked: !wasLiked,
               likesCount: newLikesCount,
             }
-          : null
+          : null,
       );
 
+      // API call
       const response = await axios.post(
-        `${blogServiceUrl}/api/v1/blog/like/${id}`,
+        `${blogServiceUrl}/api/v1/blog/like-toggle/${blogId}`,
         {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
+      console.log(response);
 
       if (response.status === 200) {
+        // Refresh data to ensure consistency
         await fetchBlog();
       }
     } catch (error) {
       console.error("Error liking blog:", error);
+      // Revert optimistic update on error
       setBlog((prev) =>
         prev
           ? {
@@ -218,8 +248,9 @@ const BlogDetail: React.FC = () => {
               isLiked: blog.isLiked,
               likesCount: blog.likesCount,
             }
-          : null
+          : null,
       );
+      alert("Failed to like blog. Please try again.");
     } finally {
       setLiking(false);
     }
@@ -227,11 +258,11 @@ const BlogDetail: React.FC = () => {
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comment.trim() || !id) return;
-
-    if (!token) {
-      alert("Please login to comment");
-      navigate("/login");
+    if (!comment.trim() || !id || !token) {
+      if (!token) {
+        alert("Please login to comment");
+        navigate("/login");
+      }
       return;
     }
 
@@ -239,30 +270,33 @@ const BlogDetail: React.FC = () => {
       setSubmittingComment(true);
       const response = await axios.post(
         `${blogServiceUrl}/api/v1/blog/comment/${id}`,
-        { comment: comment.trim() },
+        { text: comment.trim() },
         {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.status === 201) {
-        const data = response.data;
+        const newComment = response.data.comment;
         setBlog((prev) =>
           prev
             ? {
                 ...prev,
-                comments: data.comments,
-                commentsCount: data.commentsCount,
+                comments: [newComment, ...prev.comments],
+                commentCount: prev.commentCount + 1,
               }
-            : null
+            : null,
         );
         setComment("");
+        alert("Comment added successfully!");
       }
     } catch (error) {
       console.error("Error submitting comment:", error);
+      const axiosError = error as AxiosError<{ message: string }>;
+      alert(axiosError.response?.data?.message || "Failed to add comment");
     } finally {
       setSubmittingComment(false);
     }
@@ -279,27 +313,28 @@ const BlogDetail: React.FC = () => {
   };
 
   const handleDelete = async () => {
+    if (!id || !token) return;
+
     try {
-      const response = await axios.delete(
-        `${blogServiceUrl}/api/v1/blog/delete-blog/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: isAdmin && !isAuthor ? { reason: deleteReason } : {}
-        }
-      );
+      const response = await axios.delete(`${blogServiceUrl}/api/blogs/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        data: isAdmin && !isAuthor ? { reason: deleteReason } : {},
+      });
 
       if (response.status === 200) {
         alert(
-          isAdmin && !isAuthor 
-            ? "Blog deleted by admin" 
-            : "Blog deleted successfully"
+          isAdmin && !isAuthor
+            ? "Blog deleted by admin"
+            : "Blog deleted successfully",
         );
-        navigate("/myblogs");
+        navigate("/blogs");
       }
     } catch (error) {
       console.error("Error deleting blog:", error);
+      const axiosError = error as AxiosError<{ message: string }>;
+      alert(axiosError.response?.data?.message || "Failed to delete blog");
     }
   };
 
@@ -310,22 +345,7 @@ const BlogDetail: React.FC = () => {
     }
 
     try {
-      const response = await axios.delete(
-        `${blogServiceUrl}/api/v1/blog/delete-blog/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: { reason: deleteReason }
-        }
-      );
-
-      if (response.status === 200) {
-        alert("Blog deleted by admin");
-        navigate("/blog");
-      }
-    } catch (error) {
-      console.error("Error deleting blog:", error);
+      await handleDelete();
     } finally {
       setShowDeleteConfirm(false);
       setDeleteReason("");
@@ -333,18 +353,21 @@ const BlogDetail: React.FC = () => {
   };
 
   const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareText = `${blog?.title}\n\n${blog?.content.substring(0, 100)}...`;
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: blog?.title,
-          text: blog?.content.substring(0, 100),
-          url: window.location.href,
+          text: shareText,
+          url: shareUrl,
         });
       } catch (error) {
         console.error("Error sharing:", error);
       }
     } else {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(shareUrl);
       alert("Link copied to clipboard!");
     }
   };
@@ -381,8 +404,17 @@ const BlogDetail: React.FC = () => {
     }
   };
 
+  // Get doctor ID from blog
+  const getBlogAuthorId = (): string => {
+    if (!blog) return "";
+    if (typeof blog.doctorId === "object") {
+      return blog.doctorId._id;
+    }
+    return blog.doctorId;
+  };
+
   // Permission checks
-  const isAuthor = blog && currentUserId === (typeof blog.doctorId === "object" ? blog.doctorId._id : blog.doctorId);
+  const isAuthor = currentDoctorId === getBlogAuthorId();
   const isAdmin = userRole === "600" || userRole === "700";
   const isSuperAdmin = userRole === "700";
 
@@ -390,7 +422,7 @@ const BlogDetail: React.FC = () => {
   const showEditOption = () => {
     // Author can always edit their own blog
     if (isAuthor) return true;
-    
+
     // Admin can edit only in specific cases
     if (isAdmin) {
       // Admin can edit pending blogs for review
@@ -400,13 +432,14 @@ const BlogDetail: React.FC = () => {
       // Super admin can edit published blogs for content moderation
       if (blog?.status === "published" && isSuperAdmin) return true;
     }
-    
+
     return false;
   };
 
   const getEditButtonText = () => {
     if (isAuthor) return "Edit Blog";
-    if (isAdmin && blog?.adminReview?.status === "pending") return "Review Blog";
+    if (isAdmin && blog?.adminReview?.status === "pending")
+      return "Review Blog";
     if (isAdmin && blog?.status === "rejected") return "Review & Edit";
     return "Edit";
   };
@@ -415,7 +448,7 @@ const BlogDetail: React.FC = () => {
   const showDeleteOption = () => {
     // Author can delete their own unpublished blogs
     if (isAuthor) return true;
-    
+
     // Admin can delete inappropriate content
     if (isAdmin) {
       // Admin can delete rejected blogs
@@ -423,7 +456,7 @@ const BlogDetail: React.FC = () => {
       // Super admin can delete any blog
       if (isSuperAdmin) return true;
     }
-    
+
     return false;
   };
 
@@ -455,6 +488,16 @@ const BlogDetail: React.FC = () => {
     );
   }
 
+  // Get doctor object (either from doctorId or populated doctor)
+  const doctor =
+    typeof blog.doctorId === "object"
+      ? blog.doctorId
+      : blog.doctor || {
+          _id: blog.doctorId,
+          name: "Unknown Doctor",
+          email: "",
+        };
+
   return (
     <div className={styles.container}>
       {/* Back Navigation */}
@@ -468,7 +511,9 @@ const BlogDetail: React.FC = () => {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3>Confirm Deletion</h3>
-            <p>You are deleting another doctor's blog. Please provide a reason:</p>
+            <p>
+              You are deleting another doctor's blog. Please provide a reason:
+            </p>
             <textarea
               value={deleteReason}
               onChange={(e) => setDeleteReason(e.target.value)}
@@ -478,13 +523,13 @@ const BlogDetail: React.FC = () => {
               required
             />
             <div className={styles.modalActions}>
-              <button 
+              <button
                 onClick={() => setShowDeleteConfirm(false)}
                 className={styles.cancelButton}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleAdminDelete}
                 disabled={!deleteReason.trim()}
                 className={styles.confirmDeleteButton}
@@ -505,9 +550,9 @@ const BlogDetail: React.FC = () => {
               <span className={styles.featuredBadge}>Featured</span>
             )}
 
-            {/* <span className={`${styles.statusBadge} ${styles[blog.status]}`}>
+            <span className={`${styles.statusBadge} ${styles[blog.status]}`}>
               {blog.status.charAt(0).toUpperCase() + blog.status.slice(1)}
-            </span> */}
+            </span>
 
             {blog.adminReview?.status && (
               <span
@@ -527,20 +572,22 @@ const BlogDetail: React.FC = () => {
           {/* Author Info */}
           <div className={styles.authorSection}>
             <div className={styles.authorInfo}>
-              {blog.doctorId.profileImage && (
+              {doctor.profilePicture && (
                 <img
-                  src={`${blogServiceUrl}/${blog.doctorId.profileImage}`}
-                  alt={blog.doctorId.name}
+                  src={
+                    doctor.profilePicture.startsWith("http")
+                      ? doctor.profilePicture
+                      : `${blogServiceUrl}${doctor.profilePicture}`
+                  }
+                  alt={doctor.name}
                   className={styles.authorAvatar}
                 />
               )}
               <div>
-                <span className={styles.authorName}>
-                  Dr. {blog.doctorId.name}
-                </span>
-                {blog.doctorId.specialty && (
+                <span className={styles.authorName}>Dr. {doctor.name}</span>
+                {doctor.specialty && (
                   <span className={styles.authorSpecialty}>
-                    {blog.doctorId.specialty}
+                    {doctor.specialty}
                   </span>
                 )}
               </div>
@@ -604,14 +651,14 @@ const BlogDetail: React.FC = () => {
 
             <div className={styles.metaItem}>
               <Eye className={styles.metaIcon} />
-              <span>{blog.viewCount} views</span>
+              <span>{blog.viewCount || 0} views</span>
             </div>
 
             <button
               className={`${styles.likeButton} ${
-                isLikedByCurrentDoctor ? styles.interactionButtonActive : ""
+                blog.isLiked ? styles.interactionButtonActive : ""
               }`}
-              onClick={handleLike}
+              onClick={() => handleLike(blog._id)}
               disabled={liking || !token}
               title={!token ? "Login to like" : ""}
             >
@@ -621,11 +668,11 @@ const BlogDetail: React.FC = () => {
                 <Heart
                   size={16}
                   className={`${styles.metaIcon} ${
-                    isLikedByCurrentDoctor ? styles.likedHeart : ""
+                    blog.isLiked ? styles.likedHeart : ""
                   }`}
                 />
               )}
-              <span>{blog.likesCount} likes</span>
+              <span>{blog.likesCount || 0} likes</span>
             </button>
 
             <button
@@ -633,17 +680,18 @@ const BlogDetail: React.FC = () => {
               onClick={() => setShowComments(!showComments)}
             >
               <MessageCircle className={styles.metaIcon} />
-              <span>{blog.commentsCount} comments</span>
+              <span>{blog.commentCount || 0} comments</span>
             </button>
           </div>
 
           {/* Tags */}
           <div className={styles.tags}>
-            {/* {blog.tags.map((tag) => (
-              <span key={tag} className={styles.tag}>
-                #{tag}
-              </span>
-            ))} */}
+            {blog.tags &&
+              blog.tags.map((tag) => (
+                <span key={tag} className={styles.tag}>
+                  {tag}
+                </span>
+              ))}
           </div>
         </div>
       </header>
@@ -651,33 +699,37 @@ const BlogDetail: React.FC = () => {
       {/* Content Section */}
       <main className={styles.mainContent}>
         {/* Image Gallery */}
-        {blog.imageUrl.length > 0 && (
+        {blog.imageUrl && blog.imageUrl.length > 0 && (
           <div className={styles.imageGallery}>
             {blog.imageUrl.map((url, index) => (
               <img
                 key={index}
-                src={`${blogServiceUrl}${url}`}
+                src={url.startsWith("http") ? url : `${blogServiceUrl}${url}`}
                 alt={`Blog image ${index + 1}`}
                 className={styles.blogImage}
                 loading="lazy"
+                // onError={(e) => {
+                //   (e.target as HTMLImageElement).src = "https://via.placeholder.com/800x400?text=Image+Not+Found";
+                // }}
               />
             ))}
           </div>
         )}
 
         {/* Blog Content */}
-        <article
-          className={styles.content}
-          dangerouslySetInnerHTML={{ __html: blog.content }}
-        />
+        <article className={styles.content}>
+          {blog.content.split("\n").map((paragraph, index) => (
+            <p key={index}>{paragraph}</p>
+          ))}
+        </article>
 
         {/* Interactions Bar */}
         <div className={styles.interactionsBar}>
           <button
             className={`${styles.interactionButton} ${
-              isLikedByCurrentDoctor ? styles.interactionButtonActive : ""
+              blog.isLiked ? styles.interactionButtonActive : ""
             }`}
-            onClick={handleLike}
+            onClick={() => handleLike(blog._id)}
             disabled={liking || !token}
             title={!token ? "Login to like" : ""}
           >
@@ -686,10 +738,10 @@ const BlogDetail: React.FC = () => {
             ) : (
               <Heart
                 size={20}
-                className={isLikedByCurrentDoctor ? styles.likedHeart : ""}
+                className={blog.isLiked ? styles.likedHeart : ""}
               />
             )}
-            <span>{isLikedByCurrentDoctor ? "Liked" : "Like"}</span>
+            <span>{blog.isLiked ? "Liked" : "Like"}</span>
           </button>
 
           <button
@@ -715,7 +767,7 @@ const BlogDetail: React.FC = () => {
         <section id="comments" className={styles.commentsSection}>
           <div className={styles.commentsHeader}>
             <h2 className={styles.commentsTitle}>
-              Comments ({blog.commentsCount})
+              Comments ({blog.commentCount || 0})
             </h2>
             <button
               className={styles.toggleCommentsButton}
@@ -761,7 +813,7 @@ const BlogDetail: React.FC = () => {
               ) : (
                 <div className={styles.loginPrompt}>
                   <p>Please log in to leave a comment.</p>
-                  <button 
+                  <button
                     onClick={() => navigate("/login")}
                     className={styles.loginButton}
                   >
@@ -772,7 +824,7 @@ const BlogDetail: React.FC = () => {
 
               {/* Comments List */}
               <CommentSection
-                comments={blog.comments}
+                comments={blog.comments || []}
                 blogId={blog._id}
                 onCommentAdded={fetchBlog}
               />

@@ -83,74 +83,152 @@ interface Pagination {
   hasPrevPage: boolean;
 }
 
+interface ApiResponse {
+  success: boolean;
+  blogs: Blog[];
+  total: number;
+}
+
 export function MyBlogList() {
   const navigate = useNavigate();
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>("published");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalBlogs, setTotalBlogs] = useState(0);
   const [stats, setStats] = useState<BlogStats | null>(null);
-  const [userRole, setUserRole] = useState<string>("doctor"); // Replace with actual auth
+
+  // Calculate local stats from blogs
+  const calculateStats = (blogList: Blog[]) => {
+    const stats: BlogStats = {
+      totalBlogs: blogList.length,
+      draftBlogs: blogList.filter(b => b.status === 'draft').length,
+      rejectedBlogs: blogList.filter(b => b.status === 'rejected').length,
+      totalLikes: blogList.reduce((sum, blog) => sum + (blog.likesCount || 0), 0),
+      totalViews: blogList.reduce((sum, blog) => sum + (blog.viewCount || 0), 0),
+      featuredBlogs: blogList.filter(b => b.isFeatured).length
+    };
+    return stats;
+  };
+
+  // Sort blogs locally
+  const sortBlogs = (blogList: Blog[], sortBy: string, sortOrder: string) => {
+    return [...blogList].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'likesCount':
+          aValue = a.likesCount || 0;
+          bValue = b.likesCount || 0;
+          break;
+        case 'viewCount':
+          aValue = a.viewCount || 0;
+          bValue = b.viewCount || 0;
+          break;
+        case 'commentsCount':
+          aValue = a.commentsCount || 0;
+          bValue = b.commentsCount || 0;
+          break;
+        case 'createdAt':
+        default:
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+      }
+      
+      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+    });
+  };
+
+  // Filter blogs locally
+  const filterBlogs = (blogList: Blog[], searchTerm: string, statusFilter: string, selectedTags: string[]) => {
+    let filtered = blogList;
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(blog => blog.status === statusFilter);
+    }
+    
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(blog => 
+        blog.title.toLowerCase().includes(searchLower) ||
+        blog.content.toLowerCase().includes(searchLower) ||
+        blog.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
+        blog.doctorId.name.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply tag filter
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter(blog =>
+        selectedTags.every(tag => blog.tags.includes(tag))
+      );
+    }
+    
+    return filtered;
+  };
 
   const fetchBlogs = async () => {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("No authentication token found");
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: "12",
-        sortBy,
-        sortOrder,
-        status: statusFilter,
-        ...(searchTerm && { search: searchTerm }),
-        ...(selectedTags.length > 0 && { tags: selectedTags.join(",") }),
-      });
-
-      // const response = await fetch(`/api/blogs?${params}`);
-      // const data: BlogsResponse = await response.json();
+      
+      // Get all blogs for the current doctor
       const response = await axios.get(
-        `${blogServiceUrl}/api/v1/blog/my-blogs?${params.toString()}`,
+        `${blogServiceUrl}/api/v1/blog/my-blogs`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-      console.log(response);
-
-      // const data: BlogsResponse = response.data;
-      setBlogs(response.data);
-      // setTotalPages(data.pagination.totalPages);
+      
+      if (response.data.success) {
+        const allBlogs: Blog[] = response.data.blogs;
+        const totalCount = response.data.total;
+        
+        // Apply local filters and sorting
+        let filteredBlogs = filterBlogs(allBlogs, searchTerm, statusFilter, selectedTags);
+        filteredBlogs = sortBlogs(filteredBlogs, sortBy, sortOrder);
+        
+        // Calculate pagination
+        const itemsPerPage = 12;
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedBlogs = filteredBlogs.slice(startIndex, endIndex);
+        
+        // Calculate local stats
+        const localStats = calculateStats(allBlogs);
+        
+        // Update state
+        setBlogs(paginatedBlogs);
+        setTotalBlogs(filteredBlogs.length);
+        setTotalPages(Math.ceil(filteredBlogs.length / itemsPerPage));
+        setStats(localStats);
+      }
     } catch (error) {
       console.error("Error fetching blogs:", error);
+      alert("Failed to fetch blogs");
     } finally {
       setLoading(false);
     }
   };
 
-  // const fetchStats = async () => {
-  //   try {
-  //     const response = await fetch('/api/blogs/stats');
-  //     const data: BlogStats = await response.json();
-  //     setStats(data);
-  //   } catch (error) {
-  //     console.error('Error fetching stats:', error);
-  //   }
-  // };
-
   useEffect(() => {
     fetchBlogs();
-    // fetchStats();
-  }, [currentPage, statusFilter, sortBy, sortOrder, selectedTags]);
+  }, [currentPage, statusFilter, sortBy, sortOrder, searchTerm, selectedTags]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setCurrentPage(1); // Reset to first page on new search
     fetchBlogs();
   };
 
@@ -158,18 +236,31 @@ export function MyBlogList() {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
+    setCurrentPage(1); // Reset to first page when tags change
   };
 
   const handleLike = async (blogId: string) => {
     try {
-      await fetch(`/api/blogs/${blogId}/like`, { method: "POST" });
-      fetchBlogs();
+      const token = localStorage.getItem("authToken");
+      await axios.post(
+        `${blogServiceUrl}/api/v1/blog/like/${blogId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      fetchBlogs(); // Refresh the list
     } catch (error) {
       console.error("Error liking blog:", error);
+      alert("Failed to like blog");
     }
   };
+
   const getText = (html: string) =>
     new DOMParser().parseFromString(html, "text/html").body.textContent || "";
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -184,55 +275,14 @@ export function MyBlogList() {
       {/* Header Section */}
       <header className={styles.header}>
         <div className={styles.headerContent}>
-          <h1 className={styles.title}>Medical Blogs</h1>
+          <h1 className={styles.title}>My Medical Blogs</h1>
           <p className={styles.subtitle}>
-            Insights, research, and discussions from healthcare professionals
+            Manage and track all your published medical insights
           </p>
         </div>
 
         {/* Stats Bar */}
-        {stats && (
-          <div className={styles.statsBar}>
-            <div className={styles.statItem}>
-              <TrendingUp className={styles.statIcon} />
-              <div>
-                <span className={styles.statValue}>
-                  {stats.totalBlogs || 0}
-                </span>
-                <span className={styles.statLabel}>Total Blogs</span>
-              </div>
-            </div>
-            <div className={styles.statItem}>
-              <Eye className={styles.statIcon} />
-              <div>
-                <span className={styles.statValue}>
-                  {stats.totalViews || 0}
-                </span>
-                <span className={styles.statLabel}>Total Views</span>
-              </div>
-            </div>
-            <div className={styles.statItem}>
-              <Heart className={styles.statIcon} />
-              <div>
-                <span className={styles.statValue}>
-                  {stats.totalLikes || 0}
-                </span>
-                <span className={styles.statLabel}>Total Likes</span>
-              </div>
-            </div>
-            {userRole === "600" && stats.pendingReview && (
-              <div className={styles.statItem}>
-                <Clock className={styles.statIcon} />
-                <div>
-                  <span className={styles.statValue}>
-                    {stats.pendingReview}
-                  </span>
-                  <span className={styles.statLabel}>Pending Review</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        
       </header>
 
       {/* Controls Section */}
@@ -245,7 +295,7 @@ export function MyBlogList() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search blogs, tags, or doctors..."
+              placeholder="Search in your blogs..."
               className={styles.searchInput}
             />
             <button type="submit" className={styles.searchButton}>
@@ -259,23 +309,24 @@ export function MyBlogList() {
           <div className={styles.filters}>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className={styles.filterSelect}
             >
+              <option value="all">All Status</option>
               <option value="published">Published</option>
               <option value="draft">Drafts</option>
-              {userRole === "admin" && (
-                <option value="pending">Pending Review</option>
-              )}
-              {userRole === "admin" && (
-                <option value="rejected">Rejected</option>
-              )}
-              <option value="all">All</option>
+              <option value="rejected">Rejected</option>
             </select>
 
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
               className={styles.filterSelect}
             >
               <option value="createdAt">Date</option>
@@ -285,7 +336,10 @@ export function MyBlogList() {
             </select>
 
             <button
-              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              onClick={() => {
+                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                setCurrentPage(1);
+              }}
               className={styles.sortButton}
             >
               {sortOrder === "asc" ? "↑ Asc" : "↓ Desc"}
@@ -297,9 +351,8 @@ export function MyBlogList() {
               onClick={() => navigate("/blogs/create")}
               className={styles.createButton}
             >
-              + Create Blog
+              + Create New Blog
             </button>
-            <button className={styles.myblog}>My Blogs</button>
           </div>
         </div>
 
@@ -307,75 +360,35 @@ export function MyBlogList() {
         <div className={styles.tagsContainer}>
           <span className={styles.tagsLabel}>Filter by tags:</span>
           <div className={styles.tagsList}>
-            {[
-              "Research",
-              "Clinical",
-              "Case Study",
-              "Education",
-              "Technology",
-              "Wellness",
-            ].map((tag) => (
-              <button
-                key={tag}
-                onClick={() => handleTagToggle(tag)}
-                className={`${styles.tag} ${
-                  selectedTags.includes(tag) ? styles.tagActive : ""
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
+            {["Research", "Clinical", "Case Study", "Education", "Technology", "Wellness"]
+              .map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagToggle(tag)}
+                  className={`${styles.tag} ${
+                    selectedTags.includes(tag) ? styles.tagActive : ""
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
           </div>
         </div>
       </div>
 
-      {/* Featured Blogs Section */}
-      {blogs.filter((b) => b.isFeatured).length > 0 && (
-        <section className={styles.featuredSection}>
-          <h2 className={styles.sectionTitle}>Featured Articles</h2>
-          <div className={styles.featuredGrid}>
-            {blogs
-              .filter((blog) => blog.isFeatured)
-              .slice(0, 2)
-              .map((blog) => (
-                <div key={blog._id} className={styles.featuredCard}>
-                  {blog.imageUrl[0] && (
-                    <img
-                      src={`${blogServiceUrl}${blog.imageUrl[0]}`}
-                      alt={blog.title}
-                      className={styles.featuredImage}
-                    />
-                  )}
-                  <div className={styles.featuredContent}>
-                    <div className={styles.featuredBadge}>Featured</div>
-                    <h3 className={styles.featuredTitle}>{blog.title}</h3>
-                    <span className={styles.excerpt}>
-                      {getText(blog?.content).substring(0, 120)}...
-                    </span>
-                    <div className={styles.featuredMeta}>
-                      <span className={styles.author}>
-                        Dr. {blog.doctorId.name}
-                      </span>
-                      <span className={styles.date}>
-                        {format(new Date(blog.createdAt), "MMM dd, yyyy")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </section>
-      )}
+      
 
       {/* Main Blog Grid */}
       <section className={styles.blogGridSection}>
         <div className={styles.blogGrid}>
-          {blogs.map((blog) => (
+          {blogs?.map((blog) => (
             <BlogCard
               key={blog._id}
               blog={blog}
               onLike={handleLike}
               onView={() => navigate(`/blogs/${blog._id}`)}
+              // onEdit={() => navigate(`/blogs/edit/${blog._id}`)}
+              // showActions={true}
             />
           ))}
         </div>
@@ -432,7 +445,7 @@ export function MyBlogList() {
       )}
 
       {/* No Results */}
-      {blogs.length === 0 && (
+      {blogs.length === 0 && !loading && (
         <div className={styles.noResults}>
           <Filter className={styles.noResultsIcon} />
           <h3>No blogs found</h3>
@@ -441,7 +454,8 @@ export function MyBlogList() {
             onClick={() => {
               setSearchTerm("");
               setSelectedTags([]);
-              setStatusFilter("published");
+              setStatusFilter("all");
+              setCurrentPage(1);
             }}
             className={styles.clearFiltersButton}
           >

@@ -10,6 +10,7 @@ import {
   MessageCircle,
   TrendingUp,
   Clock,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import BlogCard from "./BlogCard";
@@ -83,9 +84,17 @@ interface Pagination {
   hasPrevPage: boolean;
 }
 
+interface ApiResponse {
+  success: boolean;
+  blogs: Blog[];
+  allTags: string[];
+  pagination: Pagination;
+}
+
 export function BlogList() {
   const navigate = useNavigate();
   const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -103,7 +112,7 @@ export function BlogList() {
     hasPrevPage: false,
   });
   const [userRole, setUserRole] = useState<string>("doctor");
-  const [liking, setLiking] = useState<string | null>(null); // Track which blog is being liked
+  const [liking, setLiking] = useState<string | null>(null);
 
   const fetchBlogs = async () => {
     try {
@@ -134,7 +143,7 @@ export function BlogList() {
         params.tags = selectedTags.join(",");
       }
 
-      const response = await axios.get(
+      const response = await axios.get<ApiResponse>(
         `${blogServiceUrl}/api/v1/blog/other-blogs`,
         {
           params,
@@ -143,18 +152,19 @@ export function BlogList() {
           },
         }
       );
-
-      // Handle response based on structure
-      if (response.data && response.data.blogs && Array.isArray(response.data.blogs)) {
-        setBlogs(response.data.blogs);
+      console.log(params);
+      
+      if (response.data.success) {
+        setBlogs(response.data.blogs || []);
+        setAllTags(response.data.allTags || []);
         
         if (response.data.pagination) {
           setPagination(response.data.pagination);
           setTotalPages(response.data.pagination.totalPages);
         }
       } else {
-        // Fallback for different response structure
         setBlogs([]);
+        setAllTags([]);
         setPagination({
           currentPage: 1,
           totalPages: 1,
@@ -168,39 +178,39 @@ export function BlogList() {
     } catch (error: any) {
       console.error("Error fetching blogs:", error.message);
       setBlogs([]);
+      setAllTags([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // const fetchStats = async () => {
-  //   try {
-  //     const response = await fetch('/api/blogs/stats');
-  //     const data: BlogStats = await response.json();
-  //     setStats(data);
-  //   } catch (error) {
-  //     console.error('Error fetching stats:', error);
-  //   }
-  // };
-
   useEffect(() => {
     fetchBlogs();
-    // fetchStats();
   }, [currentPage, statusFilter, sortBy, sortOrder, selectedTags]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setCurrentPage(1); // Reset to first page on new search
     fetchBlogs();
   };
 
   const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
+    setSelectedTags((prev) => {
+      const newTags = prev.includes(tag) 
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag];
+      setCurrentPage(1); // Reset to first page when tags change
+      return newTags;
+    });
+  };
+
+  const handleClearTags = () => {
+    setSelectedTags([]);
+    setCurrentPage(1);
   };
 
   const handleLike = async (blogId: string) => {
-    if (liking === blogId) return; // Prevent double-click
+    if (liking === blogId) return;
 
     try {
       setLiking(blogId);
@@ -215,7 +225,6 @@ export function BlogList() {
         ? blogToUpdate.likesCount - 1
         : blogToUpdate.likesCount + 1;
 
-      // Update the local state optimistically
       setBlogs(prevBlogs => 
         prevBlogs.map(blog => 
           blog._id === blogId 
@@ -228,7 +237,6 @@ export function BlogList() {
         )
       );
 
-      // Send the API request
       const response = await axios.post(
         `${blogServiceUrl}/api/v1/blog/like/${blogId}`,
         {},
@@ -239,11 +247,6 @@ export function BlogList() {
         }
       );
 
-      // Refresh the data if needed (or just trust the optimistic update)
-      if (response.status === 200) {
-        // Optional: Refetch to ensure data is in sync
-        // await fetchBlogs();
-      }
     } catch (error) {
       console.error("Error liking blog:", error);
       
@@ -256,7 +259,7 @@ export function BlogList() {
               ? { 
                   ...blog, 
                   isLiked: blogToUpdate.isLiked, 
-                  likesCount: blogToUpdate.likesCount 
+                  likesCount: blogToUpdate.isLiked ? blogToUpdate.likesCount + 1 : blogToUpdate.likesCount - 1
                 } 
               : blog
           )
@@ -282,106 +285,35 @@ export function BlogList() {
   return (
     <div className={styles.container}>
       {/* Header Section */}
-      <header className={styles.header}>
+      {/* <header className={styles.header}>
         <div className={styles.headerContent}>
           <h1 className={styles.title}>Medical Blogs</h1>
           <p className={styles.subtitle}>
             Insights, research, and discussions from healthcare professionals
           </p>
         </div>
+      </header> */}
 
-        {/* Stats Bar */}
-        {stats && (
-          <div className={styles.statsBar}>
-            <div className={styles.statItem}>
-              <TrendingUp className={styles.statIcon} />
-              <div>
-                <span className={styles.statValue}>
-                  {stats.totalBlogs || 0}
-                </span>
-                <span className={styles.statLabel}>Total Blogs</span>
-              </div>
-            </div>
-            <div className={styles.statItem}>
-              <Eye className={styles.statIcon} />
-              <div>
-                <span className={styles.statValue}>
-                  {stats.totalViews || 0}
-                </span>
-                <span className={styles.statLabel}>Total Views</span>
-              </div>
-            </div>
-            <div className={styles.statItem}>
-              <Heart className={styles.statIcon} />
-              <div>
-                <span className={styles.statValue}>
-                  {stats.totalLikes || 0}
-                </span>
-                <span className={styles.statLabel}>Total Likes</span>
-              </div>
-            </div>
-            {userRole === "600" && stats.pendingReview && (
-              <div className={styles.statItem}>
-                <Clock className={styles.statIcon} />
-                <div>
-                  <span className={styles.statValue}>
-                    {stats.pendingReview}
-                  </span>
-                  <span className={styles.statLabel}>Pending Review</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </header>
+      {/* Selected Tags Display */}
+      
 
       {/* Controls Section */}
       <div className={styles.controls}>
         {/* Search Bar */}
-        <form onSubmit={handleSearch} className={styles.searchForm}>
-          <div className={styles.searchInputContainer}>
-            <Search className={styles.searchIcon} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search blogs, tags, or doctors..."
-              className={styles.searchInput}
-            />
-            <button type="submit" className={styles.searchButton}>
-              Search
-            </button>
-          </div>
-        </form>
+        
 
         {/* Filters and Actions */}
         <div className={styles.actionsRow}>
           <div className={styles.filters}>
-            {/* <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className={styles.filterSelect}
-            >
-              <option value="published">Published</option>
-              <option value="draft">Drafts</option>
-              {userRole === "admin" && (
-                <option value="pending">Pending Review</option>
-              )}
-              {userRole === "admin" && (
-                <option value="rejected">Rejected</option>
-              )}
-              <option value="all">All</option>
-            </select>
-
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className={styles.filterSelect}
             >
               <option value="createdAt">Date</option>
-              <option value="likesCount">Likes</option>
-              <option value="viewCount">Views</option>
-              <option value="commentsCount">Comments</option>
+              <option value="likesCount">Most Liked</option>
+              <option value="viewCount">Most Viewed</option>
+              <option value="commentsCount">Most Commented</option>
             </select>
 
             <button
@@ -389,7 +321,7 @@ export function BlogList() {
               className={styles.sortButton}
             >
               {sortOrder === "asc" ? "↑ Asc" : "↓ Desc"}
-            </button> */}
+            </button>
           </div>
 
           <div style={{ display: "flex", gap: "10px" }}>
@@ -408,29 +340,34 @@ export function BlogList() {
           </div>
         </div>
 
-        {/* Tags Filter */}
+        {/* Available Tags Filter */}
         <div className={styles.tagsContainer}>
           <span className={styles.tagsLabel}>Filter by tags:</span>
           <div className={styles.tagsList}>
-            {[
-              "Research",
-              "Clinical",
-              "Case Study",
-              "Education",
-              "Technology",
-              "Wellness",
-            ].map((tag) => (
-              <button
-                key={tag}
-                onClick={() => handleTagToggle(tag)}
-                className={`${styles.tag} ${
-                  selectedTags.includes(tag) ? styles.tagActive : ""
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
+            {allTags.length > 0 ? (
+              allTags.slice(0, 15).map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagToggle(tag)}
+                  className={`${styles.tag} ${
+                    selectedTags.includes(tag) ? styles.tagActive : ""
+                  }`}
+                  title={tag}
+                >
+                  {tag}
+                </button>
+              ))
+            ) : (
+              <div className={styles.noTagsMessage}>
+                No tags available
+              </div>
+            )}
           </div>
+          {allTags.length > 15 && (
+            <div className={styles.tagsCount}>
+              Showing 15 of {allTags.length} tags
+            </div>
+          )}
         </div>
       </div>
 
@@ -449,6 +386,10 @@ export function BlogList() {
                       src={`${blogServiceUrl}${blog.imageUrl[0]}`}
                       alt={blog.title}
                       className={styles.featuredImage}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://via.placeholder.com/300x200?text=Image+Error';
+                      }}
                     />
                   )}
                   <div className={styles.featuredContent}>
@@ -457,7 +398,13 @@ export function BlogList() {
                     <span className={styles.excerpt}>
                       {getText(blog?.content).substring(0, 120)}...
                     </span>
-
+                    <div className={styles.featuredTags}>
+                      {blog.tags.slice(0, 3).map((tag, index) => (
+                        <span key={index} className={styles.featuredTag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                     <div className={styles.featuredMeta}>
                       <span className={styles.author}>
                         Dr. {blog.doctorId.name}
@@ -475,17 +422,46 @@ export function BlogList() {
 
       {/* Main Blog Grid */}
       <section className={styles.blogGridSection}>
-        <div className={styles.blogGrid}>
-          {blogs.map((blog) => (
-            <BlogCard
-              key={blog._id}
-              blog={blog}
-              onLike={() => handleLike(blog._id)}
-              onView={() => navigate(`/blogs/${blog._id}`)}
-              isLiking={liking === blog._id}
-            />
-          ))}
-        </div>
+        {blogs.length > 0 ? (
+          <>
+            <div className={styles.blogGridHeader}>
+              <h2 className={styles.sectionTitle}>
+                All Blogs ({pagination.totalBlogs})
+              </h2>
+              <div className={styles.blogCount}>
+                Page {currentPage} of {totalPages}
+              </div>
+            </div>
+            <div className={styles.blogGrid}>
+              {blogs.map((blog) => (
+                <BlogCard
+                  key={blog._id}
+                  blog={blog}
+                  onLike={() => handleLike(blog._id)}
+                  onView={() => navigate(`/blogs/${blog._id}`)}
+                  isLiking={liking === blog._id}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className={styles.noResults}>
+            <Filter className={styles.noResultsIcon} />
+            <h3>No blogs found</h3>
+            <p>Try adjusting your filters or create a new blog</p>
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedTags([]);
+                setStatusFilter("published");
+                setCurrentPage(1);
+              }}
+              className={styles.clearFiltersButton}
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Pagination */}
@@ -493,7 +469,7 @@ export function BlogList() {
         <div className={styles.pagination}>
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className={styles.paginationButton}
           >
             Previous
@@ -516,6 +492,7 @@ export function BlogList() {
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
+                  disabled={loading}
                   className={`${styles.pageButton} ${
                     currentPage === pageNum ? styles.pageButtonActive : ""
                   }`}
@@ -530,30 +507,10 @@ export function BlogList() {
             onClick={() =>
               setCurrentPage((prev) => Math.min(prev + 1, totalPages))
             }
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className={styles.paginationButton}
           >
             Next
-          </button>
-        </div>
-      )}
-
-      {/* No Results */}
-      {blogs.length === 0 && (
-        <div className={styles.noResults}>
-          <Filter className={styles.noResultsIcon} />
-          <h3>No blogs found</h3>
-          <p>Try adjusting your filters or create a new blog</p>
-          <button
-            onClick={() => {
-              setSearchTerm("");
-              setSelectedTags([]);
-              setStatusFilter("published");
-              setCurrentPage(1);
-            }}
-            className={styles.clearFiltersButton}
-          >
-            Clear all filters
           </button>
         </div>
       )}
