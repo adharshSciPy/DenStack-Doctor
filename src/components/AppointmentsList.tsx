@@ -113,6 +113,36 @@ interface DentalChartData {
   tmjExaminations?: any[];
   treatmentPlan?: any; 
 }
+// Add these interfaces near your other interface definitions
+interface TreatmentPlanProcedureChange {
+  type: string;
+  toothNumber: number;
+  procedureName: string;
+  surface: string;
+  stage: number;
+  previousStatus: string;
+  newStatus: string;
+  changedAt: string;
+}
+
+interface TreatmentPlanStageChange {
+  stageNumber: number;
+  stageName: string;
+  previousStatus: string;
+  newStatus: string;
+  changedAt?: string;
+  completedAt?: string;
+}
+
+interface TreatmentPlanChangeData {
+  planId: string;
+  changes: any[];
+  completedStages: TreatmentPlanStageChange[];
+  updatedProcedures: TreatmentPlanProcedureChange[];
+  stageStatusChanges: TreatmentPlanStageChange[];
+  addedStages: any[];
+  removedStages: any[];
+}
 const ADULT_TOOTH_DATA: ToothData[] = [
   // Upper Right (Quadrant 1) - FDI numbers 18-11
   {
@@ -1655,6 +1685,10 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     "urgent" | "high" | "medium" | "low"
   >("medium");
   const [selectedStage, setSelectedStage] = useState<number>(1);
+  const [chartType, setChartType] = useState<"adult" | "pediatric">("adult");
+  const [selectionMode, setSelectionMode] = useState<"single" | "multiple">("single");
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const [multipleSelectionType, setMultipleSelectionType] = useState<string>("full-mouth");
 
   useEffect(() => {
     if (initialData) {
@@ -1670,121 +1704,170 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   }, [initialData]);
 
   const handleAddProcedure = () => {
-    if (!selectedTooth || !selectedProcedure || !selectedSurface) {
-      alert("Please select tooth, procedure, and surface");
+    if (!selectedProcedure || !selectedSurface) {
+      alert("Please select procedure and surface");
       return;
     }
-    if (estimatedCost < 0) {
-    alert("Please enter a valid estimated cost (must be 0 or greater)");
-    return;
-  }
+    
+    if (selectionMode === "single") {
+      // Single tooth mode
+      if (!selectedTooth) {
+        alert("Please select a tooth");
+        return;
+      }
+      
+      if (estimatedCost < 0) {
+        alert("Please enter a valid estimated cost (must be 0 or greater)");
+        return;
+      }
 
-    const toothIndex = teethPlans.findIndex(
-      (tp) => tp.toothNumber === selectedTooth,
-    );
-    const newProcedure = {
-      name: selectedProcedure,
-      surface: selectedSurface,
-      stage: selectedStage,
-      estimatedCost: estimatedCost || 0,
-      notes,
-    };
+      const toothIndex = teethPlans.findIndex(
+        (tp) => tp.toothNumber === selectedTooth,
+      );
+      const newProcedure = {
+        name: selectedProcedure,
+        surface: selectedSurface,
+        stage: selectedStage,
+        estimatedCost: estimatedCost || 0,
+        notes,
+      };
 
-    if (toothIndex === -1) {
-      setTeethPlans([
-        ...teethPlans,
-        {
-          toothNumber: selectedTooth,
-          procedures: [newProcedure],
-          priority: selectedPriority,
-        },
-      ]);
+      if (toothIndex === -1) {
+        setTeethPlans([
+          ...teethPlans,
+          {
+            toothNumber: selectedTooth,
+            procedures: [newProcedure],
+            priority: selectedPriority,
+          },
+        ]);
+      } else {
+        const updated = [...teethPlans];
+        updated[toothIndex].procedures.push(newProcedure);
+        setTeethPlans(updated);
+      }
+      
+      // Reset single selection
+      setSelectedTooth(null);
     } else {
-      const updated = [...teethPlans];
-      updated[toothIndex].procedures.push(newProcedure);
-      setTeethPlans(updated);
+      // Multiple teeth mode
+      if (selectedTeeth.length === 0) {
+        alert("Please select teeth first");
+        return;
+      }
+      
+      if (estimatedCost < 0) {
+        alert("Please enter a valid estimated cost (must be 0 or greater)");
+        return;
+      }
+
+      const newTeethPlans = [...teethPlans];
+      
+      selectedTeeth.forEach(toothNumber => {
+        const toothIndex = newTeethPlans.findIndex(tp => tp.toothNumber === toothNumber);
+        const newProcedure = {
+          name: selectedProcedure,
+          surface: selectedSurface,
+          stage: selectedStage,
+          estimatedCost: estimatedCost || 0,
+          notes,
+        };
+        
+        if (toothIndex === -1) {
+          newTeethPlans.push({
+            toothNumber,
+            procedures: [newProcedure],
+            priority: selectedPriority,
+          });
+        } else {
+          newTeethPlans[toothIndex].procedures.push(newProcedure);
+        }
+      });
+      
+      setTeethPlans(newTeethPlans);
+      
+      // Clear selection after adding
+      setSelectedTeeth([]);
     }
 
-    // Reset form
+    // Reset form fields
     setSelectedProcedure("");
     setSelectedSurface("");
     setEstimatedCost(0);
     setNotes("");
   };
 
- const handleSavePlan = () => {
-  if (teethPlans.length === 0) {
-    alert(
-      "Please add at least one tooth procedure before saving the treatment plan",
-    );
-    return;
-  }
+  const handleSavePlan = () => {
+    if (teethPlans.length === 0) {
+      alert(
+        "Please add at least one tooth procedure before saving the treatment plan",
+      );
+      return;
+    }
 
-  // Format teeth data properly
-  const formattedTeeth = teethPlans.map((toothPlan) => ({
-    toothNumber: toothPlan.toothNumber,
-    priority: toothPlan.priority || "medium",
-    procedures: toothPlan.procedures.map((proc) => ({
-      name: proc.name,
-      surface: proc.surface || "occlusal",
-      stage: proc.stage || 1,
-      estimatedCost: proc.estimatedCost || 0,
-      notes: proc.notes || "",
-      //status: 'planned' // Default status for new procedures
-    })),
-  }));
+    // Format teeth data properly
+    const formattedTeeth = teethPlans.map((toothPlan) => ({
+      toothNumber: toothPlan.toothNumber,
+      priority: toothPlan.priority || "medium",
+      procedures: toothPlan.procedures.map((proc) => ({
+        name: proc.name,
+        surface: proc.surface || "occlusal",
+        stage: proc.stage || 1,
+        estimatedCost: proc.estimatedCost || 0,
+        notes: proc.notes || "",
+      })),
+    }));
 
-  // Format stages - CRITICAL: Include status from form
-  const formattedStages = stages.map((stage, index) => {
-    const stageNumber = index + 1;
+    // Format stages - CRITICAL: Include status from form
+    const formattedStages = stages.map((stage, index) => {
+      const stageNumber = index + 1;
 
-    const proceduresInStage = teethPlans.flatMap((toothPlan) =>
-      toothPlan.procedures
-        .filter((proc) => proc.stage === stageNumber)
-        .map((proc) => ({
-          toothNumber: toothPlan.toothNumber,
-          procedureName: proc.name,
-        })),
-    );
+      const proceduresInStage = teethPlans.flatMap((toothPlan) =>
+        toothPlan.procedures
+          .filter((proc) => proc.stage === stageNumber)
+          .map((proc) => ({
+            toothNumber: toothPlan.toothNumber,
+            procedureName: proc.name,
+          })),
+      );
 
-    // ✅ Use the actual status from the stage object
-    const stageStatus = stage.status || "pending";
+      const stageStatus = stage.status || "pending";
 
-    return {
-      stageName: stage.stageName || `Stage ${stageNumber}`,
-      stageNumber: stageNumber,
-      description: stage.description || "",
-      procedureRefs: proceduresInStage,
-      status: stageStatus, 
-      scheduledDate:
-        stage.scheduledDate ||
-        new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-      notes: stage.notes || "",
+      return {
+        stageName: stage.stageName || `Stage ${stageNumber}`,
+        stageNumber: stageNumber,
+        description: stage.description || "",
+        procedureRefs: proceduresInStage,
+        status: stageStatus, 
+        scheduledDate:
+          stage.scheduledDate ||
+          new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
+        notes: stage.notes || "",
+      };
+    });
+
+    console.log("📊 Stage Statuses being sent to backend:");
+    formattedStages.forEach((stage, idx) => {
+      console.log(
+        `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
+      );
+    });
+
+    const plan: TreatmentPlanData = {
+      planName,
+      description,
+      teeth: formattedTeeth,
+      stages: formattedStages,
     };
-  });
 
-  console.log("📊 Stage Statuses being sent to backend:");
-  formattedStages.forEach((stage, idx) => {
-    console.log(
-      `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
-    );
-  });
+    console.log("✅ Saving treatment plan:");
+    console.log("- Stages count:", formattedStages.length);
+    console.log("- Full stages data:", JSON.stringify(formattedStages, null, 2));
 
-  const plan: TreatmentPlanData = {
-    planName,
-    description,
-    teeth: formattedTeeth,
-    stages: formattedStages,
+    onSave(plan);
   };
-
-  console.log("✅ Saving treatment plan:");
-  console.log("- Stages count:", formattedStages.length);
-  console.log("- Full stages data:", JSON.stringify(formattedStages, null, 2));
-
-  onSave(plan);
-};
 
   const handleAddStage = () => {
     const newStageNumber = stages.length + 1;
@@ -1876,6 +1959,64 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
           ...proc,
         })),
     );
+  };
+
+  // Get filtered teeth based on chart type
+  const getFilteredTeeth = () => {
+    return chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
+  };
+
+  // Handle multiple selection patterns
+  const handleMultipleSelection = (selectionType: string) => {
+    setMultipleSelectionType(selectionType);
+    const filteredTeeth = getFilteredTeeth();
+    
+    let teethToSelect: number[] = [];
+    
+    switch (selectionType) {
+      case "full-mouth":
+        teethToSelect = filteredTeeth.map(t => t.number);
+        break;
+      case "upper":
+        teethToSelect = filteredTeeth.filter(t => t.quadrant === 1 || t.quadrant === 2).map(t => t.number);
+        break;
+      case "lower":
+        teethToSelect = filteredTeeth.filter(t => t.quadrant === 3 || t.quadrant === 4).map(t => t.number);
+        break;
+      case "upper-right":
+        teethToSelect = filteredTeeth.filter(t => t.quadrant === 1).map(t => t.number);
+        break;
+      case "upper-left":
+        teethToSelect = filteredTeeth.filter(t => t.quadrant === 2).map(t => t.number);
+        break;
+      case "lower-right":
+        teethToSelect = filteredTeeth.filter(t => t.quadrant === 4).map(t => t.number);
+        break;
+      case "lower-left":
+        teethToSelect = filteredTeeth.filter(t => t.quadrant === 3).map(t => t.number);
+        break;
+      case "custom":
+        // Keep current selection for custom editing
+        teethToSelect = [...selectedTeeth];
+        break;
+      default:
+        teethToSelect = filteredTeeth.map(t => t.number);
+    }
+    
+    setSelectedTeeth(teethToSelect);
+  };
+
+  // Clear selection
+  const handleClearSelection = () => {
+    setSelectedTeeth([]);
+    setSelectedTooth(null);
+  };
+
+  // Get tooth name by number
+  const getToothName = (toothNumber: number) => {
+    const allTeeth = getFilteredTeeth();
+    const tooth = allTeeth.find(t => t.number === toothNumber);
+    return tooth ? tooth.name : `Tooth ${toothNumber}`;
   };
 
   return (
@@ -2029,6 +2170,104 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
           <div className="border rounded-lg p-4">
             <h4 className="font-medium mb-4">Add Procedures</h4>
 
+            {/* Selection Mode Toggle */}
+            <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
+              <div className="flex flex-wrap items-center gap-4 mb-3">
+                {/* Chart Type */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Chart:</span>
+                  <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+                    {["adult", "pediatric"].map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          setChartType(type as "adult" | "pediatric");
+                          // Clear selections when chart type changes
+                          if (selectionMode === "single") {
+                            setSelectedTooth(null);
+                          } else {
+                            setSelectedTeeth([]);
+                          }
+                        }}
+                        className={`px-3 py-1 text-sm transition-all ${
+                          chartType === type
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {type === "adult" ? "Adult" : "Pediatric"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Multi Select Toggle */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Selection Mode:</span>
+                  <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-1 bg-white">
+                    <span className="text-sm text-gray-700">
+                      {selectionMode === "multiple" ? "Multiple" : "Single"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectionMode === "multiple") {
+                          setSelectionMode("single");
+                          setSelectedTeeth([]);
+                        } else {
+                          setSelectionMode("multiple");
+                          handleMultipleSelection("full-mouth");
+                        }
+                      }}
+                      className={`relative w-9 h-5 rounded-full transition-colors ${
+                        selectionMode === "multiple" ? "bg-primary" : "bg-gray-300"
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                          selectionMode === "multiple"
+                            ? "translate-x-4"
+                            : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Selection Options (only shown when multi-select is enabled) */}
+              {selectionMode === "multiple" && (
+                <div className="mt-3">
+                  <span className="text-sm text-gray-600 mb-2 block">Quick Selection:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { type: "full-mouth", label: "Full Mouth" },
+                      { type: "upper", label: "Upper Arch" },
+                      { type: "lower", label: "Lower Arch" },
+                      { type: "upper-right", label: "Upper Right" },
+                      { type: "upper-left", label: "Upper Left" },
+                      { type: "lower-right", label: "Lower Right" },
+                      { type: "lower-left", label: "Lower Left" },
+                    ].map((item) => (
+                      <button
+                        key={item.type}
+                        type="button"
+                        onClick={() => handleMultipleSelection(item.type)}
+                        className={`px-3 py-1.5 text-sm rounded-md border transition-all ${
+                          multipleSelectionType === item.type
+                            ? "bg-primary/10 border-primary text-primary font-medium"
+                            : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Stage Selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">
@@ -2073,33 +2312,83 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Tooth Selection */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Tooth Number
+                  {selectionMode === "single" ? "Tooth Number" : "Selected Teeth"}
                 </label>
-                <select
-                  className="w-full border rounded-lg p-2"
-                  value={selectedTooth || ""}
-                  onChange={(e) =>
-                    setSelectedTooth(
-                      e.target.value ? Number(e.target.value) : null,
-                    )
-                  }
-                >
-                  <option value="">Select tooth...</option>
-                  {[...ADULT_TOOTH_DATA, ...PEDIATRIC_TOOTH_DATA]
-                    .filter(
-                      (tooth, index, self) =>
-                        index ===
-                        self.findIndex((t) => t.number === tooth.number),
-                    )
-                    .sort((a, b) => a.number - b.number)
-                    .map((tooth) => (
-                      <option key={tooth.number} value={tooth.number}>
-                        Tooth #{tooth.number} ({tooth.name})
-                      </option>
-                    ))}
-                </select>
+                {selectionMode === "single" ? (
+                  <select
+                    className="w-full border rounded-lg p-2.5"
+                    value={selectedTooth || ""}
+                    onChange={(e) =>
+                      setSelectedTooth(
+                        e.target.value ? Number(e.target.value) : null,
+                      )
+                    }
+                  >
+                    <option value="">Select tooth...</option>
+                    {getFilteredTeeth()
+                      .sort((a, b) => a.number - b.number)
+                      .map((tooth) => (
+                        <option key={tooth.number} value={tooth.number}>
+                          Tooth #{tooth.number} ({tooth.name})
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="border rounded-lg p-3 bg-gray-50 min-h-[60px]">
+                      {selectedTeeth.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedTeeth.sort((a, b) => a - b).map(toothNum => (
+                            <div
+                              key={toothNum}
+                              className="relative group"
+                            >
+                              <span className="px-3 py-1.5 bg-white border border-primary/30 text-primary rounded-lg text-sm font-medium flex items-center gap-1 shadow-sm">
+                                <span>#{toothNum}</span>
+                                <span className="text-xs text-gray-600">
+                                  ({getToothName(toothNum)})
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTeeth(selectedTeeth.filter(num => num !== toothNum));
+                                }}
+                                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                title="Remove tooth"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-10">
+                          <span className="text-gray-400 italic">No teeth selected. Use quick selection buttons above.</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {selectedTeeth.length > 0 && (
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">{selectedTeeth.length}</span> teeth selected
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearSelection}
+                          className="px-3 py-1.5 text-sm border border-red-300 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 hover:border-red-400 transition-colors flex items-center gap-1"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Clear All
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2107,7 +2396,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                   Procedure
                 </label>
                 <select
-                  className="w-full border rounded-lg p-2"
+                  className="w-full border rounded-lg p-2.5"
                   value={selectedProcedure}
                   onChange={(e) => setSelectedProcedure(e.target.value)}
                 >
@@ -2125,7 +2414,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                   Surface
                 </label>
                 <select
-                  className="w-full border rounded-lg p-2"
+                  className="w-full border rounded-lg p-2.5"
                   value={selectedSurface}
                   onChange={(e) => setSelectedSurface(e.target.value)}
                 >
@@ -2139,36 +2428,30 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                 </select>
               </div>
 
-            <div>
-  <label className="block text-sm font-medium mb-1">
-    Estimated Cost (₹)
-  </label>
-  <input
-    type="number"
-    className="w-full border rounded-lg p-2"
-    value={estimatedCost === 0 ? "" : estimatedCost}
-    onChange={(e) => {
-      const value = e.target.value;
-      if (value === "") {
-        setEstimatedCost(0); // Set to 0 when cleared
-      } else {
-        const numValue = Number(value);
-        if (numValue >= 0) {
-          setEstimatedCost(numValue);
-        }
-      }
-    }}
-    min="0"
-    step="100"
-    placeholder="Enter amount"
-    onBlur={(e) => {
-      // Optional: Validate on blur
-      if (e.target.value === "" || Number(e.target.value) < 0) {
-        setEstimatedCost(0);
-      }
-    }}
-  />
-</div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Estimated Cost (₹)
+                </label>
+                <input
+                  type="number"
+                  className="w-full border rounded-lg p-2.5"
+                  value={estimatedCost === 0 ? "" : estimatedCost}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "") {
+                      setEstimatedCost(0);
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0) {
+                        setEstimatedCost(numValue);
+                      }
+                    }
+                  }}
+                  min="0"
+                  step="100"
+                  placeholder="Enter amount"
+                />
+              </div>
             </div>
 
             <div className="mb-4">
@@ -2182,10 +2465,10 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                       key={priority}
                       type="button"
                       onClick={() => setSelectedPriority(priority)}
-                      className={`px-3 py-1 border rounded capitalize ${
+                      className={`px-4 py-2 border rounded-lg capitalize transition-all ${
                         selectedPriority === priority
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-white border-gray-300 hover:bg-gray-50"
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400"
                       }`}
                     >
                       {priority}
@@ -2195,10 +2478,10 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
               </div>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-6">
               <label className="block text-sm font-medium mb-1">Notes</label>
               <textarea
-                className="w-full border rounded-lg p-2"
+                className="w-full border rounded-lg p-2.5"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add notes about this procedure"
@@ -2209,12 +2492,18 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             <Button
               onClick={handleAddProcedure}
               disabled={
-                !selectedTooth || !selectedProcedure || !selectedSurface
+                !selectedProcedure || !selectedSurface ||
+                (selectionMode === "single" && !selectedTooth) ||
+                (selectionMode === "multiple" && selectedTeeth.length === 0)
               }
-              className="w-full"
+              className="w-full py-3 text-base"
+              size="lg"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Procedure to Stage {selectedStage}
+              <Plus className="h-5 w-5 mr-2" />
+              {selectionMode === "multiple" 
+                ? `Add Procedure to ${selectedTeeth.length} Selected Teeth`
+                : `Add Procedure to Tooth ${selectedTooth || ""}`
+              }
             </Button>
           </div>
 
@@ -3295,15 +3584,15 @@ useEffect(() => {
 
 const handleSaveConsultation = async () => {
   // Validate required fields
-  if (!chiefComplaint.trim()) {
-    alert("Please enter chief complaint");
-    return;
-  }
+  // if (!chiefComplaint.trim()) {
+  //   alert("Please enter chief complaint");
+  //   return;
+  // }
 
-  if (!diagnosis.trim()) {
-    alert("Please enter diagnosis");
-    return;
-  }
+  // if (!diagnosis.trim()) {
+  //   alert("Please enter diagnosis");
+  //   return;
+  // }
 
   if (!appointmentDetail?._id) {
     alert("Invalid appointment data");
@@ -3332,10 +3621,10 @@ const handleSaveConsultation = async () => {
       p.medicineName.trim() && p.dosage.trim()
     );
     
-    if (validPrescriptions.length === 0) {
-      alert("Please add at least one valid prescription");
-      return;
-    }
+    // if (validPrescriptions.length === 0) {
+    //   alert("Please add at least one valid prescription");
+    //   return;
+    // }
     
     formData.append('prescriptions', JSON.stringify(validPrescriptions));
     formData.append('notes', additionalNotes?.trim() || '');
@@ -3349,68 +3638,68 @@ const handleSaveConsultation = async () => {
     formData.append('files', JSON.stringify(existingFiles));
 
     // ✅ Transform soft tissue examinations for backend
- if (softTissues && softTissues.length > 0) {
-  const transformedSoftTissues = softTissues
-    .filter((st: SoftTissueData) => 
-      (st.onExamination && st.onExamination.length > 0) ||
-      (st.diagnosis && st.diagnosis.length > 0) ||
-      (st.treatment && st.treatment.length > 0)
-    )
-    .map((st: SoftTissueData) => ({
-      id: st.id,
-      name: st.name,
-      onExamination: (st.onExamination || []).map((item: string) => ({
-        value: item,
-        isCustom: false // You can add logic to detect custom entries
-      })),
-      diagnosis: (st.diagnosis || []).map((item: string) => ({
-        value: item,
-        isCustom: false
-      })),
-      treatment: (st.treatment || []).map((item: string) => ({
-        value: item,
-        isCustom: false
-      })),
-      notes: st.notes || ""
-    }));
-  
-  if (transformedSoftTissues.length > 0) {
-    formData.append('softTissueExamination', JSON.stringify(transformedSoftTissues));
-    console.log("✅ Soft tissue data added:", transformedSoftTissues.length, "tissues");
-  }
-}
+    if (softTissues && softTissues.length > 0) {
+      const transformedSoftTissues = softTissues
+        .filter((st: SoftTissueData) => 
+          (st.onExamination && st.onExamination.length > 0) ||
+          (st.diagnosis && st.diagnosis.length > 0) ||
+          (st.treatment && st.treatment.length > 0)
+        )
+        .map((st: SoftTissueData) => ({
+          id: st.id,
+          name: st.name,
+          onExamination: (st.onExamination || []).map((item: string) => ({
+            value: item,
+            isCustom: false // You can add logic to detect custom entries
+          })),
+          diagnosis: (st.diagnosis || []).map((item: string) => ({
+            value: item,
+            isCustom: false
+          })),
+          treatment: (st.treatment || []).map((item: string) => ({
+            value: item,
+            isCustom: false
+          })),
+          notes: st.notes || ""
+        }));
+      
+      if (transformedSoftTissues.length > 0) {
+        formData.append('softTissueExamination', JSON.stringify(transformedSoftTissues));
+        console.log("✅ Soft tissue data added:", transformedSoftTissues.length, "tissues");
+      }
+    }
 
     // ✅ Transform TMJ examinations for backend
-  if (tmjExaminations && tmjExaminations.length > 0) {
-  const transformedTMJExaminations = tmjExaminations
-    .filter((tmj: TMJData) => 
-      (tmj.onExamination && tmj.onExamination.length > 0) ||
-      (tmj.diagnosis && tmj.diagnosis.length > 0) ||
-      (tmj.treatment && tmj.treatment.length > 0)
-    )
-    .map((tmj: TMJData) => ({
-      id: tmj.id,
-      name: tmj.name,
-      onExamination: (tmj.onExamination || []).map((item: string) => ({
-        value: item,
-        isCustom: false
-      })),
-      diagnosis: (tmj.diagnosis || []).map((item: string) => ({
-        value: item,
-        isCustom: false
-      })),
-      treatment: (tmj.treatment || []).map((item: string) => ({
-        value: item,
-        isCustom: false
-      })),
-      notes: tmj.notes || ""
-    }));
-  
-  if (transformedTMJExaminations.length > 0) {
-    formData.append('tmjExamination', JSON.stringify(transformedTMJExaminations));
-    console.log("✅ TMJ data added:", transformedTMJExaminations.length, "examinations");
-  }
-}
+    if (tmjExaminations && tmjExaminations.length > 0) {
+      const transformedTMJExaminations = tmjExaminations
+        .filter((tmj: TMJData) => 
+          (tmj.onExamination && tmj.onExamination.length > 0) ||
+          (tmj.diagnosis && tmj.diagnosis.length > 0) ||
+          (tmj.treatment && tmj.treatment.length > 0)
+        )
+        .map((tmj: TMJData) => ({
+          id: tmj.id,
+          name: tmj.name,
+          onExamination: (tmj.onExamination || []).map((item: string) => ({
+            value: item,
+            isCustom: false
+          })),
+          diagnosis: (tmj.diagnosis || []).map((item: string) => ({
+            value: item,
+            isCustom: false
+          })),
+          treatment: (tmj.treatment || []).map((item: string) => ({
+            value: item,
+            isCustom: false
+          })),
+          notes: tmj.notes || ""
+        }));
+      
+      if (transformedTMJExaminations.length > 0) {
+        formData.append('tmjExamination', JSON.stringify(transformedTMJExaminations));
+        console.log("✅ TMJ data added:", transformedTMJExaminations.length, "examinations");
+      }
+    }
 
     // ✅ Transform performed teeth (NO status filter)
     if (dentalData.performedTeeth && dentalData.performedTeeth.length > 0) {
@@ -3460,35 +3749,92 @@ const handleSaveConsultation = async () => {
       if (editingTreatmentPlan && !editingTreatmentPlan._id.startsWith('temp-')) {
         console.log("🔄 Updating existing treatment plan:", editingTreatmentPlan._id);
         
-        // Find completed procedures in Stage 1
-        const completedProcedures: any[] = [];
+        // ========== ADD TREATMENT PLAN CHANGES TRACKING HERE ==========
+        // Find what changed
+const treatmentPlanChanges: any = {
+  planId: editingTreatmentPlan._id,
+  changes: [],
+  completedStages: [],
+  updatedProcedures: [],
+  stageStatusChanges: [],
+  addedStages: [],
+  removedStages: []
+};
+
+// Check for completed procedures
+const completedProcedures: any[] = [];
+
+dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+  toothPlan.procedures.forEach((proc: any) => {
+    if (proc.status === 'completed' && proc.stage === 1) {
+      completedProcedures.push({
+        toothNumber: toothPlan.toothNumber,
+        procedureName: proc.name,
+        surface: proc.surface || 'occlusal',
+        stageNumber: 1,
+        estimatedCost: proc.estimatedCost || 0,
+        notes: proc.notes || ''
+      });
+      
+      // Track procedure completion
+      treatmentPlanChanges.updatedProcedures.push({
+        type: 'completed',
+        toothNumber: toothPlan.toothNumber,
+        procedureName: proc.name,
+        surface: proc.surface || 'occlusal',
+        stage: 1,
+        previousStatus: 'planned',
+        newStatus: 'completed',
+        changedAt: new Date().toISOString()
+      });
+    }
+  });
+});
+
+// Check if Stage 1 is fully completed
+const stage1Procedures = dentalData.treatmentPlan.teeth.flatMap((t: any) =>
+  t.procedures.filter((p: any) => p.stage === 1)
+);
+const allStage1Completed = stage1Procedures.length > 0 && 
+  stage1Procedures.every((p: any) => p.status === 'completed');
+
+if (allStage1Completed) {
+  treatmentPlanChanges.completedStages.push({
+    stageNumber: 1,
+    stageName: dentalData.treatmentPlan.stages[0]?.stageName || 'Stage 1',
+    previousStatus: 'in-progress',
+    newStatus: 'completed',
+    completedAt: new Date().toISOString()
+  });
+}
+
+// Check for stage status changes (compare with original plan)
+if (editingTreatmentPlan.stages && dentalData.treatmentPlan.stages) {
+  editingTreatmentPlan.stages.forEach((originalStage: any) => {
+    const updatedStage = dentalData.treatmentPlan.stages.find(
+      (s: any) => s.stageNumber === originalStage.stageNumber
+    );
+    
+    if (updatedStage && originalStage.status !== updatedStage.status) {
+      treatmentPlanChanges.stageStatusChanges.push({
+        stageNumber: originalStage.stageNumber,
+        stageName: originalStage.stageName,
+        previousStatus: originalStage.status,
+        newStatus: updatedStage.status,
+        changedAt: new Date().toISOString()
+      });
+    }
+  });
+}
         
-        dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
-          toothPlan.procedures.forEach((proc: any) => {
-            if (proc.status === 'completed' && proc.stage === 1) {
-              completedProcedures.push({
-                toothNumber: toothPlan.toothNumber,
-                procedureName: proc.name,
-                surface: proc.surface || 'occlusal',
-                stageNumber: 1,
-                estimatedCost: proc.estimatedCost || 0,
-                notes: proc.notes || ''
-              });
-            }
-          });
-        });
-        
-        // Check if Stage 1 is fully completed
-        const stage1Procedures = dentalData.treatmentPlan.teeth.flatMap((t: any) =>
-          t.procedures.filter((p: any) => p.stage === 1)
-        );
-        const allStage1Completed = stage1Procedures.length > 0 && 
-          stage1Procedures.every((p: any) => p.status === 'completed');
+        // ========== END OF TREATMENT PLAN CHANGES TRACKING ==========
         
         treatmentPlanStatusUpdate = {
           planId: editingTreatmentPlan._id,
           completedStageNumber: allStage1Completed ? 1 : null,
-          completedProcedures: completedProcedures
+          completedProcedures: completedProcedures,
+          // Send the treatment plan changes to backend
+          treatmentPlanChanges: treatmentPlanChanges
         };
         
         formData.append('treatmentPlanStatus', JSON.stringify(treatmentPlanStatusUpdate));
@@ -3704,18 +4050,18 @@ const handleSaveConsultation = async () => {
       });
       
       // Reset soft tissues and TMJ examinations
-     setSoftTissues(SOFT_TISSUE_DATA.map(tissue => ({
-  ...tissue,
-  onExamination: [],
-  diagnosis: [],
-  treatment: []
-})));
-   setTMJExaminations(TMJ_DATA.map(tmj => ({
-  ...tmj,
-  onExamination: [],
-  diagnosis: [],
-  treatment: []
-})));
+      setSoftTissues(SOFT_TISSUE_DATA.map(tissue => ({
+        ...tissue,
+        onExamination: [],
+        diagnosis: [],
+        treatment: []
+      })));
+      setTMJExaminations(TMJ_DATA.map(tmj => ({
+        ...tmj,
+        onExamination: [],
+        diagnosis: [],
+        treatment: []
+      })));
       
       // Close dental chart if open
       setShowDentalChart(false);
