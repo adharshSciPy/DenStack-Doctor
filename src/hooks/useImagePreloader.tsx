@@ -1,64 +1,76 @@
-// useImagePreloader.tsx - FIXED VERSION
+// useImagePreloader.tsx - IMPROVED VERSION
 import { useState, useEffect } from 'react';
 
 export const useImagePreloader = (imageUrls: string[]) => {
-  const [loaded, setLoaded] = useState(false);
-  const [loadedCount, setLoadedCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
     // If no images to preload, mark as loaded immediately
     if (!imageUrls || imageUrls.length === 0) {
-      setLoaded(true);
+      setIsLoading(false);
       return;
     }
 
     let mounted = true;
-    let completedCount = 0;
+    let loadedCount = 0;
     const totalImages = imageUrls.length;
+    const errorList: string[] = [];
 
-    const preloadImages = () => {
-      imageUrls.forEach((url) => {
-        const img = new Image();
-        
-        // Add cache busting to prevent browser caching issues
-        const cacheBustedUrl = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
-        
-        img.onload = () => {
-          if (!mounted) return;
+    const preloadImages = async () => {
+      const promises = imageUrls.map((url) => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
           
-          completedCount++;
-          setLoadedCount(completedCount);
+          img.onload = () => {
+            if (!mounted) return;
+            loadedCount++;
+            setProgress(Math.round((loadedCount / totalImages) * 100));
+            
+            // Mark as loaded when all images are loaded
+            if (loadedCount >= totalImages) {
+              if (mounted) {
+                setIsLoading(false);
+                setErrors(errorList);
+              }
+            }
+            resolve();
+          };
           
-          // Mark as loaded when all images are loaded
-          if (completedCount >= totalImages) {
-            setLoaded(true);
-          }
-        };
-        
-        img.onerror = () => {
-          if (!mounted) return;
+          img.onerror = () => {
+            if (!mounted) return;
+            loadedCount++;
+            setProgress(Math.round((loadedCount / totalImages) * 100));
+            errorList.push(`Failed to load: ${url}`);
+            
+            // Still mark as loaded when all are attempted
+            if (loadedCount >= totalImages) {
+              if (mounted) {
+                setIsLoading(false);
+                setErrors(errorList);
+              }
+            }
+            resolve();
+          };
           
-          completedCount++;
-          setLoadedCount(completedCount);
-          
-          // Still mark as loaded even if some fail
-          if (completedCount >= totalImages) {
-            setLoaded(true);
-          }
-        };
-        
-        img.src = cacheBustedUrl;
+          img.src = url;
+        });
       });
 
-      // Fallback timeout in case images take too long
-      const timeout = setTimeout(() => {
-        if (mounted && !loaded) {
-          console.log('Image preload timeout, continuing anyway');
-          setLoaded(true);
-        }
-      }, 3000); // 3 second timeout
+      try {
+        await Promise.all(promises);
+      } catch (error) {
+        console.error('Image preload error:', error);
+      }
 
-      return () => clearTimeout(timeout);
+      // Fallback timeout in case images take too long
+      setTimeout(() => {
+        if (mounted && isLoading) {
+          console.log('Image preload timeout, continuing anyway');
+          setIsLoading(false);
+        }
+      }, 5000); // 5 second timeout
     };
 
     preloadImages();
@@ -66,7 +78,7 @@ export const useImagePreloader = (imageUrls: string[]) => {
     return () => {
       mounted = false;
     };
-  }, [imageUrls]); // Only re-run if imageUrls changes
+  }, [imageUrls]);
 
-  return { loaded, loadedCount };
+  return { isLoading, progress, errors };
 };
