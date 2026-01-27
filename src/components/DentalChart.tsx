@@ -19,28 +19,29 @@ import {
   Check
 } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { useImagePreloader } from "../hooks/useImagePreloader"; 
 
 // Import Tooth SVG components
-import IncisorSVG from "../assets/svg/dental/incisor.svg?react";
-import CanineSVG from "../assets/svg/dental/canine.svg?react";
-import PremolarSVG from "../assets/svg/dental/premolar.svg?react";
-import MolarSVG from "../assets/svg/dental/molar.svg?react";
-import WisdomSVG from "../assets/svg/dental/wisdom.svg?react";
+const incisorSvg = "/assets/svg/dental/incisor.svg";
+const canineSvg = "/assets/svg/dental/canine.svg";
+const premolarSvg = "/assets/svg/dental/premolar.svg";
+const molarSvg = "/assets/svg/dental/molar.svg";
+const wisdomSvg = "/assets/svg/dental/wisdom.svg";
 
 // Import Soft Tissue SVG components
-import TongueSVG from "../assets/svg/softTissue/Tongue.svg?react";
-import GingivaSVG from "../assets/svg/softTissue/Gingiva.svg?react";
-import PalateSVG from "../assets/svg/softTissue/Palate.svg?react";
-import BuccalMucosaSVG from "../assets/svg/softTissue/BuccalMucosa.svg?react";
-import FloorOfMouthSVG from "../assets/svg/softTissue/FloorOfTheMouth.svg?react";
-import LabialMucosaSVG from "../assets/svg/softTissue/LabialMucosa.svg?react";
-import SalivaryGlandsSVG from "../assets/svg/softTissue/SalivaryGlands.svg?react";
-import FrenumSVG from "../assets/svg/softTissue/Frenum.svg?react";
+const tongueSvg = "/assets/svg/softTissue/Tongue.svg";
+const gingivaSvg = "/assets/svg/softTissue/Gingiva.svg";
+const palateSVG = "/assets/svg/softTissue/Palate.svg";
+const buccalMucosaSVG = "/assets/svg/softTissue/BuccalMucosa.svg";
+const floorOfMouthSVG = "/assets/svg/softTissue/FloorOfTheMouth.svg";
+const labialMucosaSVG = "/assets/svg/softTissue/LabialMucosa.svg";
+const salivaryGlandsSVG = "/assets/svg/softTissue/SalivaryGlands.svg";
+const frenumSVG ="/assets/svg/softTissue/Frenum.svg";
 
 // Import TMJ SVG components - FIXED PATHS
-import TMJLeftSVG from "../assets/svg/tmj/LeftTMJ.svg?react";
-import TMJRightSVG from "../assets/svg/tmj/RightTMJ.svg?react";
-import TMJBothSVG from "../assets/svg/tmj/BothTMJ.svg?react";
+const tmjLeftSVG = "/assets/svg/tmj/LeftTMJ.svg";
+const tmjRightSVG = "/assets/svg/tmj/RightTMJ.svg";
+const tmjBothSVG = "/assets/svg/tmj/BothTMJ.svg";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -935,32 +936,64 @@ const TMJ_TREATMENT_OPTIONS = [
 ];
 
 // SVG mapping for Teeth
-const TOOTH_SVGS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  incisor: IncisorSVG,
-  canine: CanineSVG,
-  premolar: PremolarSVG,
-  molar: MolarSVG,
-  wisdom: WisdomSVG || MolarSVG,
+const TOOTH_SVGS: Record<string, string> = {
+  incisor: "/assets/svg/dental/incisor.svg",
+  canine: "/assets/svg/dental/canine.svg",
+  premolar: "/assets/svg/dental/premolar.svg",
+  molar: "/assets/svg/dental/molar.svg",
+  wisdom: "/assets/svg/dental/wisdom.svg",
 };
 
-const SOFT_TISSUE_SVGS: Record<
-  string,
-  React.FC<React.SVGProps<SVGSVGElement>>
-> = {
-  tongue: TongueSVG,
-  gingiva: GingivaSVG,
-  palate: PalateSVG,
-  "buccal-mucosa": BuccalMucosaSVG, // This key should match the svgName in SOFT_TISSUE_DATA
-  "floor-of-mouth": FloorOfMouthSVG,
-  "labial-mucosa": LabialMucosaSVG, // This key should match the svgName in SOFT_TISSUE_DATA
-  "salivary-glands": SalivaryGlandsSVG,
-  frenum: FrenumSVG,
+const SOFT_TISSUE_SVGS: Record<string, string> = {
+  tongue: "/assets/svg/softTissue/Tongue.svg",
+  gingiva: "/assets/svg/softTissue/Gingiva.svg",
+  palate: "/assets/svg/softTissue/Palate.svg",
+  "buccal-mucosa": "/assets/svg/softTissue/BuccalMucosa.svg",
+  "floor-of-mouth": "/assets/svg/softTissue/FloorOfTheMouth.svg",
+  "labial-mucosa": "/assets/svg/softTissue/LabialMucosa.svg",
+  "salivary-glands": "/assets/svg/softTissue/SalivaryGlands.svg",
+  frenum: "/assets/svg/softTissue/Frenum.svg",
 };
 // SVG mapping for TMJ
-const TMJ_SVGS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  "tmj-left": TMJLeftSVG,
-  "tmj-right": TMJRightSVG,
-  "tmj-both": TMJBothSVG,
+const TMJ_SVGS: Record<string, string> = {
+  "tmj-left": "/assets/svg/tmj/LeftTMJ.svg",
+  "tmj-right": "/assets/svg/tmj/RightTMJ.svg",
+  "tmj-both": "/assets/svg/tmj/BothTMJ.svg",
+};
+// Helper function to get SVG URLs
+const getSvgUrlByType = (type: string, category: 'tooth' | 'softTissue' | 'tmj') => {
+  switch (category) {
+    case 'tooth':
+      switch (type.toLowerCase()) {
+        case 'incisor': return incisorSvg;
+        case 'canine': return canineSvg;
+        case 'premolar': return premolarSvg;
+        case 'molar': return molarSvg;
+        case 'wisdom': return wisdomSvg;
+        default: return null;
+      }
+    case 'softTissue':
+      switch (type.toLowerCase()) {
+        case 'tongue': return tongueSvg;
+        case 'gingiva': return gingivaSvg;
+        case 'palate': return palateSVG;
+        case 'buccal-mucosa': return buccalMucosaSVG;
+        case 'floor-of-mouth': return floorOfMouthSVG;
+        case 'labial-mucosa': return labialMucosaSVG;
+        case 'salivary-glands': return salivaryGlandsSVG;
+        case 'frenum': return frenumSVG;
+        default: return null;
+      }
+    case 'tmj':
+      switch (type.toLowerCase()) {
+        case 'tmj-left': return tmjLeftSVG;
+        case 'tmj-right': return tmjRightSVG;
+        case 'tmj-both': return tmjBothSVG;
+        default: return null;
+      }
+    default:
+      return null;
+  }
 };
 // Tooth SVG Component
 const ToothSVG = ({
@@ -976,27 +1009,8 @@ const ToothSVG = ({
   height?: number;
   rotation?: number;
 }) => {
-  const SvgComponent = TOOTH_SVGS[type.toLowerCase()];
-
-  if (!SvgComponent) {
-    return (
-      <svg
-        width={width}
-        height={height}
-        viewBox="0 0 100 100"
-        style={{ transform: `rotate(${rotation}deg)` }}
-      >
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-        />
-      </svg>
-    );
-  }
+  const svgUrl = getSvgUrlByType(type, 'tooth');
+  const [hasError, setHasError] = useState(false);
 
   return (
     <div
@@ -1005,24 +1019,60 @@ const ToothSVG = ({
         height: `${height}px`,
         transform: `rotate(${rotation}deg)`,
         display: "inline-block",
+        position: 'relative',
       }}
     >
-      <SvgComponent
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-          fill: "none",
-          stroke: color,
-          strokeWidth: "4px",
-        }}
-      />
+      {svgUrl && !hasError ? (
+        <img
+          src={svgUrl}
+          alt={`${type} tooth`}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: color === '#4b5563' ? 'none' : 
+              `drop-shadow(0 0 2px ${color}) brightness(0.9) sepia(1) hue-rotate(${getHueFromColor(color)}deg) saturate(2)`,
+          }}
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        // Fallback SVG
+        <svg
+          width={width}
+          height={height}
+          viewBox="0 0 100 100"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke={color}
+            strokeWidth="4"
+          />
+        </svg>
+      )}
     </div>
   );
 };
 
-// Soft Tissue SVG Component
+// Helper to convert hex color to hue value for filter
+const getHueFromColor = (hexColor: string): number => {
+  const colorMap: Record<string, number> = {
+    '#ef4444': 0,    // red (caries)
+    '#3b82f6': 220,  // blue (filling)
+    '#f59e0b': 40,   // orange (crown)
+    '#8b5cf6': 270,  // purple (root canal)
+    '#9ca3af': 0,    // gray (missing)
+    '#22c55e': 140,  // green (selected)
+    '#4b5563': 0,    // default gray
+  };
+  
+  return colorMap[hexColor.toLowerCase()] || 0;
+};
+
 const SoftTissueSVG = ({
   type,
   color = "#4b5563",
@@ -1034,24 +1084,8 @@ const SoftTissueSVG = ({
   width?: number;
   height?: number;
 }) => {
-  const SvgComponent = SOFT_TISSUE_SVGS[type.toLowerCase()];
-
-  if (!SvgComponent) {
-    return (
-      <svg width={width} height={height} viewBox="0 0 100 100">
-        <rect
-          x="10"
-          y="10"
-          width="80"
-          height="80"
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-          rx="10"
-        />
-      </svg>
-    );
-  }
+  const svgUrl = getSvgUrlByType(type, 'softTissue');
+  const [hasError, setHasError] = useState(false);
 
   return (
     <div
@@ -1059,19 +1093,38 @@ const SoftTissueSVG = ({
         width: `${width}px`,
         height: `${height}px`,
         display: "inline-block",
+        position: 'relative',
       }}
     >
-      <SvgComponent
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-          fill: "none",
-          // stroke: color,
-          // strokeWidth: '4px'
-        }}
-      />
+      {svgUrl && !hasError ? (
+        <img
+          src={svgUrl}
+          alt={`${type} soft tissue`}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: color === '#4b5563' || color === '#3b82f6' ? 'none' : 
+              `drop-shadow(0 0 1px ${color})`,
+          }}
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        // Fallback for soft tissue
+        <svg width={width} height={height} viewBox="0 0 100 100">
+          <rect
+            x="10"
+            y="10"
+            width="80"
+            height="80"
+            fill="none"
+            stroke={color}
+            strokeWidth="4"
+            rx="10"
+          />
+        </svg>
+      )}
     </div>
   );
 };
@@ -1088,22 +1141,8 @@ const TMJSVG = ({
   width?: number;
   height?: number;
 }) => {
-  const SvgComponent = TMJ_SVGS[type.toLowerCase()];
-
-  if (!SvgComponent) {
-    return (
-      <svg width={width} height={height} viewBox="0 0 100 100">
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-        />
-      </svg>
-    );
-  }
+  const svgUrl = getSvgUrlByType(type, 'tmj');
+  const [hasError, setHasError] = useState(false);
 
   return (
     <div
@@ -1111,21 +1150,80 @@ const TMJSVG = ({
         width: `${width}px`,
         height: `${height}px`,
         display: "inline-block",
+        position: 'relative',
       }}
     >
-      <SvgComponent
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-          fill: "none",
-          // stroke: color,
-          // strokeWidth: '4px'
-        }}
-      />
+      {svgUrl && !hasError ? (
+        <img
+          src={svgUrl}
+          alt={`${type} TMJ`}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: color === '#4b5563' || color === '#8b5cf6' ? 'none' : 
+              `drop-shadow(0 0 1px ${color})`,
+          }}
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        // Fallback for TMJ
+        <svg width={width} height={height} viewBox="0 0 100 100">
+          <circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke={color}
+            strokeWidth="4"
+          />
+        </svg>
+      )}
     </div>
   );
+};
+
+// Preload all SVG images hook
+const useSVGPreloader = () => {
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    
+    // List of all SVG paths
+   // In your svgPaths array, use the correct variable names:
+const svgPaths = [
+  incisorSvg, canineSvg, premolarSvg, molarSvg, wisdomSvg,
+  tongueSvg, gingivaSvg, palateSVG, buccalMucosaSVG, floorOfMouthSVG,
+  labialMucosaSVG, salivaryGlandsSVG, frenumSVG, // ← Changed from frenumSvg to frenumSVG
+  tmjLeftSVG, tmjRightSVG, tmjBothSVG
+];
+
+    const preloadImages = () => {
+      // Start preloading but don't block rendering
+      svgPaths.forEach(url => {
+        const img = new Image();
+        img.src = url;
+        // Don't wait for all to load - just start the requests
+      });
+
+      // Mark as loaded after short delay
+      setTimeout(() => {
+        if (mounted) {
+          setLoaded(true);
+        }
+      }, 100);
+    };
+
+    preloadImages();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { loaded };
 };
 
 // Tooth Diagram with Area Markers Component - Segmented Circle Design
@@ -3656,6 +3754,35 @@ export default function DentalChart({
   existingSoftTissues = [],
   existingTMJExaminations = [],
 }: DentalChartProps) {
+   const allSvgUrls = React.useMemo(() => {
+  // Create an array of all unique SVG URLs
+  const urls = [
+    // Tooth SVGs
+    '/assets/svg/dental/incisor.svg',
+    '/assets/svg/dental/canine.svg',
+    '/assets/svg/dental/premolar.svg',
+    '/assets/svg/dental/molar.svg',
+    '/assets/svg/dental/wisdom.svg',
+    // Soft tissue SVGs
+    '/assets/svg/softTissue/Tongue.svg',
+    '/assets/svg/softTissue/Gingiva.svg',
+    '/assets/svg/softTissue/Palate.svg',
+    '/assets/svg/softTissue/BuccalMucosa.svg',
+    '/assets/svg/softTissue/FloorOfTheMouth.svg',
+    '/assets/svg/softTissue/LabialMucosa.svg',
+    '/assets/svg/softTissue/SalivaryGlands.svg',
+    '/assets/svg/softTissue/Frenum.svg',
+    // TMJ SVGs
+    '/assets/svg/tmj/LeftTMJ.svg',
+    '/assets/svg/tmj/RightTMJ.svg',
+    '/assets/svg/tmj/BothTMJ.svg',
+  ];
+  
+  // Filter out any undefined/null URLs and return unique URLs
+  return [...new Set(urls.filter(url => url))];
+}, []);
+
+
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null);
   const [toothConditions, setToothConditions] =
     useState<ToothCondition[]>(existingConditions);
@@ -3733,6 +3860,30 @@ export default function DentalChart({
   const [procedureNotes, setProcedureNotes] = useState("");
   const [procedureCost, setProcedureCost] = useState<number>(0);
   const [useDropdownView, setUseDropdownView] = useState(false);
+   const { loaded: imagesLoaded } = useImagePreloader(allSvgUrls);
+// Remove the useSVGPreloader hook entirely
+  // const [isLoading, setIsLoading] = useState(true);
+  // useEffect(() => {
+  //   if (imagesLoaded) {
+  //     setIsLoading(false);
+  //   }
+  // }, [imagesLoaded]);
+  
+  // if (isLoading) {
+  //   return <DentalChartSkeleton />;
+  // }
+
+  // if (isLoading) {
+  //   return (
+  //     <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+  //         <h3 className="text-lg font-semibold mb-2">Loading Dental Chart</h3>
+  //         <p className="text-gray-600">Preparing dental assets...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
   const toothData =
     chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
 
@@ -5377,6 +5528,7 @@ const renderTeethTab = () => (
     </div>
   );
   return (
+    
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2">
       <Card className="max-w-7xl w-full max-h-[90vh] flex flex-col">
         <CardHeader className="flex-shrink-0 pb-2">
