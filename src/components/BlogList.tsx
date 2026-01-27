@@ -47,6 +47,7 @@ interface AdminReview {
 interface Blog {
   _id: string;
   doctorId: Doctor;
+  doctor: Doctor;
   title: string;
   content: string;
   imageUrl: string[];
@@ -407,7 +408,7 @@ export function BlogList() {
                     </div>
                     <div className={styles.featuredMeta}>
                       <span className={styles.author}>
-                        Dr. {blog.doctorId.name}
+                        Dr. {blog.doctor.name}
                       </span>
                       <span className={styles.date}>
                         {format(new Date(blog.createdAt), "MMM dd, yyyy")}

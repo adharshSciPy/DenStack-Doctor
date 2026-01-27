@@ -66,7 +66,7 @@ const CreateBlog: React.FC = () => {
       }
       
       const response = await axios.get<ApiResponse>(
-        `${blogServiceUrl}/api/blogs/${id}`,
+        `${blogServiceUrl}/api/v1/blog/blog/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -206,10 +206,10 @@ const CreateBlog: React.FC = () => {
       }
       
       const url = isEditing 
-        ? `${blogServiceUrl}/api/v1/blog/${id}`
+        ? `${blogServiceUrl}/api/v1/blog/edit-blog/${id}`
         : `${blogServiceUrl}/api/v1/blog/post-blog`;
       
-      const method = isEditing ? 'put' : 'post';
+      const method = isEditing ? 'patch' : 'post';
       
       const response = await axios({
         method,

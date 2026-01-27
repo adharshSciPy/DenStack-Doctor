@@ -3183,6 +3183,7 @@ const [dentalChartMode, setDentalChartMode] = useState<"chart-only" | "with-trea
 const [showTreatmentPlanForm, setShowTreatmentPlanForm] = useState(false);
 const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanData | null>(null);
 const [selectedTeethForPlan, setSelectedTeethForPlan] = useState<number[]>([]);
+console.log("ded",selectedHistory);
 
 
   const formatTime = (time: string) => {
