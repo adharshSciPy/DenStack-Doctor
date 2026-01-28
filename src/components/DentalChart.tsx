@@ -19,28 +19,30 @@ import {
   Check
 } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { useImagePreloader } from "../hooks/useImagePreloader"; 
+import DentalLoader from './DentalLoader';
 
 // Import Tooth SVG components
-import IncisorSVG from "../assets/svg/dental/incisor.svg?react";
-import CanineSVG from "../assets/svg/dental/canine.svg?react";
-import PremolarSVG from "../assets/svg/dental/premolar.svg?react";
-import MolarSVG from "../assets/svg/dental/molar.svg?react";
-import WisdomSVG from "../assets/svg/dental/wisdom.svg?react";
+const incisorSvg = "/assets/svg/dental/incisor.svg";
+const canineSvg = "/assets/svg/dental/canine.svg";
+const premolarSvg = "/assets/svg/dental/premolar.svg";
+const molarSvg = "/assets/svg/dental/molar.svg";
+const wisdomSvg = "/assets/svg/dental/wisdom.svg";
 
 // Import Soft Tissue SVG components
-import TongueSVG from "../assets/svg/softTissue/Tongue.svg?react";
-import GingivaSVG from "../assets/svg/softTissue/Gingiva.svg?react";
-import PalateSVG from "../assets/svg/softTissue/Palate.svg?react";
-import BuccalMucosaSVG from "../assets/svg/softTissue/BuccalMucosa.svg?react";
-import FloorOfMouthSVG from "../assets/svg/softTissue/FloorOfTheMouth.svg?react";
-import LabialMucosaSVG from "../assets/svg/softTissue/LabialMucosa.svg?react";
-import SalivaryGlandsSVG from "../assets/svg/softTissue/SalivaryGlands.svg?react";
-import FrenumSVG from "../assets/svg/softTissue/Frenum.svg?react";
+const tongueSvg = "/assets/svg/softTissue/Tongue.svg";
+const gingivaSvg = "/assets/svg/softTissue/Gingiva.svg";
+const palateSVG = "/assets/svg/softTissue/Palate.svg";
+const buccalMucosaSVG = "/assets/svg/softTissue/BuccalMucosa.svg";
+const floorOfMouthSVG = "/assets/svg/softTissue/FloorOfTheMouth.svg";
+const labialMucosaSVG = "/assets/svg/softTissue/LabialMucosa.svg";
+const salivaryGlandsSVG = "/assets/svg/softTissue/SalivaryGlands.svg";
+const frenumSVG ="/assets/svg/softTissue/Frenum.svg";
 
 // Import TMJ SVG components - FIXED PATHS
-import TMJLeftSVG from "../assets/svg/tmj/LeftTMJ.svg?react";
-import TMJRightSVG from "../assets/svg/tmj/RightTMJ.svg?react";
-import TMJBothSVG from "../assets/svg/tmj/BothTMJ.svg?react";
+const tmjLeftSVG = "/assets/svg/tmj/LeftTMJ.svg";
+const tmjRightSVG = "/assets/svg/tmj/RightTMJ.svg";
+const tmjBothSVG = "/assets/svg/tmj/BothTMJ.svg";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -935,32 +937,64 @@ const TMJ_TREATMENT_OPTIONS = [
 ];
 
 // SVG mapping for Teeth
-const TOOTH_SVGS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  incisor: IncisorSVG,
-  canine: CanineSVG,
-  premolar: PremolarSVG,
-  molar: MolarSVG,
-  wisdom: WisdomSVG || MolarSVG,
+const TOOTH_SVGS: Record<string, string> = {
+  incisor: "/assets/svg/dental/incisor.svg",
+  canine: "/assets/svg/dental/canine.svg",
+  premolar: "/assets/svg/dental/premolar.svg",
+  molar: "/assets/svg/dental/molar.svg",
+  wisdom: "/assets/svg/dental/wisdom.svg",
 };
 
-const SOFT_TISSUE_SVGS: Record<
-  string,
-  React.FC<React.SVGProps<SVGSVGElement>>
-> = {
-  tongue: TongueSVG,
-  gingiva: GingivaSVG,
-  palate: PalateSVG,
-  "buccal-mucosa": BuccalMucosaSVG, // This key should match the svgName in SOFT_TISSUE_DATA
-  "floor-of-mouth": FloorOfMouthSVG,
-  "labial-mucosa": LabialMucosaSVG, // This key should match the svgName in SOFT_TISSUE_DATA
-  "salivary-glands": SalivaryGlandsSVG,
-  frenum: FrenumSVG,
+const SOFT_TISSUE_SVGS: Record<string, string> = {
+  tongue: "/assets/svg/softTissue/Tongue.svg",
+  gingiva: "/assets/svg/softTissue/Gingiva.svg",
+  palate: "/assets/svg/softTissue/Palate.svg",
+  "buccal-mucosa": "/assets/svg/softTissue/BuccalMucosa.svg",
+  "floor-of-mouth": "/assets/svg/softTissue/FloorOfTheMouth.svg",
+  "labial-mucosa": "/assets/svg/softTissue/LabialMucosa.svg",
+  "salivary-glands": "/assets/svg/softTissue/SalivaryGlands.svg",
+  frenum: "/assets/svg/softTissue/Frenum.svg",
 };
 // SVG mapping for TMJ
-const TMJ_SVGS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  "tmj-left": TMJLeftSVG,
-  "tmj-right": TMJRightSVG,
-  "tmj-both": TMJBothSVG,
+const TMJ_SVGS: Record<string, string> = {
+  "tmj-left": "/assets/svg/tmj/LeftTMJ.svg",
+  "tmj-right": "/assets/svg/tmj/RightTMJ.svg",
+  "tmj-both": "/assets/svg/tmj/BothTMJ.svg",
+};
+// Helper function to get SVG URLs
+const getSvgUrlByType = (type: string, category: 'tooth' | 'softTissue' | 'tmj') => {
+  switch (category) {
+    case 'tooth':
+      switch (type.toLowerCase()) {
+        case 'incisor': return incisorSvg;
+        case 'canine': return canineSvg;
+        case 'premolar': return premolarSvg;
+        case 'molar': return molarSvg;
+        case 'wisdom': return wisdomSvg;
+        default: return null;
+      }
+    case 'softTissue':
+      switch (type.toLowerCase()) {
+        case 'tongue': return tongueSvg;
+        case 'gingiva': return gingivaSvg;
+        case 'palate': return palateSVG;
+        case 'buccal-mucosa': return buccalMucosaSVG;
+        case 'floor-of-mouth': return floorOfMouthSVG;
+        case 'labial-mucosa': return labialMucosaSVG;
+        case 'salivary-glands': return salivaryGlandsSVG;
+        case 'frenum': return frenumSVG;
+        default: return null;
+      }
+    case 'tmj':
+      switch (type.toLowerCase()) {
+        case 'tmj-left': return tmjLeftSVG;
+        case 'tmj-right': return tmjRightSVG;
+        case 'tmj-both': return tmjBothSVG;
+        default: return null;
+      }
+    default:
+      return null;
+  }
 };
 // Tooth SVG Component
 const ToothSVG = ({
@@ -976,27 +1010,8 @@ const ToothSVG = ({
   height?: number;
   rotation?: number;
 }) => {
-  const SvgComponent = TOOTH_SVGS[type.toLowerCase()];
-
-  if (!SvgComponent) {
-    return (
-      <svg
-        width={width}
-        height={height}
-        viewBox="0 0 100 100"
-        style={{ transform: `rotate(${rotation}deg)` }}
-      >
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-        />
-      </svg>
-    );
-  }
+  const svgUrl = getSvgUrlByType(type, 'tooth');
+  const [hasError, setHasError] = useState(false);
 
   return (
     <div
@@ -1005,24 +1020,60 @@ const ToothSVG = ({
         height: `${height}px`,
         transform: `rotate(${rotation}deg)`,
         display: "inline-block",
+        position: 'relative',
       }}
     >
-      <SvgComponent
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-          fill: "none",
-          stroke: color,
-          strokeWidth: "4px",
-        }}
-      />
+      {svgUrl && !hasError ? (
+        <img
+          src={svgUrl}
+          alt={`${type} tooth`}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: color === '#4b5563' ? 'none' : 
+              `drop-shadow(0 0 2px ${color}) brightness(0.9) sepia(1) hue-rotate(${getHueFromColor(color)}deg) saturate(2)`,
+          }}
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        // Fallback SVG
+        <svg
+          width={width}
+          height={height}
+          viewBox="0 0 100 100"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke={color}
+            strokeWidth="4"
+          />
+        </svg>
+      )}
     </div>
   );
 };
 
-// Soft Tissue SVG Component
+// Helper to convert hex color to hue value for filter
+const getHueFromColor = (hexColor: string): number => {
+  const colorMap: Record<string, number> = {
+    '#ef4444': 0,    // red (caries)
+    '#3b82f6': 220,  // blue (filling)
+    '#f59e0b': 40,   // orange (crown)
+    '#8b5cf6': 270,  // purple (root canal)
+    '#9ca3af': 0,    // gray (missing)
+    '#22c55e': 140,  // green (selected)
+    '#4b5563': 0,    // default gray
+  };
+  
+  return colorMap[hexColor.toLowerCase()] || 0;
+};
+
 const SoftTissueSVG = ({
   type,
   color = "#4b5563",
@@ -1034,24 +1085,8 @@ const SoftTissueSVG = ({
   width?: number;
   height?: number;
 }) => {
-  const SvgComponent = SOFT_TISSUE_SVGS[type.toLowerCase()];
-
-  if (!SvgComponent) {
-    return (
-      <svg width={width} height={height} viewBox="0 0 100 100">
-        <rect
-          x="10"
-          y="10"
-          width="80"
-          height="80"
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-          rx="10"
-        />
-      </svg>
-    );
-  }
+  const svgUrl = getSvgUrlByType(type, 'softTissue');
+  const [hasError, setHasError] = useState(false);
 
   return (
     <div
@@ -1059,19 +1094,38 @@ const SoftTissueSVG = ({
         width: `${width}px`,
         height: `${height}px`,
         display: "inline-block",
+        position: 'relative',
       }}
     >
-      <SvgComponent
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-          fill: "none",
-          // stroke: color,
-          // strokeWidth: '4px'
-        }}
-      />
+      {svgUrl && !hasError ? (
+        <img
+          src={svgUrl}
+          alt={`${type} soft tissue`}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: color === '#4b5563' || color === '#3b82f6' ? 'none' : 
+              `drop-shadow(0 0 1px ${color})`,
+          }}
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        // Fallback for soft tissue
+        <svg width={width} height={height} viewBox="0 0 100 100">
+          <rect
+            x="10"
+            y="10"
+            width="80"
+            height="80"
+            fill="none"
+            stroke={color}
+            strokeWidth="4"
+            rx="10"
+          />
+        </svg>
+      )}
     </div>
   );
 };
@@ -1088,22 +1142,8 @@ const TMJSVG = ({
   width?: number;
   height?: number;
 }) => {
-  const SvgComponent = TMJ_SVGS[type.toLowerCase()];
-
-  if (!SvgComponent) {
-    return (
-      <svg width={width} height={height} viewBox="0 0 100 100">
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-        />
-      </svg>
-    );
-  }
+  const svgUrl = getSvgUrlByType(type, 'tmj');
+  const [hasError, setHasError] = useState(false);
 
   return (
     <div
@@ -1111,22 +1151,81 @@ const TMJSVG = ({
         width: `${width}px`,
         height: `${height}px`,
         display: "inline-block",
+        position: 'relative',
       }}
     >
-      <SvgComponent
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-          fill: "none",
-          // stroke: color,
-          // strokeWidth: '4px'
-        }}
-      />
+      {svgUrl && !hasError ? (
+        <img
+          src={svgUrl}
+          alt={`${type} TMJ`}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: color === '#4b5563' || color === '#8b5cf6' ? 'none' : 
+              `drop-shadow(0 0 1px ${color})`,
+          }}
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        // Fallback for TMJ
+        <svg width={width} height={height} viewBox="0 0 100 100">
+          <circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke={color}
+            strokeWidth="4"
+          />
+        </svg>
+      )}
     </div>
   );
 };
+
+// Preload all SVG images hook
+// const useSVGPreloader = () => {
+//   const [loaded, setLoaded] = useState(false);
+
+//   useEffect(() => {
+//     let mounted = true;
+    
+//     // List of all SVG paths
+//    // In your svgPaths array, use the correct variable names:
+// const svgPaths = [
+//   incisorSvg, canineSvg, premolarSvg, molarSvg, wisdomSvg,
+//   tongueSvg, gingivaSvg, palateSVG, buccalMucosaSVG, floorOfMouthSVG,
+//   labialMucosaSVG, salivaryGlandsSVG, frenumSVG, // ← Changed from frenumSvg to frenumSVG
+//   tmjLeftSVG, tmjRightSVG, tmjBothSVG
+// ];
+
+//     const preloadImages = () => {
+//       // Start preloading but don't block rendering
+//       svgPaths.forEach(url => {
+//         const img = new Image();
+//         img.src = url;
+//         // Don't wait for all to load - just start the requests
+//       });
+
+//       // Mark as loaded after short delay
+//       setTimeout(() => {
+//         if (mounted) {
+//           setLoaded(true);
+//         }
+//       }, 100);
+//     };
+
+//     preloadImages();
+
+//     return () => {
+//       mounted = false;
+//     };
+//   }, []);
+
+//   return { loaded };
+// };
 
 // Tooth Diagram with Area Markers Component - Segmented Circle Design
 const ToothDiagram: React.FC<{
@@ -3656,6 +3755,30 @@ export default function DentalChart({
   existingSoftTissues = [],
   existingTMJExaminations = [],
 }: DentalChartProps) {
+  // ✅ Move the image preloader hook to the TOP and call it unconditionally
+  const allSvgUrls = React.useMemo(() => {
+    const urls = [
+      '/assets/svg/dental/incisor.svg',
+      '/assets/svg/dental/canine.svg',
+      '/assets/svg/dental/premolar.svg',
+      '/assets/svg/dental/molar.svg',
+      '/assets/svg/dental/wisdom.svg',
+      '/assets/svg/softTissue/Tongue.svg',
+      '/assets/svg/softTissue/Gingiva.svg',
+      '/assets/svg/softTissue/Palate.svg',
+      '/assets/svg/softTissue/BuccalMucosa.svg',
+      '/assets/svg/softTissue/FloorOfTheMouth.svg',
+      '/assets/svg/softTissue/LabialMucosa.svg',
+      '/assets/svg/softTissue/SalivaryGlands.svg',
+      '/assets/svg/softTissue/Frenum.svg',
+      '/assets/svg/tmj/LeftTMJ.svg',
+      '/assets/svg/tmj/RightTMJ.svg',
+      '/assets/svg/tmj/BothTMJ.svg',
+    ];
+    return [...new Set(urls.filter(url => url))];
+  }, []);
+
+  const { isLoading } = useImagePreloader(allSvgUrls);
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null);
   const [toothConditions, setToothConditions] =
     useState<ToothCondition[]>(existingConditions);
@@ -3733,6 +3856,30 @@ export default function DentalChart({
   const [procedureNotes, setProcedureNotes] = useState("");
   const [procedureCost, setProcedureCost] = useState<number>(0);
   const [useDropdownView, setUseDropdownView] = useState(false);
+  //  const { loaded: imagesLoaded } = useImagePreloader(allSvgUrls);
+// Remove the useSVGPreloader hook entirely
+  // const [isLoading, setIsLoading] = useState(true);
+  // useEffect(() => {
+  //   if (imagesLoaded) {
+  //     setIsLoading(false);
+  //   }
+  // }, [imagesLoaded]);
+  
+  // if (isLoading) {
+  //   return <DentalChartSkeleton />;
+  // }
+
+  // if (isLoading) {
+  //   return (
+  //     <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+  //         <h3 className="text-lg font-semibold mb-2">Loading Dental Chart</h3>
+  //         <p className="text-gray-600">Preparing dental assets...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
   const toothData =
     chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
 
@@ -5376,7 +5523,11 @@ const renderTeethTab = () => (
       )}
     </div>
   );
+    if (isLoading) {
+    return <DentalLoader />;
+  }
   return (
+    
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2">
       <Card className="max-w-7xl w-full max-h-[90vh] flex flex-col">
         <CardHeader className="flex-shrink-0 pb-2">
@@ -5798,927 +5949,3 @@ const renderTeethTab = () => (
     </div>
   );
 }
-
-// Treatment Plan Form Component (Remains the same as before)
-// interface TreatmentPlanFormProps {
-//   patientId: string;
-//   existingConditions: ToothCondition[];
-//   onClose: () => void;
-//   onSave: (plan: TreatmentPlanData) => void;
-//   initialData?: TreatmentPlanData | null;
-// }
-
-// const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
-//   patientId,
-//   existingConditions,
-//   onClose,
-//   onSave,
-//   initialData,
-// }) => {
-//   const [planName, setPlanName] = useState(
-//     initialData?.planName || "Treatment Plan",
-//   );
-//   const [description, setDescription] = useState(
-//     initialData?.description || "",
-//   );
-//   const [stages, setStages] = useState<TreatmentPlanStage[]>(
-//     initialData?.stages || [
-//       {
-//         stageName: "Initial Treatment",
-//         description: "Primary procedures",
-//         procedureRefs: [],
-//         status: "pending",
-//         scheduledDate: new Date().toISOString().split("T")[0],
-//       },
-//       {
-//         stageName: "Follow-up",
-//         description: "Secondary procedures",
-//         procedureRefs: [],
-//         status: "pending",
-//         scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-//           .toISOString()
-//           .split("T")[0],
-//       },
-//     ],
-//   );
-//   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
-//   const [selectedProcedure, setSelectedProcedure] = useState("");
-//   const [selectedSurface, setSelectedSurface] = useState("");
-//   const [estimatedCost, setEstimatedCost] = useState<number>(0);
-//   const [notes, setNotes] = useState("");
-//   const [teethPlans, setTeethPlans] = useState<
-//     {
-//       toothNumber: number;
-//       procedures: any[];
-//       priority: "urgent" | "high" | "medium" | "low";
-//     }[]
-//   >(
-//     initialData?.teeth.map((t) => ({
-//       toothNumber: t.toothNumber,
-//       priority: t.priority || "medium",
-//       procedures: t.procedures.map((p) => ({
-//         name: p.name,
-//         surface: p.surface || "occlusal",
-//         stage: p.stage || 1,
-//         estimatedCost: p.estimatedCost || 0,
-//         notes: p.notes || "",
-//       })),
-//     })) || [],
-//   );
-//   const [selectedPriority, setSelectedPriority] = useState<
-//     "urgent" | "high" | "medium" | "low"
-//   >("medium");
-//   const [selectedStage, setSelectedStage] = useState<number>(1);
-
-//   useEffect(() => {
-//     if (initialData) {
-//       console.log("📋 TreatmentPlanForm received initial data:", initialData);
-//       console.log("- Teeth:", initialData.teeth?.length || 0);
-//       console.log("- Stages:", initialData.stages?.length || 0);
-//       console.log(
-//         "- Procedures count:",
-//         initialData.teeth?.reduce((sum, t) => sum + t.procedures.length, 0) ||
-//           0,
-//       );
-//     }
-//   }, [initialData]);
-
-//   const handleAddProcedure = () => {
-//     if (!selectedTooth || !selectedProcedure || !selectedSurface) {
-//       alert("Please select tooth, procedure, and surface");
-//       return;
-//     }
-
-//     const toothIndex = teethPlans.findIndex(
-//       (tp) => tp.toothNumber === selectedTooth,
-//     );
-//     const newProcedure = {
-//       name: selectedProcedure,
-//       surface: selectedSurface,
-//       stage: selectedStage,
-//       estimatedCost: estimatedCost || 0,
-//       notes,
-//     };
-
-//     if (toothIndex === -1) {
-//       setTeethPlans([
-//         ...teethPlans,
-//         {
-//           toothNumber: selectedTooth,
-//           procedures: [newProcedure],
-//           priority: selectedPriority,
-//         },
-//       ]);
-//     } else {
-//       const updated = [...teethPlans];
-//       updated[toothIndex].procedures.push(newProcedure);
-//       setTeethPlans(updated);
-//     }
-
-//     // Reset form
-//     setSelectedProcedure("");
-//     setSelectedSurface("");
-//     setEstimatedCost(0);
-//     setNotes("");
-//   };
-
-//   const handleSavePlan = () => {
-//     if (teethPlans.length === 0) {
-//       alert(
-//         "Please add at least one tooth procedure before saving the treatment plan",
-//       );
-//       return;
-//     }
-
-//     // Format teeth data properly
-//     const formattedTeeth = teethPlans.map((toothPlan) => ({
-//       toothNumber: toothPlan.toothNumber,
-//       priority: toothPlan.priority || "medium",
-//       procedures: toothPlan.procedures.map((proc) => ({
-//         name: proc.name,
-//         surface: proc.surface || "occlusal",
-//         stage: proc.stage || 1,
-//         estimatedCost: proc.estimatedCost || 0,
-//         notes: proc.notes || "",
-//       })),
-//     }));
-
-//     // Format stages with procedureRefs
-//     const formattedStages = stages.map((stage, index) => {
-//       const stageNumber = index + 1;
-
-//       const proceduresInStage = teethPlans.flatMap((toothPlan) =>
-//         toothPlan.procedures
-//           .filter((proc) => proc.stage === stageNumber)
-//           .map((proc) => ({
-//             toothNumber: toothPlan.toothNumber,
-//             procedureName: proc.name,
-//           })),
-//       );
-
-//       const stageStatus = stage.status || "pending";
-
-//       return {
-//         stageName: stage.stageName || `Stage ${stageNumber}`,
-//         description: stage.description || "",
-//         procedureRefs: proceduresInStage,
-//         status: stageStatus,
-//         scheduledDate:
-//           stage.scheduledDate ||
-//           new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
-//             .toISOString()
-//             .split("T")[0],
-//         notes: stage.notes || "",
-//         ...(stageStatus === "in-progress" && {
-//           startedAt: new Date().toISOString(),
-//         }),
-//         ...(stageStatus === "completed" && {
-//           completedAt: new Date().toISOString(),
-//         }),
-//       };
-//     });
-
-//     console.log("📊 Stage Statuses being sent to backend:");
-//     formattedStages.forEach((stage, idx) => {
-//       console.log(
-//         `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
-//       );
-//     });
-
-//     const plan: TreatmentPlanData = {
-//       planName,
-//       description,
-//       teeth: formattedTeeth,
-//       stages: formattedStages,
-//     };
-
-//     console.log("✅ Saving treatment plan:");
-//     console.log("- Stages count:", formattedStages.length);
-
-//     onSave(plan);
-//   };
-
-//   const handleAddStage = () => {
-//     const newStageNumber = stages.length + 1;
-//     setStages([
-//       ...stages,
-//       {
-//         stageName: `Stage ${newStageNumber}`,
-//         description: "",
-//         procedureRefs: [],
-//         status: "pending",
-//         scheduledDate: new Date(
-//           Date.now() + (newStageNumber - 1) * 7 * 24 * 60 * 60 * 1000,
-//         )
-//           .toISOString()
-//           .split("T")[0],
-//       },
-//     ]);
-//   };
-
-//   const handleRemoveStage = (index: number) => {
-//     if (stages.length <= 1) {
-//       alert("At least one stage is required");
-//       return;
-//     }
-
-//     // Check if any procedures are assigned to this stage
-//     const proceduresInStage = teethPlans.reduce((count, tooth) => {
-//       return (
-//         count + tooth.procedures.filter((p) => p.stage === index + 1).length
-//       );
-//     }, 0);
-
-//     if (proceduresInStage > 0) {
-//       if (
-//         !confirm(
-//           `Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`,
-//         )
-//       ) {
-//         return;
-//       }
-
-//       // Remove procedures assigned to this stage completely
-//       const updatedTeethPlans = teethPlans
-//         .map((tooth) => ({
-//           ...tooth,
-//           procedures: tooth.procedures.filter(
-//             (proc) => proc.stage !== index + 1,
-//           ),
-//         }))
-//         .filter((tooth) => tooth.procedures.length > 0); // Remove teeth with no procedures
-
-//       setTeethPlans(updatedTeethPlans);
-//     }
-
-//     // Remove the stage
-//     const updatedStages = stages.filter((_, i) => i !== index);
-
-//     // Renumber remaining stages to maintain order
-//     const renumberedStages = updatedStages.map((stage, idx) => ({
-//       ...stage,
-//       stageName: stage.stageName.replace(/\d+$/, String(idx + 1)),
-//     }));
-
-//     setStages(renumberedStages);
-
-//     // Adjust selected stage if needed
-//     if (selectedStage > renumberedStages.length) {
-//       setSelectedStage(renumberedStages.length);
-//     } else if (selectedStage === index + 1) {
-//       setSelectedStage(1);
-//     }
-//   };
-
-//   const handleUpdateStageStatus = (
-//     stageIndex: number,
-//     newStatus: "pending" | "completed" | "in-progress",
-//   ) => {
-//     const updatedStages = [...stages];
-//     updatedStages[stageIndex].status = newStatus;
-//     setStages(updatedStages);
-//   };
-
-//   const getProceduresByStage = (stageNumber: number) => {
-//     return teethPlans.flatMap((tooth) =>
-//       tooth.procedures
-//         .filter((proc) => proc.stage === stageNumber)
-//         .map((proc) => ({
-//           toothNumber: tooth.toothNumber,
-//           ...proc,
-//         })),
-//     );
-//   };
-
-//   return (
-//     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-//       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg">
-//         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
-//           <div>
-//             <h3 className="text-lg font-semibold">Create Treatment Plan</h3>
-//             <p className="text-sm text-muted-foreground">
-//               Patient ID: {patientId}
-//             </p>
-//           </div>
-//           <Button variant="ghost" size="sm" onClick={onClose}>
-//             <X className="h-4 w-4" />
-//           </Button>
-//         </div>
-
-//         <div className="flex-1 overflow-y-auto p-6">
-//           <div className="space-y-6">
-//             {/* Plan Basic Info */}
-//             <div>
-//               <label className="block text-sm font-medium mb-2">
-//                 Plan Name
-//               </label>
-//               <input
-//                 type="text"
-//                 className="w-full border rounded-lg p-2"
-//                 value={planName}
-//                 onChange={(e) => setPlanName(e.target.value)}
-//                 placeholder="Enter plan name"
-//               />
-//             </div>
-
-//             <div>
-//               <label className="block text-sm font-medium mb-2">
-//                 Description
-//               </label>
-//               <textarea
-//                 className="w-full border rounded-lg p-2"
-//                 value={description}
-//                 onChange={(e) => setDescription(e.target.value)}
-//                 placeholder="Enter description"
-//                 rows={3}
-//               />
-//             </div>
-
-//             {/* Stages Management - WITHOUT REMOVE BUTTON */}
-//             <div className="border rounded-lg p-4">
-//               <div className="flex justify-between items-center mb-4">
-//                 <h4 className="font-medium">Stages Management</h4>
-//                 <Button variant="outline" size="sm" onClick={handleAddStage}>
-//                   <Plus className="h-4 w-4 mr-2" />
-//                   Add Stage
-//                 </Button>
-//               </div>
-
-//               <div className="space-y-3">
-//                 {stages.map((stage, index) => {
-//                   const stageNumber = index + 1;
-//                   const proceduresInStage = getProceduresByStage(stageNumber);
-
-//                   return (
-//                     <div key={index} className="border rounded p-4 bg-white">
-//                       <div className="flex justify-between items-center mb-3">
-//                         <div className="flex items-center gap-2">
-//                           <Badge
-//                             variant="outline"
-//                             className="bg-blue-50 text-blue-700"
-//                           >
-//                             Stage {stageNumber}
-//                           </Badge>
-//                           <span className="font-medium">{stage.stageName}</span>
-//                           <Badge variant="secondary" className="text-xs">
-//                             {proceduresInStage.length} procedure(s)
-//                           </Badge>
-//                         </div>
-//                       </div>
-
-//                       {/* Stage Status Badge */}
-//                       <div className="mb-3">
-//                         <Badge
-//                           className={`text-xs ${
-//                             stage.status === "completed"
-//                               ? "bg-green-100 text-green-700"
-//                               : stage.status === "in-progress"
-//                                 ? "bg-blue-100 text-blue-700"
-//                                 : "bg-gray-100 text-gray-700"
-//                           }`}
-//                         >
-//                           Status: {stage.status}
-//                         </Badge>
-//                       </div>
-
-//                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-//                         <div>
-//                           <label className="block text-xs text-gray-500 mb-1">
-//                             Stage Name
-//                           </label>
-//                           <input
-//                             type="text"
-//                             className="w-full border rounded p-2 text-sm"
-//                             value={stage.stageName}
-//                             onChange={(e) => {
-//                               const updated = [...stages];
-//                               updated[index].stageName = e.target.value;
-//                               setStages(updated);
-//                             }}
-//                           />
-//                         </div>
-
-//                         <div>
-//                           <label className="block text-xs text-gray-500 mb-1">
-//                             Scheduled Date
-//                           </label>
-//                           <input
-//                             type="date"
-//                             className="w-full border rounded p-2 text-sm"
-//                             value={stage.scheduledDate || ""}
-//                             onChange={(e) => {
-//                               const updated = [...stages];
-//                               updated[index].scheduledDate = e.target.value;
-//                               setStages(updated);
-//                             }}
-//                           />
-//                         </div>
-
-//                         <div className="md:col-span-2">
-//                           <label className="block text-xs text-gray-500 mb-1">
-//                             Description
-//                           </label>
-//                           <textarea
-//                             className="w-full border rounded p-2 text-sm"
-//                             value={stage.description || ""}
-//                             onChange={(e) => {
-//                               const updated = [...stages];
-//                               updated[index].description = e.target.value;
-//                               setStages(updated);
-//                             }}
-//                             rows={2}
-//                             placeholder="Describe what will be done in this stage"
-//                           />
-//                         </div>
-//                       </div>
-//                     </div>
-//                   );
-//                 })}
-//               </div>
-//             </div>
-
-//             {/* Add Procedures */}
-//             <div className="border rounded-lg p-4">
-//               <h4 className="font-medium mb-4">Add Procedures</h4>
-
-//               {/* Stage Selection */}
-//               <div className="mb-4">
-//                 <label className="block text-sm font-medium mb-2">
-//                   Assign to Stage
-//                 </label>
-//                 <div className="flex flex-wrap gap-2">
-//                   {stages.map((stage, index) => {
-//                     const stageNumber = index + 1;
-//                     const proceduresInStage =
-//                       getProceduresByStage(stageNumber).length;
-
-//                     return (
-//                       <button
-//                         key={index}
-//                         type="button"
-//                         onClick={() => setSelectedStage(stageNumber)}
-//                         className={`px-3 py-2 border rounded-lg flex items-center gap-2 ${
-//                           selectedStage === stageNumber
-//                             ? "bg-primary text-primary-foreground border-primary"
-//                             : "bg-white border-gray-300 hover:bg-gray-50"
-//                         }`}
-//                       >
-//                         <span>Stage {stageNumber}</span>
-//                         <Badge variant="secondary" className="text-xs">
-//                           {proceduresInStage}
-//                         </Badge>
-//                         <Badge
-//                           className={`text-[10px] ${
-//                             stage.status === "completed"
-//                               ? "bg-green-100 text-green-700"
-//                               : stage.status === "in-progress"
-//                                 ? "bg-blue-100 text-blue-700"
-//                                 : "bg-gray-100 text-gray-700"
-//                           }`}
-//                         >
-//                           {stage.status}
-//                         </Badge>
-//                       </button>
-//                     );
-//                   })}
-//                 </div>
-//               </div>
-
-//               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-//                 <div>
-//                   <label className="block text-sm font-medium mb-1">
-//                     Tooth Number
-//                   </label>
-//                   <select
-//                     className="w-full border rounded-lg p-2"
-//                     value={selectedTooth || ""}
-//                     onChange={(e) =>
-//                       setSelectedTooth(
-//                         e.target.value ? Number(e.target.value) : null,
-//                       )
-//                     }
-//                   >
-//                     <option value="">Select tooth...</option>
-//                     {[...ADULT_TOOTH_DATA, ...PEDIATRIC_TOOTH_DATA]
-//                       .filter(
-//                         (tooth, index, self) =>
-//                           index ===
-//                           self.findIndex((t) => t.number === tooth.number),
-//                       )
-//                       .sort((a, b) => a.number - b.number)
-//                       .map((tooth) => (
-//                         <option key={tooth.number} value={tooth.number}>
-//                           Tooth #{tooth.number} ({tooth.name})
-//                         </option>
-//                       ))}
-//                   </select>
-//                 </div>
-
-//                 <div>
-//                   <label className="block text-sm font-medium mb-1">
-//                     Procedure
-//                   </label>
-//                   <select
-//                     className="w-full border rounded-lg p-2"
-//                     value={selectedProcedure}
-//                     onChange={(e) => setSelectedProcedure(e.target.value)}
-//                   >
-//                     <option value="">Select procedure...</option>
-//                     {DENTAL_PROCEDURES.map((proc) => (
-//                       <option key={proc} value={proc}>
-//                         {proc}
-//                       </option>
-//                     ))}
-//                   </select>
-//                 </div>
-
-//                 <div>
-//                   <label className="block text-sm font-medium mb-1">
-//                     Surface
-//                   </label>
-//                   <select
-//                     className="w-full border rounded-lg p-2"
-//                     value={selectedSurface}
-//                     onChange={(e) => setSelectedSurface(e.target.value)}
-//                   >
-//                     <option value="">Select surface...</option>
-//                     <option value="mesial">Mesial</option>
-//                     <option value="distal">Distal</option>
-//                     <option value="buccal">Buccal</option>
-//                     <option value="lingual">Lingual</option>
-//                     <option value="occlusal">Occlusal</option>
-//                     <option value="entire">Entire Tooth</option>
-//                   </select>
-//                 </div>
-
-//                 <div>
-//                   <label className="block text-sm font-medium mb-1">
-//                     Estimated Cost (₹)
-//                   </label>
-//                   <input
-//                     type="number"
-//                     className="w-full border rounded-lg p-2"
-//                     value={estimatedCost}
-//                     onChange={(e) => setEstimatedCost(Number(e.target.value))}
-//                     min="0"
-//                     step="100"
-//                   />
-//                 </div>
-//               </div>
-
-//               <div className="mb-4">
-//                 <label className="block text-sm font-medium mb-1">
-//                   Priority
-//                 </label>
-//                 <div className="flex gap-2">
-//                   {(["urgent", "high", "medium", "low"] as const).map(
-//                     (priority) => (
-//                       <button
-//                         key={priority}
-//                         type="button"
-//                         onClick={() => setSelectedPriority(priority)}
-//                         className={`px-3 py-1 border rounded capitalize ${
-//                           selectedPriority === priority
-//                             ? "bg-primary text-primary-foreground border-primary"
-//                             : "bg-white border-gray-300 hover:bg-gray-50"
-//                         }`}
-//                       >
-//                         {priority}
-//                       </button>
-//                     ),
-//                   )}
-//                 </div>
-//               </div>
-
-//               <div className="mb-4">
-//                 <label className="block text-sm font-medium mb-1">Notes</label>
-//                 <textarea
-//                   className="w-full border rounded-lg p-2"
-//                   value={notes}
-//                   onChange={(e) => setNotes(e.target.value)}
-//                   placeholder="Add notes about this procedure"
-//                   rows={2}
-//                 />
-//               </div>
-
-//               <Button
-//                 onClick={handleAddProcedure}
-//                 disabled={
-//                   !selectedTooth || !selectedProcedure || !selectedSurface
-//                 }
-//                 className="w-full"
-//               >
-//                 <Plus className="h-4 w-4 mr-2" />
-//                 Add Procedure to Stage {selectedStage}
-//               </Button>
-//             </div>
-
-//             {/* Added Procedures */}
-//             {teethPlans.length > 0 && (
-//               <div className="border rounded-lg p-4">
-//                 <div className="flex justify-between items-center mb-4">
-//                   <h4 className="font-medium">Added Procedures</h4>
-//                   <div className="text-sm text-gray-500">
-//                     Total:{" "}
-//                     {teethPlans.reduce(
-//                       (sum, tp) => sum + tp.procedures.length,
-//                       0,
-//                     )}{" "}
-//                     procedures
-//                   </div>
-//                 </div>
-
-//                 {/* Summary by Stage WITH STATUS TOGGLE BUTTONS AND REMOVE BUTTON */}
-//                 <div className="mb-6">
-//                   <h5 className="text-sm font-medium mb-3 text-gray-700">
-//                     Stage Status Management
-//                   </h5>
-//                   <div className="space-y-3">
-//                     {stages.map((stage, index) => {
-//                       const stageNumber = index + 1;
-//                       const proceduresInStage =
-//                         getProceduresByStage(stageNumber);
-
-//                       return (
-//                         <div
-//                           key={index}
-//                           className="border rounded-lg p-4 bg-white"
-//                         >
-//                           <div className="flex justify-between items-center mb-2">
-//                             <div className="flex items-center gap-2">
-//                               <Badge
-//                                 variant="outline"
-//                                 className="bg-blue-50 text-blue-700"
-//                               >
-//                                 Stage {stageNumber}
-//                               </Badge>
-//                               <span className="font-medium">
-//                                 {stage.stageName}
-//                               </span>
-//                               <Badge variant="outline" className="text-xs">
-//                                 {proceduresInStage.length} procedure(s)
-//                               </Badge>
-//                             </div>
-
-//                             <div className="flex items-center gap-2">
-//                               {/* Current Status Badge */}
-//                               <Badge
-//                                 className={`text-xs ${
-//                                   stage.status === "completed"
-//                                     ? "bg-green-100 text-green-700"
-//                                     : stage.status === "in-progress"
-//                                       ? "bg-blue-100 text-blue-700"
-//                                       : "bg-gray-100 text-gray-700"
-//                                 }`}
-//                               >
-//                                 {stage.status}
-//                               </Badge>
-
-//                               {/* Remove Stage Button - Only show if more than 1 stage */}
-//                               {stages.length > 1 && (
-//                                 <Button
-//                                   variant="ghost"
-//                                   size="sm"
-//                                   onClick={() => handleRemoveStage(index)}
-//                                   className="text-red-500 hover:text-red-700"
-//                                   title="Remove this stage"
-//                                 >
-//                                   <X className="h-4 w-4" />
-//                                 </Button>
-//                               )}
-//                             </div>
-//                           </div>
-
-//                           {/* Stage Status Toggle Buttons */}
-//                           <div className="mt-3 flex items-center gap-2">
-//                             <span className="text-xs text-gray-500">
-//                               Update Status:
-//                             </span>
-//                             <div className="flex gap-1">
-//                               <button
-//                                 type="button"
-//                                 onClick={() =>
-//                                   handleUpdateStageStatus(index, "pending")
-//                                 }
-//                                 className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-//                                   stage.status === "pending"
-//                                     ? "bg-gray-100 text-gray-700 border-gray-300"
-//                                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-//                                 }`}
-//                                 title="Mark as Pending"
-//                               >
-//                                 Pending
-//                               </button>
-//                               <button
-//                                 type="button"
-//                                 onClick={() =>
-//                                   handleUpdateStageStatus(index, "in-progress")
-//                                 }
-//                                 className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-//                                   stage.status === "in-progress"
-//                                     ? "bg-blue-100 text-blue-700 border-blue-300"
-//                                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-//                                 }`}
-//                                 title="Mark as In Progress"
-//                               >
-//                                 In Progress
-//                               </button>
-//                               <button
-//                                 type="button"
-//                                 onClick={() =>
-//                                   handleUpdateStageStatus(index, "completed")
-//                                 }
-//                                 className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-//                                   stage.status === "completed"
-//                                     ? "bg-green-100 text-green-700 border-green-300"
-//                                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-//                                 }`}
-//                                 title="Mark as Completed"
-//                               >
-//                                 Completed
-//                               </button>
-//                             </div>
-//                           </div>
-
-//                           {/* Optional: Show procedures in this stage */}
-//                           {proceduresInStage.length > 0 && (
-//                             <div className="mt-3 pt-3 border-t">
-//                               <p className="text-xs text-gray-500 mb-1">
-//                                 Procedures in this stage:
-//                               </p>
-//                               <div className="flex flex-wrap gap-1">
-//                                 {proceduresInStage
-//                                   .slice(0, 3)
-//                                   .map((proc, procIdx) => (
-//                                     <Badge
-//                                       key={procIdx}
-//                                       variant="outline"
-//                                       className="text-[10px]"
-//                                     >
-//                                       T{proc.toothNumber}: {proc.name}
-//                                     </Badge>
-//                                   ))}
-//                                 {proceduresInStage.length > 3 && (
-//                                   <Badge
-//                                     variant="outline"
-//                                     className="text-[10px]"
-//                                   >
-//                                     +{proceduresInStage.length - 3} more
-//                                   </Badge>
-//                                 )}
-//                               </div>
-//                             </div>
-//                           )}
-//                         </div>
-//                       );
-//                     })}
-//                   </div>
-//                 </div>
-
-//                 <div className="space-y-3">
-//                   {teethPlans.map((toothPlan, idx) => (
-//                     <div key={idx} className="border rounded-lg p-4">
-//                       <div className="flex justify-between items-center mb-3">
-//                         <div className="flex items-center gap-2">
-//                           <Badge variant="outline" className="bg-gray-100">
-//                             Tooth #{toothPlan.toothNumber}
-//                           </Badge>
-//                           {toothPlan.priority &&
-//                             toothPlan.priority !== "medium" && (
-//                               <Badge
-//                                 className={`text-xs ${
-//                                   toothPlan.priority === "urgent"
-//                                     ? "bg-red-100 text-red-700"
-//                                     : toothPlan.priority === "high"
-//                                       ? "bg-orange-100 text-orange-700"
-//                                       : "bg-green-100 text-green-700"
-//                                 }`}
-//                               >
-//                                 {toothPlan.priority}
-//                               </Badge>
-//                             )}
-//                         </div>
-//                         <span className="text-sm text-gray-500">
-//                           {toothPlan.procedures.length} procedure(s)
-//                         </span>
-//                       </div>
-
-//                       {/* Group procedures by stage */}
-//                       {(() => {
-//                         const proceduresByStage: Record<number, any[]> = {};
-//                         toothPlan.procedures.forEach((proc) => {
-//                           const stage = proc.stage || 1;
-//                           if (!proceduresByStage[stage]) {
-//                             proceduresByStage[stage] = [];
-//                           }
-//                           proceduresByStage[stage].push(proc);
-//                         });
-
-//                         return Object.entries(proceduresByStage).map(
-//                           ([stageNum, procs]) => (
-//                             <div key={stageNum} className="mb-3 last:mb-0">
-//                               <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-//                                 <span>Stage {stageNum}</span>
-//                                 <Badge
-//                                   variant="outline"
-//                                   className="text-[10px]"
-//                                 >
-//                                   {procs.length} procedure(s)
-//                                 </Badge>
-//                                 {/* Show stage status */}
-//                                 <Badge
-//                                   className={`text-[10px] ${
-//                                     stages[parseInt(stageNum) - 1]?.status ===
-//                                     "completed"
-//                                       ? "bg-green-100 text-green-700"
-//                                       : stages[parseInt(stageNum) - 1]
-//                                             ?.status === "in-progress"
-//                                         ? "bg-blue-100 text-blue-700"
-//                                         : "bg-gray-100 text-gray-700"
-//                                   }`}
-//                                 >
-//                                   {stages[parseInt(stageNum) - 1]?.status ||
-//                                     "pending"}
-//                                 </Badge>
-//                               </div>
-//                               <div className="space-y-2">
-//                                 {procs.map((proc, procIdx) => (
-//                                   <div
-//                                     key={procIdx}
-//                                     className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border"
-//                                   >
-//                                     <div className="flex-1">
-//                                       <div className="flex items-center gap-2">
-//                                         <span className="font-medium">
-//                                           {proc.name}
-//                                         </span>
-//                                         <Badge
-//                                           variant="outline"
-//                                           className="text-xs"
-//                                         >
-//                                           {proc.surface}
-//                                         </Badge>
-//                                       </div>
-//                                       {proc.notes && (
-//                                         <div className="text-sm text-gray-600 mt-1">
-//                                           {proc.notes}
-//                                         </div>
-//                                       )}
-//                                     </div>
-//                                     <div className="flex items-center gap-3">
-//                                       <span className="text-sm font-medium">
-//                                         ₹{proc.estimatedCost}
-//                                       </span>
-//                                     </div>
-//                                   </div>
-//                                 ))}
-//                               </div>
-//                             </div>
-//                           ),
-//                         );
-//                       })()}
-//                     </div>
-//                   ))}
-//                 </div>
-//               </div>
-//             )}
-//           </div>
-//         </div>
-
-//         <div className="border-t px-6 py-4 flex justify-between items-center">
-//           <div className="text-sm text-gray-500">
-//             {teethPlans.length > 0 ? (
-//               <>
-//                 {teethPlans.length} teeth,{" "}
-//                 {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)}{" "}
-//                 procedures
-//                 <div className="mt-1">
-//                   Stages:{" "}
-//                   {stages.filter((s) => s.status === "completed").length}{" "}
-//                   completed,
-//                   {stages.filter((s) => s.status === "in-progress").length}{" "}
-//                   in-progress,
-//                   {stages.filter((s) => s.status === "pending").length} pending
-//                 </div>
-//               </>
-//             ) : (
-//               "No procedures added yet"
-//             )}
-//           </div>
-//           <div className="flex gap-2">
-//             <Button variant="outline" onClick={onClose}>
-//               Cancel
-//             </Button>
-//             <Button
-//               onClick={handleSavePlan}
-//               disabled={teethPlans.length === 0}
-//               className="bg-primary text-primary-foreground hover:bg-primary/90"
-//             >
-//               Save Treatment Plan
-//             </Button>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };

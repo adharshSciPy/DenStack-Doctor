@@ -62,13 +62,18 @@
             "@types/three": "^0.182.0",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "autoprefixer": "^10.4.21",
+            "baseline-browser-mapping": "^2.9.17",
             "postcss": "^8.5.6",
+            "rimraf": "^6.1.2",
             "tailwindcss": "^4.1.16",
             "vite": "6.3.5",
+            "vite-plugin-static-copy": "^3.1.6",
             "vite-plugin-svgr": "^4.5.0"
       },
       "scripts": {
-            "dev": "vite",
-            "build": "vite build"
+            "dev:fast": "vite --force",
+            "build:fast": "vite build --emptyOutDir",
+            "clean": "rimraf node_modules/.vite dist",
+            "dev": "npm run clean && vite"
       }
 }
