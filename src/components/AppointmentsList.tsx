@@ -18,9 +18,12 @@ import {
   Upload,
   FileText,
   File,
-  Image,
-  PlayCircle,CheckCircle,Trash2
+  PlayCircle,
+  CheckCircle,
+  Trash2,
 } from "lucide-react";
+
+import DentalLabOrderModal from "./DentalLabOrderModal";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -111,7 +114,7 @@ interface DentalChartData {
   plannedProcedures: any[];
   softTissues?: any[];
   tmjExaminations?: any[];
-  treatmentPlan?: any; 
+  treatmentPlan?: any;
 }
 // Add these interfaces near your other interface definitions
 interface TreatmentPlanProcedureChange {
@@ -654,48 +657,55 @@ const DENTAL_PROCEDURES = [
 const TreatmentPlanDetailsModal = ({
   plan,
   onClose,
-   viewOnly = false,
-  refetchTreatmentPlans, 
-  onEditPlan
-}: TreatmentPlanDetailsModalProps & { refetchTreatmentPlans?: () => void; viewOnly?: boolean; }) => {
+  viewOnly = false,
+  refetchTreatmentPlans,
+  onEditPlan,
+}: TreatmentPlanDetailsModalProps & {
+  refetchTreatmentPlans?: () => void;
+  viewOnly?: boolean;
+}) => {
   const [localPlan, setLocalPlan] = useState<TreatmentPlan | null>(plan);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'teeth' | 'stages'>('teeth');
-  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+  const [activeTab, setActiveTab] = useState<"teeth" | "stages">("teeth");
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({
     show: false,
-    message: '',
-    type: 'success'
+    message: "",
+    type: "success",
   });
-useEffect(() => {
-  console.log("TreatmentPlanDetailsModal viewOnly:", viewOnly);
-}, [viewOnly]);
+  useEffect(() => {
+    console.log("TreatmentPlanDetailsModal viewOnly:", viewOnly);
+  }, [viewOnly]);
   // Get auth token
   const getAuthToken = () => {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem("authToken");
   };
 
   // Show toast notification
 
-const showToast = (message: string, type: 'success' | 'error') => {
-  setToast({ show: true, message, type });
-  setTimeout(() => {
-    setToast(prev => ({ ...prev, show: false }));
-  }, 3000);
-};
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 3000);
+  };
   // API BASE URL
   const API_BASE = "/api/v1/patient-service/consultation";
 
   // Fetch updated plan data
   const fetchPlanDetails = async () => {
     if (!plan?._id) return;
-    
+
     try {
       const token = getAuthToken();
       const response = await axios.get(
         `${patientServiceBaseUrl}${API_BASE}/treatment-plan/${plan._id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      
+
       if (response.data.success) {
         setLocalPlan(response.data.data);
       }
@@ -706,26 +716,29 @@ const showToast = (message: string, type: 'success' | 'error') => {
 
   // 1️⃣ Start Treatment Plan (Draft → Ongoing)
   const handleStartPlan = async () => {
-    if(viewOnly)return;
+    if (viewOnly) return;
     if (!localPlan?._id) return;
-    
+
     setLoading(true);
     try {
       const token = getAuthToken();
       const response = await axios.post(
         `${patientServiceBaseUrl}${API_BASE}/start-treatment/${localPlan._id}`,
         {}, // Empty body since clinicId is already in plan
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      
+
       if (response.data.success) {
         setLocalPlan(response.data.data);
-        showToast("Treatment plan started successfully!", 'success');
+        showToast("Treatment plan started successfully!", "success");
         refetchTreatmentPlans?.();
       }
     } catch (error: any) {
       console.error("Error starting plan:", error);
-      showToast(error.response?.data?.message || "Failed to start plan", 'error');
+      showToast(
+        error.response?.data?.message || "Failed to start plan",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
@@ -733,28 +746,32 @@ const showToast = (message: string, type: 'success' | 'error') => {
 
   // 2️⃣ Complete Treatment Plan
   const handleFinishPlan = async () => {
-    if(viewOnly)return;
+    if (viewOnly) return;
     if (!localPlan?._id) return;
-    
-    if (!confirm("Are you sure you want to complete this treatment plan?")) return;
-    
+
+    if (!confirm("Are you sure you want to complete this treatment plan?"))
+      return;
+
     setLoading(true);
     try {
       const token = getAuthToken();
       const response = await axios.patch(
         `${patientServiceBaseUrl}${API_BASE}/finish-treatment/${localPlan._id}`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      
+
       if (response.data.success) {
         setLocalPlan(response.data.data);
-        showToast("Treatment plan completed successfully!", 'success');
+        showToast("Treatment plan completed successfully!", "success");
         refetchTreatmentPlans?.();
       }
     } catch (error: any) {
       console.error("Error completing plan:", error);
-      showToast(error.response?.data?.message || "Failed to complete plan", 'error');
+      showToast(
+        error.response?.data?.message || "Failed to complete plan",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
@@ -762,59 +779,70 @@ const showToast = (message: string, type: 'success' | 'error') => {
 
   // 3️⃣ Complete Stage(passing array index as stageNumber from the button)
 
-const handleCompleteStage = async (stageNumber: number) => {
-    if(viewOnly)return
-  if (!localPlan?._id) return;
-  
-  setLoading(true);
-  try {
-    const token = getAuthToken();
-    
-    // Find the array index for this stageNumber
-    const stageIndex = localPlan.stages?.findIndex(s => s.stageNumber === stageNumber);
-    
-    if (stageIndex === -1 || stageIndex === undefined) {
-      showToast("Stage not found", 'error');
+  const handleCompleteStage = async (stageNumber: number) => {
+    if (viewOnly) return;
+    if (!localPlan?._id) return;
+
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+
+      // Find the array index for this stageNumber
+      const stageIndex = localPlan.stages?.findIndex(
+        (s) => s.stageNumber === stageNumber,
+      );
+
+      if (stageIndex === -1 || stageIndex === undefined) {
+        showToast("Stage not found", "error");
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.patch(
+        `${patientServiceBaseUrl}${API_BASE}/complete-stage/${localPlan._id}/${stageIndex}`, // Use array index
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (response.data.success) {
+        // Update the local plan with the response data
+        setLocalPlan(response.data.treatmentPlan);
+
+        // Get the completed stage number from the response
+        const completedStageNumber =
+          response.data.stage?.stageNumber || stageNumber;
+        showToast(
+          `Stage ${completedStageNumber} completed successfully!`,
+          "success",
+        );
+        refetchTreatmentPlans?.();
+
+        // Force a refresh of the plan details
+        await fetchPlanDetails();
+      }
+    } catch (error: any) {
+      console.error("Error completing stage:", error);
+      showToast(
+        error.response?.data?.message || "Failed to complete stage",
+        "error",
+      );
+    } finally {
       setLoading(false);
-      return;
     }
-    
-    const response = await axios.patch(
-      `${patientServiceBaseUrl}${API_BASE}/complete-stage/${localPlan._id}/${stageIndex}`, // Use array index
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    if (response.data.success) {
-      // Update the local plan with the response data
-      setLocalPlan(response.data.treatmentPlan);
-      
-      // Get the completed stage number from the response
-      const completedStageNumber = response.data.stage?.stageNumber || stageNumber;
-      showToast(`Stage ${completedStageNumber} completed successfully!`, 'success');
-      refetchTreatmentPlans?.();
-      
-      // Force a refresh of the plan details
-      await fetchPlanDetails();
-    }
-  } catch (error: any) {
-    console.error("Error completing stage:", error);
-    showToast(error.response?.data?.message || "Failed to complete stage", 'error');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   // 4️⃣ Add New Stage
   const handleAddStage = async () => {
-    if(viewOnly)return
+    if (viewOnly) return;
     if (!localPlan?._id) return;
-    
+
     const stageName = prompt("Enter stage name:");
     if (!stageName) return;
-    
+
     const description = prompt("Enter stage description (optional):") || "";
-    const scheduledDate = prompt("Enter scheduled date (YYYY-MM-DD, optional):") || new Date().toISOString().split('T')[0];
-    
+    const scheduledDate =
+      prompt("Enter scheduled date (YYYY-MM-DD, optional):") ||
+      new Date().toISOString().split("T")[0];
+
     setLoading(true);
     try {
       const token = getAuthToken();
@@ -824,201 +852,238 @@ const handleCompleteStage = async (stageNumber: number) => {
           stageName,
           description,
           scheduledDate,
-          toothSurfaceProcedures: [] // Can be populated from UI
+          toothSurfaceProcedures: [], // Can be populated from UI
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      
+
       if (response.data.success) {
         setLocalPlan(response.data.data);
-        showToast("Stage added successfully!", 'success');
+        showToast("Stage added successfully!", "success");
         refetchTreatmentPlans?.();
       }
     } catch (error: any) {
       console.error("Error adding stage:", error);
-      showToast(error.response?.data?.message || "Failed to add stage", 'error');
+      showToast(
+        error.response?.data?.message || "Failed to add stage",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   // 5️⃣ Remove Stage
-const handleRemoveStage = async (stageNumber: number) => {
-  if(viewOnly)return
-
-  if (!localPlan?._id) return;
-  
-  if (!confirm(`Are you sure you want to remove Stage ${stageNumber}?`)) return;
-  
-  setLoading(true);
-  try {
-    const token = getAuthToken();
-    const response = await axios.delete(
-      `${patientServiceBaseUrl}${API_BASE}/remove-stage/${localPlan._id}/${stageNumber}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    if (response.data.success) {
-      setLocalPlan(response.data.treatmentPlan);
-      showToast(`Stage ${stageNumber} removed successfully!`, 'success');
-      refetchTreatmentPlans?.();
-      
-      // Force a refresh of the plan details to get updated status
-      await fetchPlanDetails();
-    }
-  } catch (error: any) {
-    console.error("Error removing stage:", error);
-    showToast(error.response?.data?.message || "Failed to remove stage", 'error');
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // 6️⃣ Remove Procedure
-const handleRemoveProcedure = async (toothNumber: number, procedureName: string, surface: string) => {
-  if (!localPlan?._id) return;
-    if(viewOnly) return; 
-  
-  if (!confirm(`Remove procedure "${procedureName}" from tooth ${toothNumber}?`)) return;
-  
-  setLoading(true);
-  try {
-    const token = getAuthToken();
-    const response = await axios.delete(
-      `${patientServiceBaseUrl}${API_BASE}/remove-procedure/${localPlan._id}/${toothNumber}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        data: { 
-          procedureName, 
-          surface 
-        }
-      }
-    );
-    
-    if (response.data.success) {
-      // Update local plan with response data
-      setLocalPlan(response.data.treatmentPlan);
-      showToast("Procedure removed successfully!", 'success');
-      refetchTreatmentPlans?.();
-      await fetchPlanDetails(); // Refresh data
-    }
-  } catch (error: any) {
-    console.error("Error removing procedure:", error);
-    showToast(error.response?.data?.message || "Failed to remove procedure", 'error');
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // 7️⃣ Remove/Cancel Treatment Plan
-  const handleRemovePlan = async () => {
-    if(viewOnly)return
+  const handleRemoveStage = async (stageNumber: number) => {
+    if (viewOnly) return;
 
     if (!localPlan?._id) return;
-    
-    const action = localPlan.status === 'draft' ? 'remove' : 'cancel';
-    const message = action === 'remove' 
-      ? "Are you sure you want to remove this treatment plan?" 
-      : "Are you sure you want to cancel this treatment plan?";
-    
-    if (!confirm(message)) return;
-    
+
+    if (!confirm(`Are you sure you want to remove Stage ${stageNumber}?`))
+      return;
+
     setLoading(true);
     try {
       const token = getAuthToken();
-      
+      const response = await axios.delete(
+        `${patientServiceBaseUrl}${API_BASE}/remove-stage/${localPlan._id}/${stageNumber}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (response.data.success) {
+        setLocalPlan(response.data.treatmentPlan);
+        showToast(`Stage ${stageNumber} removed successfully!`, "success");
+        refetchTreatmentPlans?.();
+
+        // Force a refresh of the plan details to get updated status
+        await fetchPlanDetails();
+      }
+    } catch (error: any) {
+      console.error("Error removing stage:", error);
+      showToast(
+        error.response?.data?.message || "Failed to remove stage",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6️⃣ Remove Procedure
+  const handleRemoveProcedure = async (
+    toothNumber: number,
+    procedureName: string,
+    surface: string,
+  ) => {
+    if (!localPlan?._id) return;
+    if (viewOnly) return;
+
+    if (
+      !confirm(`Remove procedure "${procedureName}" from tooth ${toothNumber}?`)
+    )
+      return;
+
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const response = await axios.delete(
+        `${patientServiceBaseUrl}${API_BASE}/remove-procedure/${localPlan._id}/${toothNumber}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          data: {
+            procedureName,
+            surface,
+          },
+        },
+      );
+
+      if (response.data.success) {
+        // Update local plan with response data
+        setLocalPlan(response.data.treatmentPlan);
+        showToast("Procedure removed successfully!", "success");
+        refetchTreatmentPlans?.();
+        await fetchPlanDetails(); // Refresh data
+      }
+    } catch (error: any) {
+      console.error("Error removing procedure:", error);
+      showToast(
+        error.response?.data?.message || "Failed to remove procedure",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 7️⃣ Remove/Cancel Treatment Plan
+  const handleRemovePlan = async () => {
+    if (viewOnly) return;
+
+    if (!localPlan?._id) return;
+
+    const action = localPlan.status === "draft" ? "remove" : "cancel";
+    const message =
+      action === "remove"
+        ? "Are you sure you want to remove this treatment plan?"
+        : "Are you sure you want to cancel this treatment plan?";
+
+    if (!confirm(message)) return;
+
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+
       let response;
-      if (action === 'remove') {
+      if (action === "remove") {
         response = await axios.delete(
           `${patientServiceBaseUrl}${API_BASE}/remove-plan/${localPlan._id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
-        const cancellationReason = prompt("Please provide a cancellation reason:") || "No reason provided";
+        const cancellationReason =
+          prompt("Please provide a cancellation reason:") ||
+          "No reason provided";
         response = await axios.patch(
           `${patientServiceBaseUrl}${API_BASE}/cancel-plan/${localPlan._id}`,
           { cancellationReason },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       }
-      
+
       if (response.data.success) {
-        showToast(`Treatment plan ${action === 'remove' ? 'removed' : 'cancelled'} successfully!`, 'success');
+        showToast(
+          `Treatment plan ${action === "remove" ? "removed" : "cancelled"} successfully!`,
+          "success",
+        );
         refetchTreatmentPlans?.();
         onClose();
       }
     } catch (error: any) {
       console.error(`Error ${action}ing plan:`, error);
-      showToast(error.response?.data?.message || `Failed to ${action} plan`, 'error');
+      showToast(
+        error.response?.data?.message || `Failed to ${action} plan`,
+        "error",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   // 8️⃣ Update Procedure Status
-const handleUpdateProcedureStatus = async (
-  toothIndex: number,
-  procedureIndex: number,
-  completed: boolean
-) => {
-    if(viewOnly)return
+  const handleUpdateProcedureStatus = async (
+    toothIndex: number,
+    procedureIndex: number,
+    completed: boolean,
+  ) => {
+    if (viewOnly) return;
 
-  if (!localPlan?._id) return;
-  
-  setLoading(true);
-  try {
-    // Get the procedure to find its stage
-    const procedure = localPlan.teeth[toothIndex]?.procedures[procedureIndex];
-    if (!procedure) {
-      showToast("Procedure not found", 'error');
-      return;
+    if (!localPlan?._id) return;
+
+    setLoading(true);
+    try {
+      // Get the procedure to find its stage
+      const procedure = localPlan.teeth[toothIndex]?.procedures[procedureIndex];
+      if (!procedure) {
+        showToast("Procedure not found", "error");
+        return;
+      }
+
+      // Find the stage index by stage number
+      const stageIndex = localPlan.stages?.findIndex(
+        (stage) => stage.stageNumber == procedure.stage,
+      );
+
+      if (stageIndex === -1) {
+        showToast("Stage not found for this procedure", "error");
+        return;
+      }
+
+      const token = getAuthToken();
+      const response = await axios.patch(
+        `${patientServiceBaseUrl}${API_BASE}/update-procedure-status/${localPlan._id}/${stageIndex}/${procedureIndex}`,
+        { completed },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (response.data.success) {
+        setLocalPlan(response.data.treatmentPlan);
+        showToast("Procedure status updated!", "success");
+        refetchTreatmentPlans?.();
+        await fetchPlanDetails(); // Refresh data
+      }
+    } catch (error: any) {
+      console.error("Error updating procedure:", error);
+      showToast(
+        error.response?.data?.message || "Failed to update procedure",
+        "error",
+      );
+    } finally {
+      setLoading(false);
     }
-    
-    // Find the stage index by stage number
-    const stageIndex = localPlan.stages?.findIndex(
-      stage => stage.stageNumber == procedure.stage
-    );
-    
-    if (stageIndex === -1) {
-      showToast("Stage not found for this procedure", 'error');
-      return;
-    }
-    
-    const token = getAuthToken();
-    const response = await axios.patch(
-      `${patientServiceBaseUrl}${API_BASE}/update-procedure-status/${localPlan._id}/${stageIndex}/${procedureIndex}`,
-      { completed },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    if (response.data.success) {
-      setLocalPlan(response.data.treatmentPlan);
-      showToast("Procedure status updated!", 'success');
-      refetchTreatmentPlans?.();
-      await fetchPlanDetails(); // Refresh data
-    }
-  } catch (error: any) {
-    console.error("Error updating procedure:", error);
-    showToast(error.response?.data?.message || "Failed to update procedure", 'error');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   useEffect(() => {
     if (plan) {
       console.log("🚀 Treatment Plan Details Modal Opened");
       console.log("📋 Full Plan Data Received:", plan);
-      
+
       console.log("🔍 Plan Structure Check:");
-      console.log("   Has stages array?", !!plan.stages && plan.stages.length > 0);
+      console.log(
+        "   Has stages array?",
+        !!plan.stages && plan.stages.length > 0,
+      );
       console.log("   Stages count:", plan.stages?.length || 0);
-      
+
       if (plan.stages) {
         console.log("📈 Stages Analysis:");
         plan.stages.forEach((stage, i) => {
-          console.log(`   Stage ${i + 1}: ${stage.stageName || 'Unnamed Stage'}`);
+          console.log(
+            `   Stage ${i + 1}: ${stage.stageName || "Unnamed Stage"}`,
+          );
           console.log(`     Status: ${stage.status}`);
-          console.log(`     Tooth-Surface Procedures:`, stage.toothSurfaceProcedures);
+          console.log(
+            `     Tooth-Surface Procedures:`,
+            stage.toothSurfaceProcedures,
+          );
         });
       }
     }
@@ -1029,42 +1094,42 @@ const handleUpdateProcedureStatus = async (
   // Helper functions (keep existing ones)
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   };
 
   const getProceduresForToothInStage = (toothNumber: number, stage: any) => {
     if (!stage.toothSurfaceProcedures) return [];
-    
+
     const toothData = stage.toothSurfaceProcedures.find(
-      (tsp: any) => tsp.toothNumber === toothNumber
+      (tsp: any) => tsp.toothNumber === toothNumber,
     );
-    
+
     if (!toothData || !toothData.surfaceProcedures) return [];
-    
+
     const procedures = [];
     for (const sp of toothData.surfaceProcedures) {
       for (const procName of sp.procedureNames) {
         procedures.push({
           name: procName,
           surface: sp.surface,
-          status: stage.status || 'pending'
+          status: stage.status || "pending",
         });
       }
     }
-    
+
     return procedures;
   };
 
   const getAllTeethFromStages = () => {
     const teethSet = new Set<number>();
     if (localPlan.stages) {
-      localPlan.stages.forEach(stage => {
+      localPlan.stages.forEach((stage) => {
         if (stage.toothSurfaceProcedures) {
-          stage.toothSurfaceProcedures.forEach(tsp => {
+          stage.toothSurfaceProcedures.forEach((tsp) => {
             teethSet.add(tsp.toothNumber);
           });
         }
@@ -1072,45 +1137,62 @@ const handleUpdateProcedureStatus = async (
     }
     return Array.from(teethSet).sort((a, b) => a - b);
   };
-const calculateStats = () => {
-  const teeth = localPlan.teeth || localPlan.treatments || [];
-  const stages = localPlan.stages || [];
-  
-  const totalTeeth = teeth.length;
-  const totalProcedures = teeth.reduce((sum, tooth) => 
-    sum + (tooth.procedures?.length || 0), 0
-  );
-  const completedProcedures = teeth.reduce((sum, tooth) => 
-    sum + (tooth.procedures?.filter(p => p.status === "completed").length || 0), 0
-  );
-  const totalCost = teeth.reduce((sum, tooth) => 
-    sum + (tooth.procedures?.reduce((procSum, proc) => 
-      procSum + (proc.estimatedCost || 0), 0) || 0), 0
-  );
-  const completedStages = stages.filter(s => s.status === "completed").length;
-  
-  const progressPercentage = stages.length > 0 
-    ? Math.round((completedStages / stages.length) * 100) 
-    : 0;
+  const calculateStats = () => {
+    const teeth = localPlan.teeth || localPlan.treatments || [];
+    const stages = localPlan.stages || [];
 
-  return {
-    totalTeeth,
-    totalProcedures,
-    completedProcedures,
-    totalCost,
-    stagesCount: stages.length,
-    completedStages,
-    progressPercentage // ← Now based on stage completion
+    const totalTeeth = teeth.length;
+    const totalProcedures = teeth.reduce(
+      (sum, tooth) => sum + (tooth.procedures?.length || 0),
+      0,
+    );
+    const completedProcedures = teeth.reduce(
+      (sum, tooth) =>
+        sum +
+        (tooth.procedures?.filter((p) => p.status === "completed").length || 0),
+      0,
+    );
+    const totalCost = teeth.reduce(
+      (sum, tooth) =>
+        sum +
+        (tooth.procedures?.reduce(
+          (procSum, proc) => procSum + (proc.estimatedCost || 0),
+          0,
+        ) || 0),
+      0,
+    );
+    const completedStages = stages.filter(
+      (s) => s.status === "completed",
+    ).length;
+
+    const progressPercentage =
+      stages.length > 0
+        ? Math.round((completedStages / stages.length) * 100)
+        : 0;
+
+    return {
+      totalTeeth,
+      totalProcedures,
+      completedProcedures,
+      totalCost,
+      stagesCount: stages.length,
+      completedStages,
+      progressPercentage, // ← Now based on stage completion
+    };
   };
-};
   const stats = calculateStats();
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'completed': return 'bg-green-100 text-green-700';
-      case 'in-progress': return 'bg-blue-100 text-blue-700';
-      case 'planned': case 'pending': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case "completed":
+        return "bg-green-100 text-green-700";
+      case "in-progress":
+        return "bg-blue-100 text-blue-700";
+      case "planned":
+      case "pending":
+        return "bg-gray-100 text-gray-700";
+      default:
+        return "bg-gray-100 text-gray-700";
     }
   };
 
@@ -1118,13 +1200,17 @@ const calculateStats = () => {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       {/* Toast Notification - hide if viewOnly */}
       {!viewOnly && toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg ${
-          toast.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg ${
+            toast.type === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
           {toast.message}
         </div>
       )}
-      
+
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
@@ -1145,37 +1231,47 @@ const calculateStats = () => {
                 {localPlan.description || "No description provided"}
               </p>
             </div>
-    
+
             <div className="flex items-center gap-2">
-              <Badge className={`
-                ${localPlan.status === "completed" ? "bg-green-100 text-green-700" :
-                  localPlan.status === "ongoing" ? "bg-blue-100 text-blue-700" :
-                  localPlan.status === "cancelled" ? "bg-red-100 text-red-700" :
-                  "bg-yellow-100 text-yellow-700"
+              <Badge
+                className={`
+                ${
+                  localPlan.status === "completed"
+                    ? "bg-green-100 text-green-700"
+                    : localPlan.status === "ongoing"
+                      ? "bg-blue-100 text-blue-700"
+                      : localPlan.status === "cancelled"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
                 } font-medium
-              `}>
+              `}
+              >
                 {localPlan.status?.toUpperCase() || "DRAFT"}
               </Badge>
               {viewOnly && (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                <Badge
+                  variant="outline"
+                  className="bg-blue-50 text-blue-700 text-xs"
+                >
                   👁️ Preview Only
                 </Badge>
               )}
-                       {viewOnly && localPlan?._id?.startsWith('temp-') && onEditPlan && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            onClose(); // Close the modal
-            onEditPlan(localPlan); // Trigger edit in parent
-          }}
-          className="text-sm flex items-center gap-2"
-        >
-          <span>✏️</span>
-          Edit Plan
-        </Button>
-      )}
-      
+              {viewOnly &&
+                localPlan?._id?.startsWith("temp-") &&
+                onEditPlan && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onClose(); // Close the modal
+                      onEditPlan(localPlan); // Trigger edit in parent
+                    }}
+                    className="text-sm flex items-center gap-2"
+                  >
+                    <span>✏️</span>
+                    Edit Plan
+                  </Button>
+                )}
             </div>
           </div>
 
@@ -1184,7 +1280,9 @@ const calculateStats = () => {
             <div className="bg-gray-50 p-3 rounded-lg">
               <p className="text-gray-500 text-xs">Patient</p>
               <p className="font-medium">{localPlan.patient?.name}</p>
-              <p className="text-xs text-gray-500">{localPlan.patient?.patientUniqueId}</p>
+              <p className="text-xs text-gray-500">
+                {localPlan.patient?.patientUniqueId}
+              </p>
             </div>
             <div className="bg-gray-50 p-3 rounded-lg">
               <p className="text-gray-500 text-xs">Created</p>
@@ -1205,21 +1303,21 @@ const calculateStats = () => {
         <div className="mb-6 border-b">
           <div className="flex space-x-4">
             <button
-              onClick={() => setActiveTab('teeth')}
+              onClick={() => setActiveTab("teeth")}
               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === 'teeth'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                activeTab === "teeth"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               🦷 Teeth View ({stats.totalTeeth} teeth)
             </button>
             <button
-              onClick={() => setActiveTab('stages')}
+              onClick={() => setActiveTab("stages")}
               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === 'stages'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                activeTab === "stages"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               📋 Stages View ({stats.stagesCount} stages)
@@ -1228,14 +1326,17 @@ const calculateStats = () => {
         </div>
 
         {/* Content based on active tab */}
-        {activeTab === 'teeth' ? (
+        {activeTab === "teeth" ? (
           /* TEETH VIEW - Read Only */
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-primary">Teeth & Procedures</h3>
+                <h3 className="text-lg font-semibold text-primary">
+                  Teeth & Procedures
+                </h3>
                 <p className="text-sm text-gray-500">
-                  {stats.totalProcedures} procedures across {stats.totalTeeth} teeth
+                  {stats.totalProcedures} procedures across {stats.totalTeeth}{" "}
+                  teeth
                 </p>
               </div>
               {/* {!localPlan.conflictChecked && !viewOnly && (
@@ -1248,70 +1349,93 @@ const calculateStats = () => {
             {/* Teeth List */}
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
               {(localPlan.teeth || localPlan.treatments || []).length > 0 ? (
-                (localPlan.teeth || localPlan.treatments || []).map((tooth, toothIndex) => (
-                  <div
-                    key={tooth._id || `tooth-${toothIndex}`}
-                    className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                          <span className="font-bold text-primary text-lg">
-                            {tooth.toothNumber}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold">Tooth #{tooth.toothNumber}</h4>
-                          <Badge className={`text-xs ${
-                            tooth.isCompleted 
-                              ? "bg-green-100 text-green-700" 
-                              : "bg-gray-100 text-gray-700"
-                          }`}>
-                            {tooth.isCompleted ? "Completed" : "Pending"}
-                          </Badge>
+                (localPlan.teeth || localPlan.treatments || []).map(
+                  (tooth, toothIndex) => (
+                    <div
+                      key={tooth._id || `tooth-${toothIndex}`}
+                      className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                            <span className="font-bold text-primary text-lg">
+                              {tooth.toothNumber}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold">
+                              Tooth #{tooth.toothNumber}
+                            </h4>
+                            <Badge
+                              className={`text-xs ${
+                                tooth.isCompleted
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {tooth.isCompleted ? "Completed" : "Pending"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Procedures List */}
-                    <div className="border-t pt-3">
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">Procedures:</h5>
-                      <div className="space-y-2">
-                        {tooth.procedures && tooth.procedures.length > 0 ? (
-                          tooth.procedures.map((procedure, procedureIndex) => (
-                            <div
-                              key={procedure.procedureId || `proc-${procedureIndex}`}
-                              className="p-3 border border-gray-200 rounded-lg bg-gray-50/50"
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium">{procedure.name}</span>
-                                    <Badge className={`text-[10px] ${getStatusColor(procedure.status)}`}>
-                                      {procedure.status || "Planned"}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-                                    <span>Surface: {procedure.surface}</span>
-                                    <span>•</span>
-                                    <span>Cost: ₹{procedure.estimatedCost || 0}</span>
-                                    {procedure.notes && (
-                                      <>
+                      {/* Procedures List */}
+                      <div className="border-t pt-3">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">
+                          Procedures:
+                        </h5>
+                        <div className="space-y-2">
+                          {tooth.procedures && tooth.procedures.length > 0 ? (
+                            tooth.procedures.map(
+                              (procedure, procedureIndex) => (
+                                <div
+                                  key={
+                                    procedure.procedureId ||
+                                    `proc-${procedureIndex}`
+                                  }
+                                  className="p-3 border border-gray-200 rounded-lg bg-gray-50/50"
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-medium">
+                                          {procedure.name}
+                                        </span>
+                                        <Badge
+                                          className={`text-[10px] ${getStatusColor(procedure.status)}`}
+                                        >
+                                          {procedure.status || "Planned"}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex flex-wrap gap-3 text-xs text-gray-600">
+                                        <span>
+                                          Surface: {procedure.surface}
+                                        </span>
                                         <span>•</span>
-                                        <span className="italic">Note: {procedure.notes}</span>
-                                      </>
-                                    )}
-                                    {procedure.stage && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="text-blue-600">Stage: {procedure.stage}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                                {/* Only show action buttons if NOT viewOnly */}
+                                        <span>
+                                          Cost: ₹{procedure.estimatedCost || 0}
+                                        </span>
+                                        {procedure.notes && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="italic">
+                                              Note: {procedure.notes}
+                                            </span>
+                                          </>
+                                        )}
+                                        {procedure.stage && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="text-blue-600">
+                                              Stage: {procedure.stage}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {/* Only show action buttons if NOT viewOnly */}
 
-{/* {!viewOnly && (
+                                    {/* {!viewOnly && (
   <div className="flex gap-2">
     <Button
       size="sm"
@@ -1332,18 +1456,22 @@ const calculateStats = () => {
     </Button>
   </div>
 )} */}
-                              </div>
+                                  </div>
+                                </div>
+                              ),
+                            )
+                          ) : (
+                            <div className="text-center py-4 border border-dashed rounded-lg">
+                              <p className="text-gray-500 text-sm">
+                                No procedures added
+                              </p>
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-4 border border-dashed rounded-lg">
-                            <p className="text-gray-500 text-sm">No procedures added</p>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ),
+                )
               ) : (
                 <div className="text-center py-8 border rounded-lg bg-gray-50">
                   <p className="text-gray-500">No teeth added yet</p>
@@ -1356,9 +1484,12 @@ const calculateStats = () => {
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-primary">Treatment Stages</h3>
+                <h3 className="text-lg font-semibold text-primary">
+                  Treatment Stages
+                </h3>
                 <p className="text-sm text-gray-500">
-                  {stats.completedStages} of {stats.stagesCount} stages completed
+                  {stats.completedStages} of {stats.stagesCount} stages
+                  completed
                 </p>
               </div>
               {/* Only show Add Stage button if NOT viewOnly */}
@@ -1392,12 +1523,19 @@ const calculateStats = () => {
                           </span>
                         </div>
                         <div>
-                          <h4 className="font-semibold">{stage.stageName || `Stage ${stage.stageNumber}`}</h4>
+                          <h4 className="font-semibold">
+                            {stage.stageName || `Stage ${stage.stageNumber}`}
+                          </h4>
                           <div className="flex gap-2 mt-1">
-                            <Badge className={`text-xs ${getStatusColor(stage.status)}`}>
+                            <Badge
+                              className={`text-xs ${getStatusColor(stage.status)}`}
+                            >
                               {stage.status?.toUpperCase() || "PENDING"}
                             </Badge>
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-blue-50 text-blue-700"
+                            >
                               Scheduled: {formatDate(stage.scheduledDate)}
                             </Badge>
                           </div>
@@ -1410,7 +1548,7 @@ const calculateStats = () => {
                           variant="ghost"
                           className="text-red-500 hover:text-red-600"
                           onClick={() => handleRemoveStage(stage.stageNumber)}
-                          disabled={stage.status === 'completed' || loading}
+                          disabled={stage.status === "completed" || loading}
                         >
                           <Trash2 size={14} />
                         </Button>
@@ -1426,72 +1564,104 @@ const calculateStats = () => {
 
                     {/* Tooth-Surface Procedures */}
                     <div className="border-t pt-3">
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">Procedures in this Stage:</h5>
+                      <h5 className="text-sm font-medium text-gray-700 mb-2">
+                        Procedures in this Stage:
+                      </h5>
                       <div className="space-y-3">
-                        {stage.toothSurfaceProcedures && stage.toothSurfaceProcedures.length > 0 ? (
+                        {stage.toothSurfaceProcedures &&
+                        stage.toothSurfaceProcedures.length > 0 ? (
                           stage.toothSurfaceProcedures.map((tsp, tspIndex) => (
-                            <div key={tspIndex} className="border border-gray-200 rounded-lg p-3">
+                            <div
+                              key={tspIndex}
+                              className="border border-gray-200 rounded-lg p-3"
+                            >
                               <div className="flex items-center gap-2 mb-2">
                                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                                   <span className="font-bold text-primary text-sm">
                                     {tsp.toothNumber}
                                   </span>
                                 </div>
-                                <span className="font-medium">Tooth #{tsp.toothNumber}</span>
+                                <span className="font-medium">
+                                  Tooth #{tsp.toothNumber}
+                                </span>
                               </div>
-                              
+
                               <div className="ml-10 space-y-2">
-                                {tsp.surfaceProcedures && tsp.surfaceProcedures.map((sp, spIndex) => (
-                                  <div key={spIndex} className="text-sm">
-                                    <div className="flex items-start gap-2">
-                                      <Badge variant="outline" className="text-xs capitalize bg-gray-100">
-                                        {sp.surface} Surface
-                                      </Badge>
-                                      <div className="flex-1">
-                                        <div className="font-medium text-gray-700">Procedures:</div>
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                          {sp.procedureNames.map((procName, pIndex) => (
-                                            <Badge key={pIndex} className="text-xs bg-green-50 text-green-700">
-                                              {procName}
-                                            </Badge>
-                                          ))}
+                                {tsp.surfaceProcedures &&
+                                  tsp.surfaceProcedures.map((sp, spIndex) => (
+                                    <div key={spIndex} className="text-sm">
+                                      <div className="flex items-start gap-2">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs capitalize bg-gray-100"
+                                        >
+                                          {sp.surface} Surface
+                                        </Badge>
+                                        <div className="flex-1">
+                                          <div className="font-medium text-gray-700">
+                                            Procedures:
+                                          </div>
+                                          <div className="flex flex-wrap gap-1 mt-1">
+                                            {sp.procedureNames.map(
+                                              (procName, pIndex) => (
+                                                <Badge
+                                                  key={pIndex}
+                                                  className="text-xs bg-green-50 text-green-700"
+                                                >
+                                                  {procName}
+                                                </Badge>
+                                              ),
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
                               </div>
                             </div>
                           ))
                         ) : (
                           <div className="text-center py-4 border border-dashed rounded-lg">
-                            <p className="text-gray-500 text-sm">No procedures scheduled for this stage</p>
+                            <p className="text-gray-500 text-sm">
+                              No procedures scheduled for this stage
+                            </p>
                           </div>
                         )}
                       </div>
                     </div>
 
-{!viewOnly && (
-  <div className="mt-4 pt-3 border-t">
-    <div className="flex justify-between items-center">
-      <div className="text-xs text-gray-500">
-        {stage.toothSurfaceProcedures?.reduce((total, tsp) => 
-          total + (tsp.surfaceProcedures?.reduce((spTotal, sp) => 
-            spTotal + (sp.procedureNames?.length || 0), 0) || 0), 0
-        ) || 0} procedures in this stage
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="text-xs"
-        disabled={stage.status === "completed" || loading}
-        onClick={() => handleCompleteStage(stage.stageNumber)} 
-      >
-        {stage.status === "completed" ? "✓ Stage Completed" : "Mark as Completed"}
-      </Button>
-    </div>
-  </div>
-)}
+                    {!viewOnly && (
+                      <div className="mt-4 pt-3 border-t">
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs text-gray-500">
+                            {stage.toothSurfaceProcedures?.reduce(
+                              (total, tsp) =>
+                                total +
+                                (tsp.surfaceProcedures?.reduce(
+                                  (spTotal, sp) =>
+                                    spTotal + (sp.procedureNames?.length || 0),
+                                  0,
+                                ) || 0),
+                              0,
+                            ) || 0}{" "}
+                            procedures in this stage
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                            disabled={stage.status === "completed" || loading}
+                            onClick={() =>
+                              handleCompleteStage(stage.stageNumber)
+                            }
+                          >
+                            {stage.status === "completed"
+                              ? "✓ Stage Completed"
+                              : "Mark as Completed"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -1503,57 +1673,77 @@ const calculateStats = () => {
           </div>
         )}
 
-     {/* Progress Summary - Only show for saved plans (not temp plans) */}
-{!localPlan?._id?.startsWith('temp-') && (
-  <div className="mb-6">
-    <div className="bg-blue-50 rounded-lg p-4">
-      <h4 className="font-medium text-blue-800 mb-3">Treatment Progress</h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-primary">{stats.totalTeeth}</div>
-          <div className="text-xs text-blue-600">Teeth</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.completedProcedures}</div>
-          <div className="text-xs text-green-600">Completed Procedures</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-orange-600">{stats.completedStages}/{stats.stagesCount}</div>
-          <div className="text-xs text-orange-600">Stages Completed</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-700">{stats.progressPercentage}%</div>
-          <div className="text-xs text-gray-600">Overall Progress</div>
-        </div>
-      </div>
-      {stats.totalProcedures > 0 && (
-        <div className="mt-3">
-          <div className="flex justify-between text-xs text-gray-600 mb-1">
-            <span>Stage Progress</span>
-            <span>{stats.completedStages}/{stats.stagesCount} stages completed</span>
+        {/* Progress Summary - Only show for saved plans (not temp plans) */}
+        {!localPlan?._id?.startsWith("temp-") && (
+          <div className="mb-6">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h4 className="font-medium text-blue-800 mb-3">
+                Treatment Progress
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {stats.totalTeeth}
+                  </div>
+                  <div className="text-xs text-blue-600">Teeth</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {stats.completedProcedures}
+                  </div>
+                  <div className="text-xs text-green-600">
+                    Completed Procedures
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {stats.completedStages}/{stats.stagesCount}
+                  </div>
+                  <div className="text-xs text-orange-600">
+                    Stages Completed
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-700">
+                    {stats.progressPercentage}%
+                  </div>
+                  <div className="text-xs text-gray-600">Overall Progress</div>
+                </div>
+              </div>
+              {stats.totalProcedures > 0 && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>Stage Progress</span>
+                    <span>
+                      {stats.completedStages}/{stats.stagesCount} stages
+                      completed
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${stats.progressPercentage}%` }}
+                    />
+                  </div>
+                  {/* Optional: Show procedure completion separately */}
+                  <div className="text-xs text-gray-500 mt-1">
+                    ({stats.completedProcedures}/{stats.totalProcedures}{" "}
+                    procedures completed)
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${stats.progressPercentage}%` }}
-            />
-          </div>
-          {/* Optional: Show procedure completion separately */}
-          <div className="text-xs text-gray-500 mt-1">
-            ({stats.completedProcedures}/{stats.totalProcedures} procedures completed)
-          </div>
-        </div>
-      )}
-    </div>
-  </div>
-)}
+        )}
 
         {/* Action Buttons - Hide if viewOnly */}
         {!viewOnly && (
           <div className="flex justify-between items-center pt-4 border-t">
             <div className="text-sm text-gray-500 flex gap-4">
               {localPlan.conflictChecked && (
-                <span className="text-green-600">✓ Conflict check completed</span>
+                <span className="text-green-600">
+                  ✓ Conflict check completed
+                </span>
               )}
               <Button
                 variant="ghost"
@@ -1562,7 +1752,7 @@ const calculateStats = () => {
                 onClick={handleRemovePlan}
                 disabled={loading}
               >
-                {localPlan.status === 'draft' ? 'Delete Plan' : 'Cancel Plan'}
+                {localPlan.status === "draft" ? "Delete Plan" : "Cancel Plan"}
               </Button>
             </div>
             <div className="flex gap-3">
@@ -1576,7 +1766,11 @@ const calculateStats = () => {
               </Button>
               <Button
                 className="text-sm bg-primary hover:bg-primary/90"
-                disabled={loading || localPlan.status === "completed" || localPlan.status === "cancelled"}
+                disabled={
+                  loading ||
+                  localPlan.status === "completed" ||
+                  localPlan.status === "cancelled"
+                }
                 onClick={() => {
                   if (localPlan.status === "draft") {
                     handleStartPlan();
@@ -1606,8 +1800,7 @@ const calculateStats = () => {
         )}
 
         {/* If viewOnly, show only Close button */}
-     {/* If viewOnly, show only Close button */}
-
+        {/* If viewOnly, show only Close button */}
       </div>
     </div>
   );
@@ -1616,7 +1809,7 @@ const calculateStats = () => {
 // Treatment Plan Form Component (Remains the same as before)
 interface TreatmentPlanFormProps {
   patientId: string;
-  patientName:string;
+  patientName: string;
   existingConditions: ToothCondition[];
   onClose: () => void;
   onSave: (plan: TreatmentPlanData) => void;
@@ -1686,9 +1879,12 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   >("medium");
   const [selectedStage, setSelectedStage] = useState<number>(1);
   const [chartType, setChartType] = useState<"adult" | "pediatric">("adult");
-  const [selectionMode, setSelectionMode] = useState<"single" | "multiple">("single");
+  const [selectionMode, setSelectionMode] = useState<"single" | "multiple">(
+    "single",
+  );
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
-  const [multipleSelectionType, setMultipleSelectionType] = useState<string>("full-mouth");
+  const [multipleSelectionType, setMultipleSelectionType] =
+    useState<string>("full-mouth");
 
   useEffect(() => {
     if (initialData) {
@@ -1708,14 +1904,14 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
       alert("Please select procedure and surface");
       return;
     }
-    
+
     if (selectionMode === "single") {
       // Single tooth mode
       if (!selectedTooth) {
         alert("Please select a tooth");
         return;
       }
-      
+
       if (estimatedCost < 0) {
         alert("Please enter a valid estimated cost (must be 0 or greater)");
         return;
@@ -1746,7 +1942,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         updated[toothIndex].procedures.push(newProcedure);
         setTeethPlans(updated);
       }
-      
+
       // Reset single selection
       setSelectedTooth(null);
     } else {
@@ -1755,16 +1951,18 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         alert("Please select teeth first");
         return;
       }
-      
+
       if (estimatedCost < 0) {
         alert("Please enter a valid estimated cost (must be 0 or greater)");
         return;
       }
 
       const newTeethPlans = [...teethPlans];
-      
-      selectedTeeth.forEach(toothNumber => {
-        const toothIndex = newTeethPlans.findIndex(tp => tp.toothNumber === toothNumber);
+
+      selectedTeeth.forEach((toothNumber) => {
+        const toothIndex = newTeethPlans.findIndex(
+          (tp) => tp.toothNumber === toothNumber,
+        );
         const newProcedure = {
           name: selectedProcedure,
           surface: selectedSurface,
@@ -1772,7 +1970,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
           estimatedCost: estimatedCost || 0,
           notes,
         };
-        
+
         if (toothIndex === -1) {
           newTeethPlans.push({
             toothNumber,
@@ -1783,9 +1981,9 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
           newTeethPlans[toothIndex].procedures.push(newProcedure);
         }
       });
-      
+
       setTeethPlans(newTeethPlans);
-      
+
       // Clear selection after adding
       setSelectedTeeth([]);
     }
@@ -1838,7 +2036,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         stageNumber: stageNumber,
         description: stage.description || "",
         procedureRefs: proceduresInStage,
-        status: stageStatus, 
+        status: stageStatus,
         scheduledDate:
           stage.scheduledDate ||
           new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
@@ -1864,7 +2062,10 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
 
     console.log("✅ Saving treatment plan:");
     console.log("- Stages count:", formattedStages.length);
-    console.log("- Full stages data:", JSON.stringify(formattedStages, null, 2));
+    console.log(
+      "- Full stages data:",
+      JSON.stringify(formattedStages, null, 2),
+    );
 
     onSave(plan);
   };
@@ -1970,39 +2171,51 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   const handleMultipleSelection = (selectionType: string) => {
     setMultipleSelectionType(selectionType);
     const filteredTeeth = getFilteredTeeth();
-    
+
     let teethToSelect: number[] = [];
-    
+
     switch (selectionType) {
       case "full-mouth":
-        teethToSelect = filteredTeeth.map(t => t.number);
+        teethToSelect = filteredTeeth.map((t) => t.number);
         break;
       case "upper":
-        teethToSelect = filteredTeeth.filter(t => t.quadrant === 1 || t.quadrant === 2).map(t => t.number);
+        teethToSelect = filteredTeeth
+          .filter((t) => t.quadrant === 1 || t.quadrant === 2)
+          .map((t) => t.number);
         break;
       case "lower":
-        teethToSelect = filteredTeeth.filter(t => t.quadrant === 3 || t.quadrant === 4).map(t => t.number);
+        teethToSelect = filteredTeeth
+          .filter((t) => t.quadrant === 3 || t.quadrant === 4)
+          .map((t) => t.number);
         break;
       case "upper-right":
-        teethToSelect = filteredTeeth.filter(t => t.quadrant === 1).map(t => t.number);
+        teethToSelect = filteredTeeth
+          .filter((t) => t.quadrant === 1)
+          .map((t) => t.number);
         break;
       case "upper-left":
-        teethToSelect = filteredTeeth.filter(t => t.quadrant === 2).map(t => t.number);
+        teethToSelect = filteredTeeth
+          .filter((t) => t.quadrant === 2)
+          .map((t) => t.number);
         break;
       case "lower-right":
-        teethToSelect = filteredTeeth.filter(t => t.quadrant === 4).map(t => t.number);
+        teethToSelect = filteredTeeth
+          .filter((t) => t.quadrant === 4)
+          .map((t) => t.number);
         break;
       case "lower-left":
-        teethToSelect = filteredTeeth.filter(t => t.quadrant === 3).map(t => t.number);
+        teethToSelect = filteredTeeth
+          .filter((t) => t.quadrant === 3)
+          .map((t) => t.number);
         break;
       case "custom":
         // Keep current selection for custom editing
         teethToSelect = [...selectedTeeth];
         break;
       default:
-        teethToSelect = filteredTeeth.map(t => t.number);
+        teethToSelect = filteredTeeth.map((t) => t.number);
     }
-    
+
     setSelectedTeeth(teethToSelect);
   };
 
@@ -2015,7 +2228,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   // Get tooth name by number
   const getToothName = (toothNumber: number) => {
     const allTeeth = getFilteredTeeth();
-    const tooth = allTeeth.find(t => t.number === toothNumber);
+    const tooth = allTeeth.find((t) => t.number === toothNumber);
     return tooth ? tooth.name : `Tooth ${toothNumber}`;
   };
 
@@ -2038,9 +2251,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         <div className="space-y-6">
           {/* Plan Basic Info */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Plan Name
-            </label>
+            <label className="block text-sm font-medium mb-2">Plan Name</label>
             <input
               type="text"
               className="w-full border rounded-lg p-2"
@@ -2221,7 +2432,9 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                         }
                       }}
                       className={`relative w-9 h-5 rounded-full transition-colors ${
-                        selectionMode === "multiple" ? "bg-primary" : "bg-gray-300"
+                        selectionMode === "multiple"
+                          ? "bg-primary"
+                          : "bg-gray-300"
                       }`}
                     >
                       <div
@@ -2239,7 +2452,9 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
               {/* Selection Options (only shown when multi-select is enabled) */}
               {selectionMode === "multiple" && (
                 <div className="mt-3">
-                  <span className="text-sm text-gray-600 mb-2 block">Quick Selection:</span>
+                  <span className="text-sm text-gray-600 mb-2 block">
+                    Quick Selection:
+                  </span>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { type: "full-mouth", label: "Full Mouth" },
@@ -2315,7 +2530,9 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
               {/* Tooth Selection */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  {selectionMode === "single" ? "Tooth Number" : "Selected Teeth"}
+                  {selectionMode === "single"
+                    ? "Tooth Number"
+                    : "Selected Teeth"}
                 </label>
                 {selectionMode === "single" ? (
                   <select
@@ -2341,41 +2558,50 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                     <div className="border rounded-lg p-3 bg-gray-50 min-h-[60px]">
                       {selectedTeeth.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                          {selectedTeeth.sort((a, b) => a - b).map(toothNum => (
-                            <div
-                              key={toothNum}
-                              className="relative group"
-                            >
-                              <span className="px-3 py-1.5 bg-white border border-primary/30 text-primary rounded-lg text-sm font-medium flex items-center gap-1 shadow-sm">
-                                <span>#{toothNum}</span>
-                                <span className="text-xs text-gray-600">
-                                  ({getToothName(toothNum)})
+                          {selectedTeeth
+                            .sort((a, b) => a - b)
+                            .map((toothNum) => (
+                              <div key={toothNum} className="relative group">
+                                <span className="px-3 py-1.5 bg-white border border-primary/30 text-primary rounded-lg text-sm font-medium flex items-center gap-1 shadow-sm">
+                                  <span>#{toothNum}</span>
+                                  <span className="text-xs text-gray-600">
+                                    ({getToothName(toothNum)})
+                                  </span>
                                 </span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedTeeth(selectedTeeth.filter(num => num !== toothNum));
-                                }}
-                                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                                title="Remove tooth"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTeeth(
+                                      selectedTeeth.filter(
+                                        (num) => num !== toothNum,
+                                      ),
+                                    );
+                                  }}
+                                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  title="Remove tooth"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center h-10">
-                          <span className="text-gray-400 italic">No teeth selected. Use quick selection buttons above.</span>
+                          <span className="text-gray-400 italic">
+                            No teeth selected. Use quick selection buttons
+                            above.
+                          </span>
                         </div>
                       )}
                     </div>
-                    
+
                     {selectedTeeth.length > 0 && (
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-gray-600">
-                          <span className="font-medium">{selectedTeeth.length}</span> teeth selected
+                          <span className="font-medium">
+                            {selectedTeeth.length}
+                          </span>{" "}
+                          teeth selected
                         </div>
                         <button
                           type="button"
@@ -2455,9 +2681,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">
-                Priority
-              </label>
+              <label className="block text-sm font-medium mb-1">Priority</label>
               <div className="flex gap-2">
                 {(["urgent", "high", "medium", "low"] as const).map(
                   (priority) => (
@@ -2492,7 +2716,8 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             <Button
               onClick={handleAddProcedure}
               disabled={
-                !selectedProcedure || !selectedSurface ||
+                !selectedProcedure ||
+                !selectedSurface ||
                 (selectionMode === "single" && !selectedTooth) ||
                 (selectionMode === "multiple" && selectedTeeth.length === 0)
               }
@@ -2500,10 +2725,9 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
               size="lg"
             >
               <Plus className="h-5 w-5 mr-2" />
-              {selectionMode === "multiple" 
+              {selectionMode === "multiple"
                 ? `Add Procedure to ${selectedTeeth.length} Selected Teeth`
-                : `Add Procedure to Tooth ${selectedTooth || ""}`
-              }
+                : `Add Procedure to Tooth ${selectedTooth || ""}`}
             </Button>
           </div>
 
@@ -2530,8 +2754,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                 <div className="space-y-3">
                   {stages.map((stage, index) => {
                     const stageNumber = index + 1;
-                    const proceduresInStage =
-                      getProceduresByStage(stageNumber);
+                    const proceduresInStage = getProceduresByStage(stageNumber);
 
                     return (
                       <div
@@ -2722,8 +2945,8 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                                   stages[parseInt(stageNum) - 1]?.status ===
                                   "completed"
                                     ? "bg-green-100 text-green-700"
-                                    : stages[parseInt(stageNum) - 1]
-                                          ?.status === "in-progress"
+                                    : stages[parseInt(stageNum) - 1]?.status ===
+                                        "in-progress"
                                       ? "bg-blue-100 text-blue-700"
                                       : "bg-gray-100 text-gray-700"
                                 }`}
@@ -2785,8 +3008,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
               {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)}{" "}
               procedures
               <div className="mt-1">
-                Stages:{" "}
-                {stages.filter((s) => s.status === "completed").length}{" "}
+                Stages: {stages.filter((s) => s.status === "completed").length}{" "}
                 completed,
                 {stages.filter((s) => s.status === "in-progress").length}{" "}
                 in-progress,
@@ -2899,12 +3121,18 @@ interface TreatmentPlan {
   _id: string;
   planName: string;
   description?: string;
-  status: "draft" | "pending" | "in-progress" | "completed" | "ongoing"|"cancelled";
+  status:
+    | "draft"
+    | "pending"
+    | "in-progress"
+    | "completed"
+    | "ongoing"
+    | "cancelled";
   conflictChecked: boolean;
   currentStage?: number;
   totalEstimatedCost: number;
   completedCost: number;
-  
+
   patient: {
     _id: string;
     name: string;
@@ -2925,7 +3153,7 @@ interface TreatmentPlan {
     specialization: string;
     phoneNumber: number;
   };
-  
+
   // Main data arrays
   teeth: TreatmentItem[];
   treatments: TreatmentItem[]; // For backward compatibility
@@ -2946,12 +3174,12 @@ interface TreatmentPlan {
     scheduledDate: string;
     notes?: string;
   }[];
-  
+
   // Timestamps
   createdAt: string;
   updatedAt: string;
   startedAt?: string;
-  
+
   __v: number;
 }
 interface TreatmentItem {
@@ -3007,26 +3235,28 @@ interface TreatmentPlanData {
       stage?: number;
       estimatedCost: number;
       notes?: string;
-      status?: 'planned' | 'in-progress' | 'completed';
+      status?: "planned" | "in-progress" | "completed";
     }[];
-    priority?: 'urgent' | 'high' | 'medium' | 'low';
+    priority?: "urgent" | "high" | "medium" | "low";
   }[];
   stages: {
     stageName: string;
     stageNumber?: number;
     description?: string;
-    procedureRefs: { // This is required
+    procedureRefs: {
+      // This is required
       toothNumber: number;
       procedureName: string;
     }[];
-    toothSurfaceProcedures?: { // This is optional
+    toothSurfaceProcedures?: {
+      // This is optional
       toothNumber: number;
       surfaceProcedures: {
         surface: string;
         procedureNames: string[];
       }[];
     }[];
-    status: 'pending' | 'completed' | 'in-progress';
+    status: "pending" | "completed" | "in-progress";
     scheduledDate?: string;
     completedAt?: string;
     notes?: string;
@@ -3038,7 +3268,7 @@ interface TreatmentPlanDetailsModalProps {
   onClose: () => void;
   refetchTreatmentPlans?: () => void;
   viewOnly?: boolean;
-  onEditPlan?: (plan: TreatmentPlan) => void; 
+  onEditPlan?: (plan: TreatmentPlan) => void;
 }
 interface Department {
   _id: string;
@@ -3046,8 +3276,8 @@ interface Department {
 }
 
 interface Doctor {
-  doctorId: string;   // existing
-  doctor?: any;       // add only if your API actually sends this
+  doctorId: string; // existing
+  doctor?: any; // add only if your API actually sends this
 }
 interface ExaminationItem {
   value: string;
@@ -3060,13 +3290,13 @@ interface SoftTissueData {
   diagnosis: string[];
   treatment: string[];
   notes?: string;
-  surfaceConditions?: {  
+  surfaceConditions?: {
     surface: string;
     conditions: string[];
   }[];
 }
 interface TMJData {
-  id: string;       
+  id: string;
   name: string;
   onExamination: string[];
   diagnosis: string[];
@@ -3075,20 +3305,20 @@ interface TMJData {
 }
 // Add these constants before the AppointmentsList component
 const SOFT_TISSUE_DATA = [
-  { id: 'tongue', name: 'Tongue' },
-  { id: 'gingiva', name: 'Gingiva' },
-  { id: 'palate', name: 'Palate' },
-  { id: 'buccal-mucosa', name: 'Buccal Mucosa' },
-  { id: 'floor-of-mouth', name: 'Floor of Mouth' },
-  { id: 'labial-mucosa', name: 'Labial Mucosa' },
-  { id: 'salivary-glands', name: 'Salivary Glands' },
-  { id: 'frenum', name: 'Frenum' }
+  { id: "tongue", name: "Tongue" },
+  { id: "gingiva", name: "Gingiva" },
+  { id: "palate", name: "Palate" },
+  { id: "buccal-mucosa", name: "Buccal Mucosa" },
+  { id: "floor-of-mouth", name: "Floor of Mouth" },
+  { id: "labial-mucosa", name: "Labial Mucosa" },
+  { id: "salivary-glands", name: "Salivary Glands" },
+  { id: "frenum", name: "Frenum" },
 ];
 
-const TMJ_DATA: Pick<TMJData, 'id' | 'name'>[] = [
-  { id: 'tmj-left', name: 'TMJ Left' },
-  { id: 'tmj-right', name: 'TMJ Right' },
-  { id: 'tmj-both', name: 'TMJ Both' }
+const TMJ_DATA: Pick<TMJData, "id" | "name">[] = [
+  { id: "tmj-left", name: "TMJ Left" },
+  { id: "tmj-right", name: "TMJ Right" },
+  { id: "tmj-both", name: "TMJ Both" },
 ];
 
 const generateProcedureId = (): string => {
@@ -3097,12 +3327,11 @@ const generateProcedureId = (): string => {
 
 const generateObjectId = (): string => {
   const timestamp = Math.floor(new Date().getTime() / 1000).toString(16);
-  const random = Array.from({ length: 16 }, () => 
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('');
+  const random = Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join("");
   return timestamp + random;
 };
-
 
 export function AppointmentsList() {
   const [clinicAppointments, setClinicAppointments] = useState<
@@ -3127,7 +3356,7 @@ export function AppointmentsList() {
   const [appointmentDetail, setAppointmentDetail] =
     useState<AppointmentDetail | null>(null);
   const [patientHistory, setPatientHistory] = useState<PatientHistoryItem[]>(
-    []
+    [],
   );
   const [detailLoading, setDetailLoading] = useState(false);
   // const [prescription, setPrescription] = useState("");
@@ -3150,41 +3379,50 @@ export function AppointmentsList() {
   const [planDescription, setPlanDescription] = useState("");
   const [stages, setStages] = useState<Stage[]>([]);
   const [treatmentPlanLoading, setTreatmentPlanLoading] = useState(false);
-const [patientTreatmentPlans, setPatientTreatmentPlans] = useState<TreatmentPlan[]>([]);
-const [treatmentPlansLoading, setTreatmentPlansLoading] = useState(false);
-const [selectedTreatmentPlan, setSelectedTreatmentPlan] = useState<TreatmentPlan | null>(null);
-const [departments, setDepartments] = useState<Department[]>([]);
-const [selectedDepartment, setSelectedDepartment] = useState("");
-const [doctors, setDoctors] = useState<Doctor[]>([]);
-const [referralDoctorId, setReferralDoctorId] = useState("");
-const [referralReason, setReferralReason] = useState("");
-const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-const [filePreviews, setFilePreviews] = useState<any[]>([]);
-const [showDentalChart, setShowDentalChart] = useState(false);
-const [showRecall, setShowRecall] = useState(false);
-const [recallDate, setRecallDate] = useState<Date | null>(null);
-const [recallTime, setRecallTime] = useState("");
-const [recallDepartment, setRecallDepartment] = useState("");
-const [dentalData, setDentalData] = useState<{
-  performedTeeth: any[];
-  plannedProcedures: any[];
-   treatmentPlan?: any;
-}>({
-  performedTeeth: [],
-  plannedProcedures: []
-});
-const [editingTreatmentPlan, setEditingTreatmentPlan] = useState<TreatmentPlan | null>(null)
-const [isTransitioningToEdit, setIsTransitioningToEdit] = useState(false);
-// const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
-const [softTissues, setSoftTissues] = useState<SoftTissueData[]>([]);
-const [tmjExaminations, setTMJExaminations] = useState<TMJData[]>([]);
-// In AppointmentsList component, add these states:
-const [dentalChartMode, setDentalChartMode] = useState<"chart-only" | "with-treatment-plan">("chart-only");
-const [showTreatmentPlanForm, setShowTreatmentPlanForm] = useState(false);
-const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanData | null>(null);
-const [selectedTeethForPlan, setSelectedTeethForPlan] = useState<number[]>([]);
-console.log("ded",selectedHistory);
-
+  const [patientTreatmentPlans, setPatientTreatmentPlans] = useState<
+    TreatmentPlan[]
+  >([]);
+  const [treatmentPlansLoading, setTreatmentPlansLoading] = useState(false);
+  const [selectedTreatmentPlan, setSelectedTreatmentPlan] =
+    useState<TreatmentPlan | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [referralDoctorId, setReferralDoctorId] = useState("");
+  const [referralReason, setReferralReason] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<any[]>([]);
+  const [showDentalChart, setShowDentalChart] = useState(false);
+  const [showRecall, setShowRecall] = useState(false);
+  const [recallDate, setRecallDate] = useState<Date | null>(null);
+  const [recallTime, setRecallTime] = useState("");
+  const [recallDepartment, setRecallDepartment] = useState("");
+  const [dentalData, setDentalData] = useState<{
+    performedTeeth: any[];
+    plannedProcedures: any[];
+    treatmentPlan?: any;
+  }>({
+    performedTeeth: [],
+    plannedProcedures: [],
+  });
+  const [editingTreatmentPlan, setEditingTreatmentPlan] =
+    useState<TreatmentPlan | null>(null);
+  const [isTransitioningToEdit, setIsTransitioningToEdit] = useState(false);
+  // const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
+  const [softTissues, setSoftTissues] = useState<SoftTissueData[]>([]);
+  const [tmjExaminations, setTMJExaminations] = useState<TMJData[]>([]);
+  // In AppointmentsList component, add these states:
+  const [dentalChartMode, setDentalChartMode] = useState<
+    "chart-only" | "with-treatment-plan"
+  >("chart-only");
+  const [showTreatmentPlanForm, setShowTreatmentPlanForm] = useState(false);
+  const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanData | null>(
+    null,
+  );
+  const [selectedTeethForPlan, setSelectedTeethForPlan] = useState<number[]>(
+    [],
+  );
+  console.log("ded", selectedHistory);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
@@ -3203,6 +3441,7 @@ console.log("ded",selectedHistory);
     });
   };
 
+  const [showLabOrderModal, setShowLabOrderModal] = useState(false);
   //  useEffect(()=>(
   // console.log("clnicId",selectedClinic?.clinicId)
   //  ),[])
@@ -3210,7 +3449,7 @@ console.log("ded",selectedHistory);
     page: number = 1,
     search: string = "",
     resetSearch: boolean = false,
-    date: Date | null = selectedDate
+    date: Date | null = selectedDate,
   ) => {
     try {
       // setLoading(true);
@@ -3222,13 +3461,13 @@ console.log("ded",selectedHistory);
       const cursor = resetSearch
         ? null
         : page > 1
-        ? pagination.cursors[page - 1]
-        : null;
+          ? pagination.cursors[page - 1]
+          : null;
 
       const formattedDate = date
         ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
             2,
-            "0"
+            "0",
           )}-${String(date.getDate()).padStart(2, "0")}`
         : "";
 
@@ -3245,7 +3484,7 @@ console.log("ded",selectedHistory);
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       // ✅ Axios automatically parses JSON and stores it in `response.data`
@@ -3296,7 +3535,7 @@ console.log("ded",selectedHistory);
       // console.log("121212121",result)
       if (!result.success)
         throw new Error(
-          result.message || "Failed to fetch appointment details"
+          result.message || "Failed to fetch appointment details",
         );
 
       const appointmentData = result.appointment || result.data;
@@ -3305,27 +3544,26 @@ console.log("ded",selectedHistory);
       // === 2️⃣ Fetch patient history ===
       const patientId = appointmentData.patientId._id;
       const clinicId = appointmentData.clinicId;
-const historyUrl = `${patientServiceBaseUrl}/api/v1/patient-service/appointment/patient-history/${patientId}?clinicId=${clinicId}`;
-const historyResponse = await axios.get(historyUrl, {
-  headers: {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  },
-});
+      const historyUrl = `${patientServiceBaseUrl}/api/v1/patient-service/appointment/patient-history/${patientId}?clinicId=${clinicId}`;
+      const historyResponse = await axios.get(historyUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       const historyResult = historyResponse.data;
-      console.log("32323232",historyResult)
-     if (historyResult.success) {
-  const { data: historyData = [] } = historyResult;
+      console.log("32323232", historyResult);
+      if (historyResult.success) {
+        const { data: historyData = [] } = historyResult;
 
-  const updatedHistory = historyData.map((item: any) => ({
-    ...item,
-    hasTreatmentPlan: !!item.treatmentPlan,
-  }));
+        const updatedHistory = historyData.map((item: any) => ({
+          ...item,
+          hasTreatmentPlan: !!item.treatmentPlan,
+        }));
 
-  setPatientHistory(updatedHistory);
-}
-
+        setPatientHistory(updatedHistory);
+      }
     } catch (err) {
       console.error("Error fetching details:", err);
     } finally {
@@ -3363,10 +3601,10 @@ const historyResponse = await axios.get(historyUrl, {
     setSelectedHistory(null);
     setUploadFiles([]);
     setFilePreviews([]);
-      setShowRecall(false);
-  setRecallDate(null);
-  setRecallTime("");
-  setRecallDepartment("");
+    setShowRecall(false);
+    setRecallDate(null);
+    setRecallTime("");
+    setRecallDepartment("");
   };
 
   const handleViewHistory = (historyItem: PatientHistoryItem) => {
@@ -3451,7 +3689,7 @@ const historyResponse = await axios.get(historyUrl, {
   const handlePrescriptionChange = (
     index: number,
     field: string,
-    value: string
+    value: string,
   ) => {
     const updated = [...prescriptions];
     (updated[index] as any)[field] = value;
@@ -3475,730 +3713,843 @@ const historyResponse = await axios.get(historyUrl, {
     const updated = prescriptions.filter((_, i) => i !== index);
     setPrescriptions(updated);
   };
-const fetchDepartments = async () => {
-  if (!selectedClinic?.clinicId) {
-    console.warn("⚠ No selectedClinic.clinicId");
-    return;
-  }
+  const fetchDepartments = async () => {
+    if (!selectedClinic?.clinicId) {
+      console.warn("⚠ No selectedClinic.clinicId");
+      return;
+    }
 
-  console.log("📌 Fetching departments for clinic:", selectedClinic.clinicId);
+    console.log("📌 Fetching departments for clinic:", selectedClinic.clinicId);
 
-  try {
-    const url = `${clinicServiceBaseUrl}/api/v1/clinic-service/department/details/${selectedClinic.clinicId}`;
-    console.log("➡ API URL:", url);
-const response = await axios.get(url);
+    try {
+      const url = `${clinicServiceBaseUrl}/api/v1/clinic-service/department/details/${selectedClinic.clinicId}`;
+      console.log("➡ API URL:", url);
+      const response = await axios.get(url);
 
-console.log("Departments response:", response.data);
+      console.log("Departments response:", response.data);
 
-const raw = response.data?.departments || [];
+      const raw = response.data?.departments || [];
 
-const formatted = raw.map((d: any, index: number) => {
-  if (typeof d === "string") {
-    return {
-      _id: index.toString(),  // temporary ID
-      departmentName: d,
-    };
-  }
-  return d;
-});
+      const formatted = raw.map((d: any, index: number) => {
+        if (typeof d === "string") {
+          return {
+            _id: index.toString(), // temporary ID
+            departmentName: d,
+          };
+        }
+        return d;
+      });
 
-setDepartments(formatted);
-
-  } catch (err) {
-    console.error("❌ Error fetching departments:", err);
-  }
-};
-
-
+      setDepartments(formatted);
+    } catch (err) {
+      console.error("❌ Error fetching departments:", err);
+    }
+  };
 
   // to fetch doctors for referal only ones inside clinic
-const fetchDoctorsByDepartment = async (department: string) => {
-  if (!department) {
-    console.warn("⚠ No department selected");
-    return;
-  }
+  const fetchDoctorsByDepartment = async (department: string) => {
+    if (!department) {
+      console.warn("⚠ No department selected");
+      return;
+    }
 
-  console.log("📌 Fetching doctors for department:", department);
-  console.log("📌 Using clinicId:", selectedClinic?.clinicId);
+    console.log("📌 Fetching doctors for department:", department);
+    console.log("📌 Using clinicId:", selectedClinic?.clinicId);
 
-  try {
-    const url = `${clinicServiceBaseUrl}/api/v1/clinic-service/department-based/availability`;
-    console.log("➡ Doctors API URL:", url);
+    try {
+      const url = `${clinicServiceBaseUrl}/api/v1/clinic-service/department-based/availability`;
+      console.log("➡ Doctors API URL:", url);
 
-    const response = await axios.get(url, {
-      params: {
-        clinicId: selectedClinic?.clinicId,
-        department,
-      },
-    });
+      const response = await axios.get(url, {
+        params: {
+          clinicId: selectedClinic?.clinicId,
+          department,
+        },
+      });
 
-    console.log("✅ Doctors Response:", response.data);
+      console.log("✅ Doctors Response:", response.data);
 
-    setDoctors(response.data?.doctors || []);
-  } catch (err) {
-    console.error("❌ Error fetching doctors:", err);
-  }
-};
+      setDoctors(response.data?.doctors || []);
+    } catch (err) {
+      console.error("❌ Error fetching doctors:", err);
+    }
+  };
 
+  useEffect(() => {
+    console.log("🏥 Selected Clinic changed:", selectedClinic);
 
-useEffect(() => {
-  console.log("🏥 Selected Clinic changed:", selectedClinic);
+    if (selectedClinic) fetchDepartments();
+  }, [selectedClinic]);
 
-  if (selectedClinic) fetchDepartments();
-}, [selectedClinic]);
-
- // ✅ NEW: File upload handlers
+  // ✅ NEW: File upload handlers
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
-    
+
     if (selectedFiles.length === 0) return;
 
-    setUploadFiles(prev => [...prev, ...selectedFiles]);
+    setUploadFiles((prev) => [...prev, ...selectedFiles]);
 
-    selectedFiles.forEach(file => {
-      if (file.type.startsWith('image/')) {
+    selectedFiles.forEach((file) => {
+      if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setFilePreviews(prev => [...prev, {
-            name: file.name,
-            type: 'image',
-            url: reader.result
-          }]);
+          setFilePreviews((prev) => [
+            ...prev,
+            {
+              name: file.name,
+              type: "image",
+              url: reader.result,
+            },
+          ]);
         };
         reader.readAsDataURL(file);
       } else {
-        setFilePreviews(prev => [...prev, {
-          name: file.name,
-          type: file.type.includes('pdf') ? 'pdf' : 'other',
-          url: null
-        }]);
+        setFilePreviews((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            type: file.type.includes("pdf") ? "pdf" : "other",
+            url: null,
+          },
+        ]);
       }
     });
   };
 
   const handleRemoveFile = (index: number) => {
-    setUploadFiles(prev => prev.filter((_, i) => i !== index));
-    setFilePreviews(prev => prev.filter((_, i) => i !== index));
+    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-// Fixed helper function to generate ObjectId-like strings
+  // Fixed helper function to generate ObjectId-like strings
 
-const handleSaveConsultation = async () => {
-  // Validate required fields
-  // if (!chiefComplaint.trim()) {
-  //   alert("Please enter chief complaint");
-  //   return;
-  // }
-
-  // if (!diagnosis.trim()) {
-  //   alert("Please enter diagnosis");
-  //   return;
-  // }
-
-  if (!appointmentDetail?._id) {
-    alert("Invalid appointment data");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const token = localStorage.getItem("authToken");
-    if (!token) throw new Error("No authentication token found");
-
-    const clinicId = selectedClinic!.clinicId;
-
-    const formData = new FormData();
-
-    // Append basic fields
-    const symptomsArray = chiefComplaint.split(',').map(s => s.trim()).filter(Boolean);
-    const diagnosisArray = diagnosis.split(',').map(d => d.trim()).filter(Boolean);
-
-    formData.append('symptoms', JSON.stringify(symptomsArray));
-    formData.append('diagnosis', JSON.stringify(diagnosisArray));
-    
-    // Filter out empty prescriptions
-    const validPrescriptions = prescriptions.filter(p => 
-      p.medicineName.trim() && p.dosage.trim()
-    );
-    
-    // if (validPrescriptions.length === 0) {
-    //   alert("Please add at least one valid prescription");
+  const handleSaveConsultation = async () => {
+    // Validate required fields
+    // if (!chiefComplaint.trim()) {
+    //   alert("Please enter chief complaint");
     //   return;
     // }
-    
-    formData.append('prescriptions', JSON.stringify(validPrescriptions));
-    formData.append('notes', additionalNotes?.trim() || '');
-    
-    // Append existing files
-    const existingFiles = filePreviews.map(fp => ({
-      name: fp.name,
-      type: fp.type,
-      url: fp.url || ''
-    }));
-    formData.append('files', JSON.stringify(existingFiles));
 
-    // ✅ Transform soft tissue examinations for backend
-    if (softTissues && softTissues.length > 0) {
-      const transformedSoftTissues = softTissues
-        .filter((st: SoftTissueData) => 
-          (st.onExamination && st.onExamination.length > 0) ||
-          (st.diagnosis && st.diagnosis.length > 0) ||
-          (st.treatment && st.treatment.length > 0)
-        )
-        .map((st: SoftTissueData) => ({
-          id: st.id,
-          name: st.name,
-          onExamination: (st.onExamination || []).map((item: string) => ({
-            value: item,
-            isCustom: false // You can add logic to detect custom entries
-          })),
-          diagnosis: (st.diagnosis || []).map((item: string) => ({
-            value: item,
-            isCustom: false
-          })),
-          treatment: (st.treatment || []).map((item: string) => ({
-            value: item,
-            isCustom: false
-          })),
-          notes: st.notes || ""
-        }));
-      
-      if (transformedSoftTissues.length > 0) {
-        formData.append('softTissueExamination', JSON.stringify(transformedSoftTissues));
-        console.log("✅ Soft tissue data added:", transformedSoftTissues.length, "tissues");
-      }
+    // if (!diagnosis.trim()) {
+    //   alert("Please enter diagnosis");
+    //   return;
+    // }
+
+    if (!appointmentDetail?._id) {
+      alert("Invalid appointment data");
+      return;
     }
 
-    // ✅ Transform TMJ examinations for backend
-    if (tmjExaminations && tmjExaminations.length > 0) {
-      const transformedTMJExaminations = tmjExaminations
-        .filter((tmj: TMJData) => 
-          (tmj.onExamination && tmj.onExamination.length > 0) ||
-          (tmj.diagnosis && tmj.diagnosis.length > 0) ||
-          (tmj.treatment && tmj.treatment.length > 0)
-        )
-        .map((tmj: TMJData) => ({
-          id: tmj.id,
-          name: tmj.name,
-          onExamination: (tmj.onExamination || []).map((item: string) => ({
-            value: item,
-            isCustom: false
-          })),
-          diagnosis: (tmj.diagnosis || []).map((item: string) => ({
-            value: item,
-            isCustom: false
-          })),
-          treatment: (tmj.treatment || []).map((item: string) => ({
-            value: item,
-            isCustom: false
-          })),
-          notes: tmj.notes || ""
-        }));
-      
-      if (transformedTMJExaminations.length > 0) {
-        formData.append('tmjExamination', JSON.stringify(transformedTMJExaminations));
-        console.log("✅ TMJ data added:", transformedTMJExaminations.length, "examinations");
-      }
-    }
+    setLoading(true);
 
-    // ✅ Transform performed teeth (NO status filter)
-    if (dentalData.performedTeeth && dentalData.performedTeeth.length > 0) {
-      const transformedPerformedTeeth = dentalData.performedTeeth
-        .filter(tc => 
-          tc.conditions.length > 0 || 
-          tc.surfaceConditions?.length > 0 || 
-          tc.procedures?.length > 0
-        )
-        .map(tc => ({
-          toothNumber: tc.toothNumber,
-          conditions: tc.conditions || [],
-          surfaceConditions: (tc.surfaceConditions || []).map((sc:any) => ({
-            surface: sc.surface,
-            conditions: sc.conditions || []
-          })),
-          procedures: (tc.procedures || [])
-            .map((p:any) => ({
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("No authentication token found");
+
+      const clinicId = selectedClinic!.clinicId;
+
+      const formData = new FormData();
+
+      // Append basic fields
+      const symptomsArray = chiefComplaint
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const diagnosisArray = diagnosis
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean);
+
+      formData.append("symptoms", JSON.stringify(symptomsArray));
+      formData.append("diagnosis", JSON.stringify(diagnosisArray));
+
+      // Filter out empty prescriptions
+      const validPrescriptions = prescriptions.filter(
+        (p) => p.medicineName.trim() && p.dosage.trim(),
+      );
+
+      // if (validPrescriptions.length === 0) {
+      //   alert("Please add at least one valid prescription");
+      //   return;
+      // }
+
+      formData.append("prescriptions", JSON.stringify(validPrescriptions));
+      formData.append("notes", additionalNotes?.trim() || "");
+
+      // Append existing files
+      const existingFiles = filePreviews.map((fp) => ({
+        name: fp.name,
+        type: fp.type,
+        url: fp.url || "",
+      }));
+      formData.append("files", JSON.stringify(existingFiles));
+
+      // ✅ Transform soft tissue examinations for backend
+      if (softTissues && softTissues.length > 0) {
+        const transformedSoftTissues = softTissues
+          .filter(
+            (st: SoftTissueData) =>
+              (st.onExamination && st.onExamination.length > 0) ||
+              (st.diagnosis && st.diagnosis.length > 0) ||
+              (st.treatment && st.treatment.length > 0),
+          )
+          .map((st: SoftTissueData) => ({
+            id: st.id,
+            name: st.name,
+            onExamination: (st.onExamination || []).map((item: string) => ({
+              value: item,
+              isCustom: false, // You can add logic to detect custom entries
+            })),
+            diagnosis: (st.diagnosis || []).map((item: string) => ({
+              value: item,
+              isCustom: false,
+            })),
+            treatment: (st.treatment || []).map((item: string) => ({
+              value: item,
+              isCustom: false,
+            })),
+            notes: st.notes || "",
+          }));
+
+        if (transformedSoftTissues.length > 0) {
+          formData.append(
+            "softTissueExamination",
+            JSON.stringify(transformedSoftTissues),
+          );
+          console.log(
+            "✅ Soft tissue data added:",
+            transformedSoftTissues.length,
+            "tissues",
+          );
+        }
+      }
+
+      // ✅ Transform TMJ examinations for backend
+      if (tmjExaminations && tmjExaminations.length > 0) {
+        const transformedTMJExaminations = tmjExaminations
+          .filter(
+            (tmj: TMJData) =>
+              (tmj.onExamination && tmj.onExamination.length > 0) ||
+              (tmj.diagnosis && tmj.diagnosis.length > 0) ||
+              (tmj.treatment && tmj.treatment.length > 0),
+          )
+          .map((tmj: TMJData) => ({
+            id: tmj.id,
+            name: tmj.name,
+            onExamination: (tmj.onExamination || []).map((item: string) => ({
+              value: item,
+              isCustom: false,
+            })),
+            diagnosis: (tmj.diagnosis || []).map((item: string) => ({
+              value: item,
+              isCustom: false,
+            })),
+            treatment: (tmj.treatment || []).map((item: string) => ({
+              value: item,
+              isCustom: false,
+            })),
+            notes: tmj.notes || "",
+          }));
+
+        if (transformedTMJExaminations.length > 0) {
+          formData.append(
+            "tmjExamination",
+            JSON.stringify(transformedTMJExaminations),
+          );
+          console.log(
+            "✅ TMJ data added:",
+            transformedTMJExaminations.length,
+            "examinations",
+          );
+        }
+      }
+
+      // ✅ Transform performed teeth (NO status filter)
+      if (dentalData.performedTeeth && dentalData.performedTeeth.length > 0) {
+        const transformedPerformedTeeth = dentalData.performedTeeth
+          .filter(
+            (tc) =>
+              tc.conditions.length > 0 ||
+              tc.surfaceConditions?.length > 0 ||
+              tc.procedures?.length > 0,
+          )
+          .map((tc) => ({
+            toothNumber: tc.toothNumber,
+            conditions: tc.conditions || [],
+            surfaceConditions: (tc.surfaceConditions || []).map((sc: any) => ({
+              surface: sc.surface,
+              conditions: sc.conditions || [],
+            })),
+            procedures: (tc.procedures || []).map((p: any) => ({
               name: p.name,
               surface: p.surface || "occlusal",
               cost: p.cost || p.estimatedCost || 0,
               notes: p.notes || "",
-              performedAt: p.performedAt || new Date().toISOString()
-            }))
-        }));
-      
-      if (transformedPerformedTeeth.length > 0) {
-        formData.append('performedTeeth', JSON.stringify(transformedPerformedTeeth));
-        console.log("✅ Performed teeth data added:", transformedPerformedTeeth.length, "teeth");
+              performedAt: p.performedAt || new Date().toISOString(),
+            })),
+          }));
+
+        if (transformedPerformedTeeth.length > 0) {
+          formData.append(
+            "performedTeeth",
+            JSON.stringify(transformedPerformedTeeth),
+          );
+          console.log(
+            "✅ Performed teeth data added:",
+            transformedPerformedTeeth.length,
+            "teeth",
+          );
+        }
       }
-    }
 
-    // ✅ Transform planned procedures for treatment plan
-    if (dentalData.plannedProcedures && dentalData.plannedProcedures.length > 0) {
-      formData.append('plannedProcedures', JSON.stringify(dentalData.plannedProcedures));
-      console.log("✅ Planned procedures added:", dentalData.plannedProcedures.length);
-    }
+      // ✅ Transform planned procedures for treatment plan
+      if (
+        dentalData.plannedProcedures &&
+        dentalData.plannedProcedures.length > 0
+      ) {
+        formData.append(
+          "plannedProcedures",
+          JSON.stringify(dentalData.plannedProcedures),
+        );
+        console.log(
+          "✅ Planned procedures added:",
+          dentalData.plannedProcedures.length,
+        );
+      }
 
-    // ✅ TREATMENT PLAN HANDLING
-    let treatmentPlanInput = null;
-    let treatmentPlanStatusUpdate = null;
-    
-    if (dentalData.treatmentPlan) {
-      console.log("📋 Processing treatment plan data");
-      
-      // Check if we're editing an existing plan
-      if (editingTreatmentPlan && !editingTreatmentPlan._id.startsWith('temp-')) {
-        console.log("🔄 Updating existing treatment plan:", editingTreatmentPlan._id);
-        
-        // ========== ADD TREATMENT PLAN CHANGES TRACKING HERE ==========
-        // Find what changed
-const treatmentPlanChanges: any = {
-  planId: editingTreatmentPlan._id,
-  changes: [],
-  completedStages: [],
-  updatedProcedures: [],
-  stageStatusChanges: [],
-  addedStages: [],
-  removedStages: []
-};
+      // ✅ TREATMENT PLAN HANDLING
+      let treatmentPlanInput = null;
+      let treatmentPlanStatusUpdate = null;
 
-// Check for completed procedures
-const completedProcedures: any[] = [];
+      if (dentalData.treatmentPlan) {
+        console.log("📋 Processing treatment plan data");
 
-dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
-  toothPlan.procedures.forEach((proc: any) => {
-    if (proc.status === 'completed' && proc.stage === 1) {
-      completedProcedures.push({
-        toothNumber: toothPlan.toothNumber,
-        procedureName: proc.name,
-        surface: proc.surface || 'occlusal',
-        stageNumber: 1,
-        estimatedCost: proc.estimatedCost || 0,
-        notes: proc.notes || ''
-      });
-      
-      // Track procedure completion
-      treatmentPlanChanges.updatedProcedures.push({
-        type: 'completed',
-        toothNumber: toothPlan.toothNumber,
-        procedureName: proc.name,
-        surface: proc.surface || 'occlusal',
-        stage: 1,
-        previousStatus: 'planned',
-        newStatus: 'completed',
-        changedAt: new Date().toISOString()
-      });
-    }
-  });
-});
+        // Check if we're editing an existing plan
+        if (
+          editingTreatmentPlan &&
+          !editingTreatmentPlan._id.startsWith("temp-")
+        ) {
+          console.log(
+            "🔄 Updating existing treatment plan:",
+            editingTreatmentPlan._id,
+          );
 
-// Check if Stage 1 is fully completed
-const stage1Procedures = dentalData.treatmentPlan.teeth.flatMap((t: any) =>
-  t.procedures.filter((p: any) => p.stage === 1)
-);
-const allStage1Completed = stage1Procedures.length > 0 && 
-  stage1Procedures.every((p: any) => p.status === 'completed');
+          // ========== ADD TREATMENT PLAN CHANGES TRACKING HERE ==========
+          // Find what changed
+          const treatmentPlanChanges: any = {
+            planId: editingTreatmentPlan._id,
+            changes: [],
+            completedStages: [],
+            updatedProcedures: [],
+            stageStatusChanges: [],
+            addedStages: [],
+            removedStages: [],
+          };
 
-if (allStage1Completed) {
-  treatmentPlanChanges.completedStages.push({
-    stageNumber: 1,
-    stageName: dentalData.treatmentPlan.stages[0]?.stageName || 'Stage 1',
-    previousStatus: 'in-progress',
-    newStatus: 'completed',
-    completedAt: new Date().toISOString()
-  });
-}
+          // Check for completed procedures
+          const completedProcedures: any[] = [];
 
-// Check for stage status changes (compare with original plan)
-if (editingTreatmentPlan.stages && dentalData.treatmentPlan.stages) {
-  editingTreatmentPlan.stages.forEach((originalStage: any) => {
-    const updatedStage = dentalData.treatmentPlan.stages.find(
-      (s: any) => s.stageNumber === originalStage.stageNumber
-    );
-    
-    if (updatedStage && originalStage.status !== updatedStage.status) {
-      treatmentPlanChanges.stageStatusChanges.push({
-        stageNumber: originalStage.stageNumber,
-        stageName: originalStage.stageName,
-        previousStatus: originalStage.status,
-        newStatus: updatedStage.status,
-        changedAt: new Date().toISOString()
-      });
-    }
-  });
-}
-        
-        // ========== END OF TREATMENT PLAN CHANGES TRACKING ==========
-        
-        treatmentPlanStatusUpdate = {
-          planId: editingTreatmentPlan._id,
-          completedStageNumber: allStage1Completed ? 1 : null,
-          completedProcedures: completedProcedures,
-          // Send the treatment plan changes to backend
-          treatmentPlanChanges: treatmentPlanChanges
-        };
-        
-        formData.append('treatmentPlanStatus', JSON.stringify(treatmentPlanStatusUpdate));
-        
-      } else {
-        // Creating new treatment plan
-        console.log("🆕 Creating new treatment plan");
-        
-        // Get teeth procedures by stage
-        const proceduresByStage: Record<number, any[]> = {};
-        
-        dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
-          toothPlan.procedures.forEach((proc: any) => {
-            const stageNum = proc.stage || 1;
-            if (!proceduresByStage[stageNum]) {
-              proceduresByStage[stageNum] = [];
-            }
-            
-            proceduresByStage[stageNum].push({
-              toothNumber: toothPlan.toothNumber,
-              name: proc.name,
-              surface: proc.surface || 'occlusal',
-              estimatedCost: proc.estimatedCost || 0,
-              notes: proc.notes || '',
-              status: proc.status || 'planned'
+          dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+            toothPlan.procedures.forEach((proc: any) => {
+              if (proc.status === "completed" && proc.stage === 1) {
+                completedProcedures.push({
+                  toothNumber: toothPlan.toothNumber,
+                  procedureName: proc.name,
+                  surface: proc.surface || "occlusal",
+                  stageNumber: 1,
+                  estimatedCost: proc.estimatedCost || 0,
+                  notes: proc.notes || "",
+                });
+
+                // Track procedure completion
+                treatmentPlanChanges.updatedProcedures.push({
+                  type: "completed",
+                  toothNumber: toothPlan.toothNumber,
+                  procedureName: proc.name,
+                  surface: proc.surface || "occlusal",
+                  stage: 1,
+                  previousStatus: "planned",
+                  newStatus: "completed",
+                  changedAt: new Date().toISOString(),
+                });
+              }
             });
           });
-        });
-        
-        // Check if any procedures were performed today
-        const stage1Procedures = proceduresByStage[1] || [];
-        const completedInStage1 = stage1Procedures.filter(p => p.status === 'completed');
-        const shouldStartToday = completedInStage1.length > 0;
-        
-        // Build stages
-        const stagesData = Object.entries(proceduresByStage).map(([stageNumStr, procs]) => {
-          const stageNumber = parseInt(stageNumStr);
-          
-          // Group procedures by tooth and surface
-          const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
-          
-          procs.forEach(proc => {
-            if (!toothSurfaceMap[proc.toothNumber]) {
-              toothSurfaceMap[proc.toothNumber] = {};
-            }
-            
-            if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
-              toothSurfaceMap[proc.toothNumber][proc.surface] = [];
-            }
-            
-            if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
-              toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
-            }
-          });
-          
-          // Convert to toothSurfaceProcedures format
-          const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(([toothNumStr, surfaces]) => {
-            const surfaceProcedures = Object.entries(surfaces).map(([surface, procedureNames]) => ({
-              surface: surface,
-              procedureNames: procedureNames
-            }));
-            
-            return {
-              toothNumber: parseInt(toothNumStr),
-              surfaceProcedures: surfaceProcedures
-            };
-          });
-          
-          const stageInput = dentalData.treatmentPlan.stages?.find((s: any) => 
-            (s.stageNumber || s.stage) === stageNumber
+
+          // Check if Stage 1 is fully completed
+          const stage1Procedures = dentalData.treatmentPlan.teeth.flatMap(
+            (t: any) => t.procedures.filter((p: any) => p.stage === 1),
           );
-          
-          // Determine stage status
-          let stageStatus;
-          if (stageInput?.status) {
-            stageStatus = stageInput.status;
-          } else {
-            const totalProcedures = procs.length;
-            const completedProcedures = procs.filter(p => p.status === 'completed').length;
-            
-            if (totalProcedures === 0) {
-              stageStatus = 'pending';
-            } else if (completedProcedures === totalProcedures) {
-              stageStatus = 'completed';
-            } else if (completedProcedures > 0) {
-              stageStatus = 'in-progress';
-            } else {
-              stageStatus = 'pending';
-            }
+          const allStage1Completed =
+            stage1Procedures.length > 0 &&
+            stage1Procedures.every((p: any) => p.status === "completed");
+
+          if (allStage1Completed) {
+            treatmentPlanChanges.completedStages.push({
+              stageNumber: 1,
+              stageName:
+                dentalData.treatmentPlan.stages[0]?.stageName || "Stage 1",
+              previousStatus: "in-progress",
+              newStatus: "completed",
+              completedAt: new Date().toISOString(),
+            });
           }
-          
-          return {
-            stageNumber: stageNumber,
-            stageName: stageInput?.stageName || `Stage ${stageNumber}`,
-            description: stageInput?.description || '',
-            status: stageStatus,
-            scheduledDate: stageInput?.scheduledDate || new Date().toISOString().split('T')[0],
-            toothSurfaceProcedures: toothSurfaceProcedures,
-            notes: stageInput?.notes || ''
+
+          // Check for stage status changes (compare with original plan)
+          if (editingTreatmentPlan.stages && dentalData.treatmentPlan.stages) {
+            editingTreatmentPlan.stages.forEach((originalStage: any) => {
+              const updatedStage = dentalData.treatmentPlan.stages.find(
+                (s: any) => s.stageNumber === originalStage.stageNumber,
+              );
+
+              if (
+                updatedStage &&
+                originalStage.status !== updatedStage.status
+              ) {
+                treatmentPlanChanges.stageStatusChanges.push({
+                  stageNumber: originalStage.stageNumber,
+                  stageName: originalStage.stageName,
+                  previousStatus: originalStage.status,
+                  newStatus: updatedStage.status,
+                  changedAt: new Date().toISOString(),
+                });
+              }
+            });
+          }
+
+          // ========== END OF TREATMENT PLAN CHANGES TRACKING ==========
+
+          treatmentPlanStatusUpdate = {
+            planId: editingTreatmentPlan._id,
+            completedStageNumber: allStage1Completed ? 1 : null,
+            completedProcedures: completedProcedures,
+            // Send the treatment plan changes to backend
+            treatmentPlanChanges: treatmentPlanChanges,
           };
-        });
-        
-        // Build teeth data
-        const teethData = dentalData.treatmentPlan.teeth.map((toothPlan: any) => ({
-          toothNumber: toothPlan.toothNumber,
-          priority: toothPlan.priority || 'medium',
-          isCompleted: false,
-          procedures: toothPlan.procedures.map((proc: any) => ({
-            name: proc.name,
-            surface: proc.surface || 'occlusal',
-            stage: proc.stage || 1,
-            estimatedCost: proc.estimatedCost || 0,
-            notes: proc.notes || '',
-            status: proc.status || 'planned'
-          }))
-        }));
-        
-        treatmentPlanInput = {
-          planName: dentalData.treatmentPlan.planName.trim(),
-          description: dentalData.treatmentPlan.description?.trim() || '',
-          teeth: teethData,
-          stages: stagesData,
-          startToday: shouldStartToday
-        };
-        
-        formData.append('treatmentPlan', JSON.stringify(treatmentPlanInput));
+
+          formData.append(
+            "treatmentPlanStatus",
+            JSON.stringify(treatmentPlanStatusUpdate),
+          );
+        } else {
+          // Creating new treatment plan
+          console.log("🆕 Creating new treatment plan");
+
+          // Get teeth procedures by stage
+          const proceduresByStage: Record<number, any[]> = {};
+
+          dentalData.treatmentPlan.teeth.forEach((toothPlan: any) => {
+            toothPlan.procedures.forEach((proc: any) => {
+              const stageNum = proc.stage || 1;
+              if (!proceduresByStage[stageNum]) {
+                proceduresByStage[stageNum] = [];
+              }
+
+              proceduresByStage[stageNum].push({
+                toothNumber: toothPlan.toothNumber,
+                name: proc.name,
+                surface: proc.surface || "occlusal",
+                estimatedCost: proc.estimatedCost || 0,
+                notes: proc.notes || "",
+                status: proc.status || "planned",
+              });
+            });
+          });
+
+          // Check if any procedures were performed today
+          const stage1Procedures = proceduresByStage[1] || [];
+          const completedInStage1 = stage1Procedures.filter(
+            (p) => p.status === "completed",
+          );
+          const shouldStartToday = completedInStage1.length > 0;
+
+          // Build stages
+          const stagesData = Object.entries(proceduresByStage).map(
+            ([stageNumStr, procs]) => {
+              const stageNumber = parseInt(stageNumStr);
+
+              // Group procedures by tooth and surface
+              const toothSurfaceMap: Record<
+                number,
+                Record<string, string[]>
+              > = {};
+
+              procs.forEach((proc) => {
+                if (!toothSurfaceMap[proc.toothNumber]) {
+                  toothSurfaceMap[proc.toothNumber] = {};
+                }
+
+                if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+                  toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+                }
+
+                if (
+                  !toothSurfaceMap[proc.toothNumber][proc.surface].includes(
+                    proc.name,
+                  )
+                ) {
+                  toothSurfaceMap[proc.toothNumber][proc.surface].push(
+                    proc.name,
+                  );
+                }
+              });
+
+              // Convert to toothSurfaceProcedures format
+              const toothSurfaceProcedures = Object.entries(
+                toothSurfaceMap,
+              ).map(([toothNumStr, surfaces]) => {
+                const surfaceProcedures = Object.entries(surfaces).map(
+                  ([surface, procedureNames]) => ({
+                    surface: surface,
+                    procedureNames: procedureNames,
+                  }),
+                );
+
+                return {
+                  toothNumber: parseInt(toothNumStr),
+                  surfaceProcedures: surfaceProcedures,
+                };
+              });
+
+              const stageInput = dentalData.treatmentPlan.stages?.find(
+                (s: any) => (s.stageNumber || s.stage) === stageNumber,
+              );
+
+              // Determine stage status
+              let stageStatus;
+              if (stageInput?.status) {
+                stageStatus = stageInput.status;
+              } else {
+                const totalProcedures = procs.length;
+                const completedProcedures = procs.filter(
+                  (p) => p.status === "completed",
+                ).length;
+
+                if (totalProcedures === 0) {
+                  stageStatus = "pending";
+                } else if (completedProcedures === totalProcedures) {
+                  stageStatus = "completed";
+                } else if (completedProcedures > 0) {
+                  stageStatus = "in-progress";
+                } else {
+                  stageStatus = "pending";
+                }
+              }
+
+              return {
+                stageNumber: stageNumber,
+                stageName: stageInput?.stageName || `Stage ${stageNumber}`,
+                description: stageInput?.description || "",
+                status: stageStatus,
+                scheduledDate:
+                  stageInput?.scheduledDate ||
+                  new Date().toISOString().split("T")[0],
+                toothSurfaceProcedures: toothSurfaceProcedures,
+                notes: stageInput?.notes || "",
+              };
+            },
+          );
+
+          // Build teeth data
+          const teethData = dentalData.treatmentPlan.teeth.map(
+            (toothPlan: any) => ({
+              toothNumber: toothPlan.toothNumber,
+              priority: toothPlan.priority || "medium",
+              isCompleted: false,
+              procedures: toothPlan.procedures.map((proc: any) => ({
+                name: proc.name,
+                surface: proc.surface || "occlusal",
+                stage: proc.stage || 1,
+                estimatedCost: proc.estimatedCost || 0,
+                notes: proc.notes || "",
+                status: proc.status || "planned",
+              })),
+            }),
+          );
+
+          treatmentPlanInput = {
+            planName: dentalData.treatmentPlan.planName.trim(),
+            description: dentalData.treatmentPlan.description?.trim() || "",
+            teeth: teethData,
+            stages: stagesData,
+            startToday: shouldStartToday,
+          };
+
+          formData.append("treatmentPlan", JSON.stringify(treatmentPlanInput));
+        }
       }
-    }
 
-    // Append referral if exists
-    if (referralDoctorId && referralReason.trim()) {
-      formData.append('referral', JSON.stringify({
-        referredToDoctorId: referralDoctorId,
-        referralReason: referralReason.trim(),
-      }));
-    }
-
-    // Append recall if exists
-    if (recallDate && recallTime) {
-      formData.append('recall', JSON.stringify({
-        appointmentDate: recallDate.toISOString().split('T')[0],
-        appointmentTime: recallTime,
-        department: recallDepartment || appointmentDetail.department,
-      }));
-    }
-
-    // Append uploaded files
-    uploadFiles.forEach(file => {
-      formData.append('files', file);
-    });
-
-    console.log("=== FORM DATA SUMMARY ===");
-    console.log("Soft tissues:", softTissues.filter(st => 
-      st.onExamination.length > 0 || 
-      st.diagnosis.length > 0 || 
-      st.treatment.length > 0
-    ).length);
-    console.log("TMJ examinations:", tmjExaminations.filter(tmj => 
-      tmj.onExamination.length > 0 || 
-      tmj.diagnosis.length > 0 || 
-      tmj.treatment.length > 0
-    ).length);
-    console.log("Has treatment plan:", !!dentalData.treatmentPlan);
-    console.log("Has performed teeth:", dentalData.performedTeeth?.length || 0);
-    console.log("Has files:", uploadFiles.length);
-
-    // Using axios with FormData
-    const response = await axios.post(
-      `${patientServiceBaseUrl}/api/v1/patient-service/consultation/consult-patient/${appointmentDetail._id}`,
-      formData,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      // Append referral if exists
+      if (referralDoctorId && referralReason.trim()) {
+        formData.append(
+          "referral",
+          JSON.stringify({
+            referredToDoctorId: referralDoctorId,
+            referralReason: referralReason.trim(),
+          }),
+        );
       }
-    );
 
-    const data = response.data;
+      // Append recall if exists
+      if (recallDate && recallTime) {
+        formData.append(
+          "recall",
+          JSON.stringify({
+            appointmentDate: recallDate.toISOString().split("T")[0],
+            appointmentTime: recallTime,
+            department: recallDepartment || appointmentDetail.department,
+          }),
+        );
+      }
 
-    if (data?.success) {
-      console.log("✅ Consultation saved successfully!");
-      console.log("Response data:", data);
-      
-      // Refresh patient treatment plans
-      await fetchPatientTreatmentPlans();
-      
-      // Clear editing state
-      setEditingTreatmentPlan(null);
-      
-      // Reset form
-      setChiefComplaint("");
-      setDiagnosis("");
-      setPrescriptions([{
-        medicineName: "",
-        dosage: "",
-        frequency: "",
-        duration: "",
-        instructions: "",
-      }]);
-      setAdditionalNotes("");
-      setUploadFiles([]);
-      setFilePreviews([]);
-      setReferralDoctorId("");
-      setReferralReason("");
-      setRecallDate(null);
-      setRecallTime("");
-      setRecallDepartment("");
-      setDentalData({
-        performedTeeth: [],
-        plannedProcedures: [],
-        treatmentPlan: null
+      // Append uploaded files
+      uploadFiles.forEach((file) => {
+        formData.append("files", file);
       });
-      
-      // Reset soft tissues and TMJ examinations
-      setSoftTissues(SOFT_TISSUE_DATA.map(tissue => ({
-        ...tissue,
-        onExamination: [],
-        diagnosis: [],
-        treatment: []
-      })));
-      setTMJExaminations(TMJ_DATA.map(tmj => ({
-        ...tmj,
-        onExamination: [],
-        diagnosis: [],
-        treatment: []
-      })));
-      
-      // Close dental chart if open
-      setShowDentalChart(false);
-      
-      alert("✅ Consultation saved successfully!");
-      
-      // Optionally close the consultation view
-      handleBackToAppointments();
-    } else {
-      alert(data?.message || "Failed to save consultation");
-    }
-  } catch (err: any) {
-    console.error("❌ Error saving consultation:", err);
-    console.error("Error response:", err.response?.data);
-    
-    if (err.response?.data?.errors) {
-      const errorMessages = Object.entries(err.response.data.errors)
-        .map(([field, message]) => `${field}: ${message}`)
-        .join('\n');
-      alert(`Validation errors:\n${errorMessages}`);
-    } else {
-      alert(err.response?.data?.message || "Error saving consultation");
-    }
-  } finally {
-    setLoading(false);
-  }
-};
-const handleEditTreatmentPlan = (plan: TreatmentPlan) => {
-  console.log("✏️ Editing treatment plan:", plan.planName);
-  
-  setIsTransitioningToEdit(true);
-  
-  const dentalChartPlan = convertToDentalChartFormat(plan);
-  
-  setSelectedTreatmentPlan(null);
-  setEditingTreatmentPlan(plan);
-  setShowDentalChart(true);
-  
-  setDentalData(prev => ({
-    ...prev,
-    treatmentPlan: dentalChartPlan
-  }));
-  
-  setTimeout(() => {
-    setIsTransitioningToEdit(false);
-  }, 1000);
-};
 
-{isTransitioningToEdit && (
-  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-    <div className="bg-white p-6 rounded-xl shadow-lg">
-      <div className="flex items-center gap-3">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <div>
-          <p className="font-medium">Opening treatment plan editor...</p>
-          <p className="text-sm text-gray-500">Please wait</p>
+      console.log("=== FORM DATA SUMMARY ===");
+      console.log(
+        "Soft tissues:",
+        softTissues.filter(
+          (st) =>
+            st.onExamination.length > 0 ||
+            st.diagnosis.length > 0 ||
+            st.treatment.length > 0,
+        ).length,
+      );
+      console.log(
+        "TMJ examinations:",
+        tmjExaminations.filter(
+          (tmj) =>
+            tmj.onExamination.length > 0 ||
+            tmj.diagnosis.length > 0 ||
+            tmj.treatment.length > 0,
+        ).length,
+      );
+      console.log("Has treatment plan:", !!dentalData.treatmentPlan);
+      console.log(
+        "Has performed teeth:",
+        dentalData.performedTeeth?.length || 0,
+      );
+      console.log("Has files:", uploadFiles.length);
+
+      // Using axios with FormData
+      const response = await axios.post(
+        `${patientServiceBaseUrl}/api/v1/patient-service/consultation/consult-patient/${appointmentDetail._id}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+
+      const data = response.data;
+
+      if (data?.success) {
+        console.log("✅ Consultation saved successfully!");
+        console.log("Response data:", data);
+
+        // Refresh patient treatment plans
+        await fetchPatientTreatmentPlans();
+
+        // Clear editing state
+        setEditingTreatmentPlan(null);
+
+        // Reset form
+        setChiefComplaint("");
+        setDiagnosis("");
+        setPrescriptions([
+          {
+            medicineName: "",
+            dosage: "",
+            frequency: "",
+            duration: "",
+            instructions: "",
+          },
+        ]);
+        setAdditionalNotes("");
+        setUploadFiles([]);
+        setFilePreviews([]);
+        setReferralDoctorId("");
+        setReferralReason("");
+        setRecallDate(null);
+        setRecallTime("");
+        setRecallDepartment("");
+        setDentalData({
+          performedTeeth: [],
+          plannedProcedures: [],
+          treatmentPlan: null,
+        });
+
+        // Reset soft tissues and TMJ examinations
+        setSoftTissues(
+          SOFT_TISSUE_DATA.map((tissue) => ({
+            ...tissue,
+            onExamination: [],
+            diagnosis: [],
+            treatment: [],
+          })),
+        );
+        setTMJExaminations(
+          TMJ_DATA.map((tmj) => ({
+            ...tmj,
+            onExamination: [],
+            diagnosis: [],
+            treatment: [],
+          })),
+        );
+
+        // Close dental chart if open
+        setShowDentalChart(false);
+
+        alert("✅ Consultation saved successfully!");
+
+        // Optionally close the consultation view
+        handleBackToAppointments();
+      } else {
+        alert(data?.message || "Failed to save consultation");
+      }
+    } catch (err: any) {
+      console.error("❌ Error saving consultation:", err);
+      console.error("Error response:", err.response?.data);
+
+      if (err.response?.data?.errors) {
+        const errorMessages = Object.entries(err.response.data.errors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .join("\n");
+        alert(`Validation errors:\n${errorMessages}`);
+      } else {
+        alert(err.response?.data?.message || "Error saving consultation");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleEditTreatmentPlan = (plan: TreatmentPlan) => {
+    console.log("✏️ Editing treatment plan:", plan.planName);
+
+    setIsTransitioningToEdit(true);
+
+    const dentalChartPlan = convertToDentalChartFormat(plan);
+
+    setSelectedTreatmentPlan(null);
+    setEditingTreatmentPlan(plan);
+    setShowDentalChart(true);
+
+    setDentalData((prev) => ({
+      ...prev,
+      treatmentPlan: dentalChartPlan,
+    }));
+
+    setTimeout(() => {
+      setIsTransitioningToEdit(false);
+    }, 1000);
+  };
+
+  {
+    isTransitioningToEdit && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-xl shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div>
+              <p className="font-medium">Opening treatment plan editor...</p>
+              <p className="text-sm text-gray-500">Please wait</p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-)}
-const convertToDentalChartFormat = (treatmentPlan: TreatmentPlan): TreatmentPlanData | null => {
-  if (!treatmentPlan) return null;
-  
-  console.log("🔄 Converting treatment plan to dental chart format:", treatmentPlan);
-  
-  const teeth = treatmentPlan.teeth.map(tooth => ({
-    toothNumber: tooth.toothNumber,
-    priority: (tooth.priority as 'urgent' | 'high' | 'medium' | 'low') || 'medium',
-    procedures: tooth.procedures.map(proc => ({
-      name: proc.name,
-      surface: proc.surface || 'occlusal',
-      stage: proc.stage || 1,
-      estimatedCost: proc.estimatedCost || 0,
-      notes: proc.notes || '',
-      status: (proc.status as 'planned' | 'in-progress' | 'completed') || 'planned'
-    }))
-  }));
-  
-  const stages = treatmentPlan.stages.map(stage => {
-    const procedureRefs: { toothNumber: number; procedureName: string; }[] = [];
-    
-    if (stage.toothSurfaceProcedures && stage.toothSurfaceProcedures.length > 0) {
-      stage.toothSurfaceProcedures.forEach(tsp => {
-        tsp.surfaceProcedures.forEach(sp => {
-          sp.procedureNames.forEach(procName => {
-            procedureRefs.push({
-              toothNumber: tsp.toothNumber,
-              procedureName: procName
+    );
+  }
+  const convertToDentalChartFormat = (
+    treatmentPlan: TreatmentPlan,
+  ): TreatmentPlanData | null => {
+    if (!treatmentPlan) return null;
+
+    console.log(
+      "🔄 Converting treatment plan to dental chart format:",
+      treatmentPlan,
+    );
+
+    const teeth = treatmentPlan.teeth.map((tooth) => ({
+      toothNumber: tooth.toothNumber,
+      priority:
+        (tooth.priority as "urgent" | "high" | "medium" | "low") || "medium",
+      procedures: tooth.procedures.map((proc) => ({
+        name: proc.name,
+        surface: proc.surface || "occlusal",
+        stage: proc.stage || 1,
+        estimatedCost: proc.estimatedCost || 0,
+        notes: proc.notes || "",
+        status:
+          (proc.status as "planned" | "in-progress" | "completed") || "planned",
+      })),
+    }));
+
+    const stages = treatmentPlan.stages.map((stage) => {
+      const procedureRefs: { toothNumber: number; procedureName: string }[] =
+        [];
+
+      if (
+        stage.toothSurfaceProcedures &&
+        stage.toothSurfaceProcedures.length > 0
+      ) {
+        stage.toothSurfaceProcedures.forEach((tsp) => {
+          tsp.surfaceProcedures.forEach((sp) => {
+            sp.procedureNames.forEach((procName) => {
+              procedureRefs.push({
+                toothNumber: tsp.toothNumber,
+                procedureName: procName,
+              });
             });
           });
         });
-      });
-    } else {
-      const stageNum = stage.stageNumber;
-      teeth.forEach(tooth => {
-        tooth.procedures.forEach(proc => {
-          if (proc.stage === stageNum) {
-            procedureRefs.push({
-              toothNumber: tooth.toothNumber,
-              procedureName: proc.name
-            });
-          }
+      } else {
+        const stageNum = stage.stageNumber;
+        teeth.forEach((tooth) => {
+          tooth.procedures.forEach((proc) => {
+            if (proc.stage === stageNum) {
+              procedureRefs.push({
+                toothNumber: tooth.toothNumber,
+                procedureName: proc.name,
+              });
+            }
+          });
         });
-      });
-    }
-    
-    return {
-      stageName: stage.stageName || `Stage ${stage.stageNumber}`,
-      stageNumber: stage.stageNumber,
-      description: stage.description || '',
-      procedureRefs: procedureRefs,
-      status: stage.status as 'pending' | 'completed' | 'in-progress',
-      scheduledDate: stage.scheduledDate || new Date().toISOString().split('T')[0],
-      notes: stage.notes || ''
-    };
-  });
-  
-  const formattedPlan: TreatmentPlanData = {
-    planName: treatmentPlan.planName,
-    description: treatmentPlan.description || '',
-    teeth: teeth,
-    stages: stages
-  };
-  
-  return formattedPlan;
-};
+      }
 
-// const formatDate = (dateString: string) => {
-//   if (!dateString) return "N/A";
-//   return new Date(dateString).toLocaleDateString('en-IN', {
-//     day: 'numeric',
-//     month: 'short',
-//     year: 'numeric'
-//   });
-// };
+      return {
+        stageName: stage.stageName || `Stage ${stage.stageNumber}`,
+        stageNumber: stage.stageNumber,
+        description: stage.description || "",
+        procedureRefs: procedureRefs,
+        status: stage.status as "pending" | "completed" | "in-progress",
+        scheduledDate:
+          stage.scheduledDate || new Date().toISOString().split("T")[0],
+        notes: stage.notes || "",
+      };
+    });
+
+    const formattedPlan: TreatmentPlanData = {
+      planName: treatmentPlan.planName,
+      description: treatmentPlan.description || "",
+      teeth: teeth,
+      stages: stages,
+    };
+
+    return formattedPlan;
+  };
+
+  // const formatDate = (dateString: string) => {
+  //   if (!dateString) return "N/A";
+  //   return new Date(dateString).toLocaleDateString('en-IN', {
+  //     day: 'numeric',
+  //     month: 'short',
+  //     year: 'numeric'
+  //   });
+  // };
   const addStage = () => {
     setStages((prev) => [
       ...prev,
@@ -4212,37 +4563,36 @@ const convertToDentalChartFormat = (treatmentPlan: TreatmentPlan): TreatmentPlan
 
   const handleStageChange = (index: number, field: string, value: string) => {
     setStages((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, [field]: value } : s))
+      prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
     );
   };
 
-const fetchPatientTreatmentPlans = async () => {
-  try {
-    if (!appointmentDetail?.patientId?._id) return;
-    setTreatmentPlansLoading(true);
+  const fetchPatientTreatmentPlans = async () => {
+    try {
+      if (!appointmentDetail?.patientId?._id) return;
+      setTreatmentPlansLoading(true);
 
-    const token = localStorage.getItem("authToken");
-    const response = await axios.get(
-      `${patientServiceBaseUrl}/api/v1/patient-service/appointment/treatment-plans/${appointmentDetail.patientId._id}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+      const token = localStorage.getItem("authToken");
+      const response = await axios.get(
+        `${patientServiceBaseUrl}/api/v1/patient-service/appointment/treatment-plans/${appointmentDetail.patientId._id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
-    setPatientTreatmentPlans(response.data.data || []);
-  } catch (err) {
-    console.error("Error fetching treatment plans", err);
-  } finally {
-    setTreatmentPlansLoading(false);
-  }
-};
+      setPatientTreatmentPlans(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching treatment plans", err);
+    } finally {
+      setTreatmentPlansLoading(false);
+    }
+  };
 
-useEffect(() => {
-  if (appointmentDetail?.patientId?._id) {
-    fetchPatientTreatmentPlans();
-  }
-}, [appointmentDetail]);
-
+  useEffect(() => {
+    if (appointmentDetail?.patientId?._id) {
+      fetchPatientTreatmentPlans();
+    }
+  }, [appointmentDetail]);
 
   // History Detail Modal
   if (selectedHistory) {
@@ -4257,7 +4607,7 @@ useEffect(() => {
                 {formatDate(
                   selectedHistory.visitDate ||
                     selectedHistory.appointmentDate ||
-                    ""
+                    "",
                 )}
               </p>
             </div>
@@ -4390,62 +4740,64 @@ useEffect(() => {
             </div>
           </div>
           {/* Files Section */}
-{selectedHistory.files && selectedHistory.files.length > 0 && (
-<Card>
-  <CardHeader>
-    <CardTitle className="text-lg">Attached Files</CardTitle>
-  </CardHeader>
+          {selectedHistory.files && selectedHistory.files.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Attached Files</CardTitle>
+              </CardHeader>
 
-  <CardContent className="space-y-4">
-    {selectedHistory.files.map((file, index) => {
-      const filePath = `${patientServiceBaseUrl}${file.url}`;
-      
-      const isImage = file.type?.includes("image");
+              <CardContent className="space-y-4">
+                {selectedHistory.files.map((file, index) => {
+                  const filePath = `${patientServiceBaseUrl}${file.url}`;
 
-      return (
-        <div
-          key={file._id || index}
-          className="flex items-center justify-between border p-3 rounded-lg"
-        >
-          <div className="flex items-center gap-3">
-            {/* Preview */}
-            {isImage ? (
-              <img
-                src={filePath}
-                crossOrigin="anonymous"
-                // onError={(e) => (e.target.src = "/no-preview.png")} // fallback
-                alt="Preview"
-                className="h-14 w-14 rounded-md object-cover border"
-              />
-            ) : (
-              <div className="h-14 w-14 flex items-center justify-center border rounded-md bg-red-50 text-red-600 font-semibold">
-                PDF
-              </div>
-            )}
+                  const isImage = file.type?.includes("image");
 
-            {/* File Info */}
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                {isImage ? "Image" : "PDF"}
-              </p>
-              <p className="text-xs text-gray-500">
-                {new Date(file.uploadedAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
+                  return (
+                    <div
+                      key={file._id || index}
+                      className="flex items-center justify-between border p-3 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Preview */}
+                        {isImage ? (
+                          <img
+                            src={filePath}
+                            crossOrigin="anonymous"
+                            // onError={(e) => (e.target.src = "/no-preview.png")} // fallback
+                            alt="Preview"
+                            className="h-14 w-14 rounded-md object-cover border"
+                          />
+                        ) : (
+                          <div className="h-14 w-14 flex items-center justify-center border rounded-md bg-red-50 text-red-600 font-semibold">
+                            PDF
+                          </div>
+                        )}
 
-          {/* View Button */}
-          <Button variant="outline" size="sm" onClick={() => window.open(filePath, "_blank")}>
-            View
-          </Button>
-        </div>
-      );
-    })}
-  </CardContent>
-</Card>
+                        {/* File Info */}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {isImage ? "Image" : "PDF"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(file.uploadedAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
 
-)}
-
+                      {/* View Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(filePath, "_blank")}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Footer */}
           <div className="border-t px-6 py-4 flex justify-end flex-shrink-0">
@@ -4457,21 +4809,21 @@ useEffect(() => {
   }
 
   // Detail View Screen
- if (selectedAppointmentId && appointmentDetail) {
-  return (
-    <>
-     {/* Treatment Plan Form Modal - Drawer Style - NOW AT TOP LEVEL OF THIS VIEW */}
+  if (selectedAppointmentId && appointmentDetail) {
+    return (
+      <>
+        {/* Treatment Plan Form Modal - Drawer Style - NOW AT TOP LEVEL OF THIS VIEW */}
         {showTreatmentPlanForm && (
           <div className="fixed inset-0 z-[100] flex justify-end">
             {/* Backdrop */}
-            <div 
+            <div
               className="absolute inset-0 bg-black/50"
               onClick={() => setShowTreatmentPlanForm(false)}
             />
-            
+
             {/* Drawer */}
-            <div className="relative z-10 w-full max-w-2xl h-full bg-white shadow-2xl overflow-y-auto animate-slide-in-right">      
-           <div className="p-6">
+            <div className="relative z-10 w-full max-w-2xl h-full bg-white shadow-2xl overflow-y-auto animate-slide-in-right">
+              <div className="p-6">
                 <TreatmentPlanForm
                   patientId={appointmentDetail?.patientId?._id || ""}
                   patientName={appointmentDetail?.patientId?.name || ""}
@@ -4479,9 +4831,9 @@ useEffect(() => {
                   onClose={() => setShowTreatmentPlanForm(false)}
                   onSave={(plan) => {
                     console.log("Saving treatment plan:", plan);
-                    setDentalData(prev => ({
+                    setDentalData((prev) => ({
                       ...prev,
-                      treatmentPlan: plan
+                      treatmentPlan: plan,
                     }));
                     alert("Treatment plan created successfully!");
                     setShowTreatmentPlanForm(false);
@@ -4493,678 +4845,767 @@ useEffect(() => {
           </div>
         )}
 
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBackToAppointments}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Appointments
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-semibold">Appointment Details</h1>
-            <p className="text-sm text-muted-foreground">
-              OP# {appointmentDetail.opNumber} -{" "}
-              {appointmentDetail.patientId.name}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Full-screen Dental Chart Mode */}
-      {showDentalChart ? (
-        <div className="fixed inset-0 z-[100] bg-white">
-          {/* Dental Chart Header */}
-          <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div className="min-h-screen bg-gray-50">
+          <div className="bg-white border-b px-6 py-4">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowDentalChart(false)}
+                onClick={handleBackToAppointments}
                 className="gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Consultation
+                Back to Appointments
               </Button>
               <div className="flex-1">
-                <h1 className="text-2xl font-semibold">Dental Chart</h1>
+                <h1 className="text-2xl font-semibold">Appointment Details</h1>
                 <p className="text-sm text-muted-foreground">
-                  Patient: {appointmentDetail.patientId.name} • 
-                  ID: {appointmentDetail.patientId.patientUniqueId}
+                  OP# {appointmentDetail.opNumber} -{" "}
+                  {appointmentDetail.patientId.name}
                 </p>
               </div>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowDentalChart(false)}
-            >
-              Save & Close
-            </Button>
           </div>
 
-          {/* Full-screen Dental Chart Container */}
-       <div className="h-[calc(100vh-60px)] w-full"> 
-
-<DentalChart
-  patientId={appointmentDetail.patientId._id}
-  visitId={appointmentDetail._id}
-  mode="edit"
-  patientName={appointmentDetail.patientId.name}
-  patientUniqueId={appointmentDetail.patientId.patientUniqueId}
-  onClose={() => {
-    setShowDentalChart(false);
-  }}
-  onSave={(dentalDataFromChart) => {
-    console.log("DentalChart onSave called with:", dentalDataFromChart);
-    
-    // Update the state
-    setDentalData({
-      performedTeeth: dentalDataFromChart.performedTeeth || [],
-      plannedProcedures: dentalDataFromChart.plannedProcedures || [],
-      treatmentPlan: dentalDataFromChart.treatmentPlan || null
-    });
-    
-    // Also update soft tissues and TMJ from the chart
-    if (dentalDataFromChart.softTissues) {
-      setSoftTissues(dentalDataFromChart.softTissues);
-    }
-    
-    if (dentalDataFromChart.tmjExaminations) {
-      setTMJExaminations(dentalDataFromChart.tmjExaminations);
-    }
-    
-    console.log("Updated dental data:", {
-      performedTeeth: dentalDataFromChart.performedTeeth?.length || 0,
-      plannedProcedures: dentalDataFromChart.plannedProcedures?.length || 0,
-      hasTreatmentPlan: !!dentalDataFromChart.treatmentPlan,
-      softTissues: dentalDataFromChart.softTissues?.length || 0,
-      tmjExaminations: dentalDataFromChart.tmjExaminations?.length || 0
-    });
-    
-    // Clear editing state if we were editing
-    if (editingTreatmentPlan) {
-      setEditingTreatmentPlan(null);
-    }
-    
-    setShowDentalChart(false);
-  }}
-  onProcedureAdded={(toothNumber, procedure) => {
-    console.log(`Procedure ${procedure.name} added to tooth ${toothNumber}`);
-  }}
-  existingTreatmentPlan={editingTreatmentPlan ? convertToDentalChartFormat(editingTreatmentPlan) : null}
-  existingConditions={dentalData.performedTeeth}
-  // dentalChartMode={dentalChartMode} // Pass the mode
-/>
-     </div>
-        </div>
-      ) : (
-        // Original consultation view when dental chart is not open
-        <div className="flex h-[calc(100vh-80px)]">
-          <div className="w-[30%] bg-primary/5 border-r p-6 overflow-y-auto">
-            <div className="space-y-4">
-              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                <div className="flex items-center gap-3 mb-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                      {appointmentDetail.patientId.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {appointmentDetail.patientId.name}
-                    </h3>
+          {/* Full-screen Dental Chart Mode */}
+          {showDentalChart ? (
+            <div className="fixed inset-0 z-[100] bg-white">
+              {/* Dental Chart Header */}
+              <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDentalChart(false)}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Consultation
+                  </Button>
+                  <div className="flex-1">
+                    <h1 className="text-2xl font-semibold">Dental Chart</h1>
                     <p className="text-sm text-muted-foreground">
+                      Patient: {appointmentDetail.patientId.name} • ID:{" "}
                       {appointmentDetail.patientId.patientUniqueId}
                     </p>
                   </div>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-primary" />
-                    <span>
-                      {appointmentDetail.patientId.age}Y,{" "}
-                      {appointmentDetail.patientId.gender}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-primary" />
-                    <span>{appointmentDetail.patientId.phone}</span>
-                  </div>
-                  {appointmentDetail.patientId.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-primary" />
-                      <span className="truncate">
-                        {appointmentDetail.patientId.email}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowDentalChart(false)}
+                >
+                  Save & Close
+                </Button>
               </div>
 
-              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                <h4 className="font-semibold mb-3 text-primary">
-                  Appointment Info
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4 text-primary" />
-                    <span>{formatDate(appointmentDetail.appointmentDate)}</span>
+              {/* Full-screen Dental Chart Container */}
+              <div className="h-[calc(100vh-60px)] w-full">
+                <DentalChart
+                  patientId={appointmentDetail.patientId._id}
+                  visitId={appointmentDetail._id}
+                  mode="edit"
+                  patientName={appointmentDetail.patientId.name}
+                  patientUniqueId={appointmentDetail.patientId.patientUniqueId}
+                  onClose={() => {
+                    setShowDentalChart(false);
+                  }}
+                  onSave={(dentalDataFromChart) => {
+                    console.log(
+                      "DentalChart onSave called with:",
+                      dentalDataFromChart,
+                    );
+
+                    // Update the state
+                    setDentalData({
+                      performedTeeth: dentalDataFromChart.performedTeeth || [],
+                      plannedProcedures:
+                        dentalDataFromChart.plannedProcedures || [],
+                      treatmentPlan: dentalDataFromChart.treatmentPlan || null,
+                    });
+
+                    // Also update soft tissues and TMJ from the chart
+                    if (dentalDataFromChart.softTissues) {
+                      setSoftTissues(dentalDataFromChart.softTissues);
+                    }
+
+                    if (dentalDataFromChart.tmjExaminations) {
+                      setTMJExaminations(dentalDataFromChart.tmjExaminations);
+                    }
+
+                    console.log("Updated dental data:", {
+                      performedTeeth:
+                        dentalDataFromChart.performedTeeth?.length || 0,
+                      plannedProcedures:
+                        dentalDataFromChart.plannedProcedures?.length || 0,
+                      hasTreatmentPlan: !!dentalDataFromChart.treatmentPlan,
+                      softTissues: dentalDataFromChart.softTissues?.length || 0,
+                      tmjExaminations:
+                        dentalDataFromChart.tmjExaminations?.length || 0,
+                    });
+
+                    // Clear editing state if we were editing
+                    if (editingTreatmentPlan) {
+                      setEditingTreatmentPlan(null);
+                    }
+
+                    setShowDentalChart(false);
+                  }}
+                  onProcedureAdded={(toothNumber, procedure) => {
+                    console.log(
+                      `Procedure ${procedure.name} added to tooth ${toothNumber}`,
+                    );
+                  }}
+                  existingTreatmentPlan={
+                    editingTreatmentPlan
+                      ? convertToDentalChartFormat(editingTreatmentPlan)
+                      : null
+                  }
+                  existingConditions={dentalData.performedTeeth}
+                  // dentalChartMode={dentalChartMode} // Pass the mode
+                />
+              </div>
+            </div>
+          ) : (
+            // Original consultation view when dental chart is not open
+            <div className="flex h-[calc(100vh-80px)]">
+              <div className="w-[30%] bg-primary/5 border-r p-6 overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                          {appointmentDetail.patientId.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-semibold text-lg">
+                          {appointmentDetail.patientId.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {appointmentDetail.patientId.patientUniqueId}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-primary" />
+                        <span>
+                          {appointmentDetail.patientId.age}Y,{" "}
+                          {appointmentDetail.patientId.gender}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-primary" />
+                        <span>{appointmentDetail.patientId.phone}</span>
+                      </div>
+                      {appointmentDetail.patientId.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-primary" />
+                          <span className="truncate">
+                            {appointmentDetail.patientId.email}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-primary" />
-                    <span>{formatTime(appointmentDetail.appointmentTime)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="font-normal">
-                      {appointmentDetail.department}
-                    </Badge>
-                  </div>
-                  {/* <div className="mt-2">
+
+                  <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                    <h4 className="font-semibold mb-3 text-primary">
+                      Appointment Info
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-primary" />
+                        <span>
+                          {formatDate(appointmentDetail.appointmentDate)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span>
+                          {formatTime(appointmentDetail.appointmentTime)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-normal">
+                          {appointmentDetail.department}
+                        </Badge>
+                      </div>
+                      {/* <div className="mt-2">
                     <Badge className={getStatusColor(appointmentDetail.status)}>
                       {getStatusLabel(appointmentDetail.status)}
                     </Badge>
                   </div> */}
+                    </div>
+                  </div>
+
+                  {/* ✅ Patient Treatment Plans */}
+
+                  <div className="bg-primary/10 rounded-xl p-4 border border-primary/20 mt-4">
+                    <h4 className="font-semibold mb-3 text-primary">
+                      Patient Treatment Plans
+                    </h4>
+
+                    {treatmentPlansLoading ? (
+                      <p className="text-sm text-muted-foreground">
+                        Loading treatment plans...
+                      </p>
+                    ) : patientTreatmentPlans.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No treatment plans found
+                      </p>
+                    ) : (
+                      <ScrollArea className="h-[250px] pr-2">
+                        <div className="space-y-2">
+                          {patientTreatmentPlans.map((plan) => (
+                            <div
+                              key={plan._id}
+                              className="flex items-center justify-between p-3 border border-primary/20 rounded-lg bg-white/60 hover:bg-white transition-all cursor-pointer"
+                              onClick={() => {
+                                console.log(
+                                  "📋 Treatment Plan Clicked:",
+                                  plan.planName,
+                                );
+                                console.log("🆔 Plan ID:", plan._id);
+                                console.log("📊 Status:", plan.status);
+
+                                // Specifically log stages data
+                                console.log("📈 STAGES DATA:");
+                                if (plan.stages && plan.stages.length > 0) {
+                                  plan.stages.forEach((stage, index) => {
+                                    console.log(`  Stage ${index + 1}:`);
+                                    console.log(`    ID: ${stage._id}`);
+                                    console.log(`    Name: ${stage.stageName}`);
+                                    console.log(
+                                      `    Number: ${stage.stageNumber}`,
+                                    );
+                                    console.log(`    Status: ${stage.status}`);
+                                    console.log(
+                                      `    Scheduled: ${stage.scheduledDate}`,
+                                    );
+
+                                    // Log toothSurfaceProcedures
+                                    if (
+                                      stage.toothSurfaceProcedures &&
+                                      stage.toothSurfaceProcedures.length > 0
+                                    ) {
+                                      console.log(
+                                        `    Tooth-Surface Procedures: ${stage.toothSurfaceProcedures.length}`,
+                                      );
+                                      stage.toothSurfaceProcedures.forEach(
+                                        (tsp, tspIndex) => {
+                                          console.log(
+                                            `      Tooth #${tsp.toothNumber}:`,
+                                          );
+                                          tsp.surfaceProcedures.forEach(
+                                            (sp, spIndex) => {
+                                              console.log(
+                                                `        Surface: ${sp.surface}`,
+                                              );
+                                              console.log(
+                                                `        Procedures: ${sp.procedureNames.join(", ")}`,
+                                              );
+                                            },
+                                          );
+                                        },
+                                      );
+                                    } else {
+                                      console.log(
+                                        `    Tooth-Surface Procedures: None`,
+                                      );
+                                    }
+                                  });
+                                } else {
+                                  console.log("  No stages found in this plan");
+                                }
+
+                                // Also show complete stages array
+                                console.log(
+                                  "📋 Complete Stages Array:",
+                                  plan.stages,
+                                );
+
+                                // Show JSON stringified version for full structure
+                                console.log(
+                                  "📋 Stages JSON:",
+                                  JSON.stringify(plan.stages, null, 2),
+                                );
+
+                                setSelectedTreatmentPlan(plan);
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <CalendarIcon className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="text-sm font-medium text-gray-700">
+                                  {formatDate(plan.startedAt || plan.createdAt)}
+                                </span>
+                                <span className="text-sm text-gray-600 truncate max-w-[120px]">
+                                  {plan.planName}
+                                </span>
+                                {/* Show stages count badge */}
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-blue-50 text-blue-700"
+                                >
+                                  {plan.stages?.length || 0} stages
+                                </Badge>
+                              </div>
+                              <Badge
+                                className={`${
+                                  plan.status === "completed"
+                                    ? "bg-green-100 text-green-700"
+                                    : plan.status === "in-progress"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-yellow-100 text-yellow-700"
+                                } text-[10px]`}
+                              >
+                                {plan.status}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                  {/* ✅ Modal for Treatment Plan Details */}
+                  {selectedTreatmentPlan && (
+                    <TreatmentPlanDetailsModal
+                      plan={selectedTreatmentPlan}
+                      onClose={() => setSelectedTreatmentPlan(null)}
+                      refetchTreatmentPlans={fetchPatientTreatmentPlans}
+                      viewOnly={selectedTreatmentPlan._id.startsWith("temp-")}
+                      onEditPlan={handleEditTreatmentPlan}
+                    />
+                  )}
+                  <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                    <h4 className="font-semibold mb-3 text-primary">
+                      Patient History
+                    </h4>
+
+                    {detailLoading ? (
+                      <p className="text-sm text-muted-foreground">
+                        Loading history...
+                      </p>
+                    ) : patientHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No previous visits
+                      </p>
+                    ) : (
+                      <ScrollArea className="h-[300px] pr-2">
+                        <div className="space-y-3">
+                          {patientHistory.map((item) => {
+                            const hasTreatmentPlan = !!item.treatmentPlan;
+
+                            return (
+                              <div
+                                key={item._id}
+                                className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
+                              >
+                                <div className="flex justify-between items-center mb-1">
+                                  <p className="text-xs font-medium text-primary">
+                                    {formatDate(
+                                      item.visitDate ||
+                                        item.appointmentDate ||
+                                        "",
+                                    )}
+                                  </p>
+
+                                  {hasTreatmentPlan && (
+                                    <span className="bg-green-100 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                      Treatment Plan
+                                    </span>
+                                  )}
+                                </div>
+
+                                {item.doctor && (
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    Dr. {item.doctor.name}
+                                  </p>
+                                )}
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full mt-2"
+                                  onClick={() => handleViewHistory(item)}
+                                >
+                                  View Full Details
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* ✅ Patient Treatment Plans */}
-      
-<div className="bg-primary/10 rounded-xl p-4 border border-primary/20 mt-4">
-  <h4 className="font-semibold mb-3 text-primary">Patient Treatment Plans</h4>
+              <div className="flex-1 p-6 overflow-y-auto">
+                <div className="max-w-4xl mx-auto">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Consultation Notes</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Chief Complaint */}
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">
+                          Chief Complaint
+                        </label>
+                        <Textarea
+                          placeholder="Enter patient's main complaint..."
+                          className="min-h-[100px]"
+                          value={chiefComplaint}
+                          onChange={(e) => setChiefComplaint(e.target.value)}
+                        />
+                      </div>
 
-  {treatmentPlansLoading ? (
-    <p className="text-sm text-muted-foreground">Loading treatment plans...</p>
-  ) : patientTreatmentPlans.length === 0 ? (
-    <p className="text-sm text-muted-foreground">No treatment plans found</p>
-  ) : (
-    <ScrollArea className="h-[250px] pr-2">
-      <div className="space-y-2">
-        {patientTreatmentPlans.map((plan) => (
-          <div
-            key={plan._id}
-            className="flex items-center justify-between p-3 border border-primary/20 rounded-lg bg-white/60 hover:bg-white transition-all cursor-pointer"
-            onClick={() => {
-              console.log("📋 Treatment Plan Clicked:", plan.planName);
-              console.log("🆔 Plan ID:", plan._id);
-              console.log("📊 Status:", plan.status);
-              
-              // Specifically log stages data
-              console.log("📈 STAGES DATA:");
-              if (plan.stages && plan.stages.length > 0) {
-                plan.stages.forEach((stage, index) => {
-                  console.log(`  Stage ${index + 1}:`);
-                  console.log(`    ID: ${stage._id}`);
-                  console.log(`    Name: ${stage.stageName}`);
-                  console.log(`    Number: ${stage.stageNumber}`);
-                  console.log(`    Status: ${stage.status}`);
-                  console.log(`    Scheduled: ${stage.scheduledDate}`);
-                  
-                  // Log toothSurfaceProcedures
-                  if (stage.toothSurfaceProcedures && stage.toothSurfaceProcedures.length > 0) {
-                    console.log(`    Tooth-Surface Procedures: ${stage.toothSurfaceProcedures.length}`);
-                    stage.toothSurfaceProcedures.forEach((tsp, tspIndex) => {
-                      console.log(`      Tooth #${tsp.toothNumber}:`);
-                      tsp.surfaceProcedures.forEach((sp, spIndex) => {
-                        console.log(`        Surface: ${sp.surface}`);
-                        console.log(`        Procedures: ${sp.procedureNames.join(', ')}`);
-                      });
-                    });
-                  } else {
-                    console.log(`    Tooth-Surface Procedures: None`);
-                  }
-                });
-              } else {
-                console.log("  No stages found in this plan");
-              }
-              
-              // Also show complete stages array
-              console.log("📋 Complete Stages Array:", plan.stages);
-              
-              // Show JSON stringified version for full structure
-              console.log("📋 Stages JSON:", JSON.stringify(plan.stages, null, 2));
-              
-              setSelectedTreatmentPlan(plan);
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <CalendarIcon className="h-4 w-4 text-primary flex-shrink-0" />
-              <span className="text-sm font-medium text-gray-700">
-                {formatDate(plan.startedAt || plan.createdAt)}
-              </span>
-              <span className="text-sm text-gray-600 truncate max-w-[120px]">
-                {plan.planName}
-              </span>
-              {/* Show stages count badge */}
-              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700">
-                {plan.stages?.length || 0} stages
-              </Badge>
-            </div>
-            <Badge
-              className={`${
-                plan.status === "completed"
-                  ? "bg-green-100 text-green-700"
-                  : plan.status === "in-progress"
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-yellow-100 text-yellow-700"
-              } text-[10px]`}
-            >
-              {plan.status}
-            </Badge>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
-  )}
-</div>
-              {/* ✅ Modal for Treatment Plan Details */}
-{selectedTreatmentPlan && (
-  <TreatmentPlanDetailsModal
-    plan={selectedTreatmentPlan}
-    onClose={() => setSelectedTreatmentPlan(null)}
-    refetchTreatmentPlans={fetchPatientTreatmentPlans}
-    viewOnly={selectedTreatmentPlan._id.startsWith('temp-')}
-    onEditPlan={handleEditTreatmentPlan} 
-  />
-)}
-              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                <h4 className="font-semibold mb-3 text-primary">Patient History</h4>
+                      {/* Diagnosis */}
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">
+                          Diagnosis
+                        </label>
+                        <Textarea
+                          placeholder="Enter diagnosis..."
+                          className="min-h-[100px]"
+                          value={diagnosis}
+                          onChange={(e) => setDiagnosis(e.target.value)}
+                        />
+                      </div>
 
-                {detailLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading history...</p>
-                ) : patientHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No previous visits</p>
-                ) : (
-                  <ScrollArea className="h-[300px] pr-2">
-                    <div className="space-y-3">
-                      {patientHistory.map((item) => {
-                        const hasTreatmentPlan = !!item.treatmentPlan;
+                      {/* Prescription */}
+                      <div>
+                        <label className="text-sm font-semibold mb-3 block text-gray-800">
+                          Prescription
+                        </label>
 
-                        return (
-                          <div
-                            key={item._id}
-                            className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
-                          >
-                            <div className="flex justify-between items-center mb-1">
-                              <p className="text-xs font-medium text-primary">
-                                {formatDate(item.visitDate || item.appointmentDate || "")}
-                              </p>
-
-                              {hasTreatmentPlan && (
-                                <span className="bg-green-100 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                                  Treatment Plan
-                                </span>
-                              )}
-                            </div>
-
-                            {item.doctor && (
-                              <p className="text-xs text-muted-foreground mb-1">
-                                Dr. {item.doctor.name}
-                              </p>
-                            )}
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full mt-2"
-                              onClick={() => handleViewHistory(item)}
+                        <div className="space-y-4">
+                          {prescriptions.map((prescription, index) => (
+                            <div
+                              key={index}
+                              className="border border-gray-200 rounded-2xl shadow-sm p-4 bg-white space-y-3 hover:shadow-md transition-all"
                             >
-                              View Full Details
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-medium text-gray-700">
+                                  Medicine {index + 1}
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={() => removePrescription(index)}
+                                  className="text-red-500 text-sm hover:text-red-600 transition"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">
+                                    Medicine Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. Amoxicillin"
+                                    value={prescription.medicineName}
+                                    onChange={(e) =>
+                                      handlePrescriptionChange(
+                                        index,
+                                        "medicineName",
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">
+                                    Dosage
+                                  </label>
+                                  <input
+                                    type="text"
+                                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. 500 mg"
+                                    value={prescription.dosage}
+                                    onChange={(e) =>
+                                      handlePrescriptionChange(
+                                        index,
+                                        "dosage",
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">
+                                    Frequency
+                                  </label>
+                                  <input
+                                    type="text"
+                                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. 3 times/day"
+                                    value={prescription.frequency}
+                                    onChange={(e) =>
+                                      handlePrescriptionChange(
+                                        index,
+                                        "frequency",
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">
+                                    Duration
+                                  </label>
+                                  <input
+                                    type="text"
+                                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. 5 days"
+                                    value={prescription.duration}
+                                    onChange={(e) =>
+                                      handlePrescriptionChange(
+                                        index,
+                                        "duration",
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-1">
+                                  Instructions
+                                </label>
+                                <textarea
+                                  className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[60px]"
+                                  placeholder="e.g. Take after meals"
+                                  value={prescription.instructions}
+                                  onChange={(e) =>
+                                    handlePrescriptionChange(
+                                      index,
+                                      "instructions",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={addPrescription}
+                              className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition"
+                            >
+                              + Add Another Medicine
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Notes */}
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">
+                          Additional Notes
+                        </label>
+                        <Textarea
+                          placeholder="Any additional notes or observations..."
+                          className="min-h-[100px]"
+                          value={additionalNotes}
+                          onChange={(e) => setAdditionalNotes(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">
+                          Attach Files (Images, PDFs, X-rays, etc.)
+                        </label>
+
+                        <div className="flex items-center gap-3">
+                          <label className="cursor-pointer">
+                            <div className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all">
+                              <Upload className="h-4 w-4 text-gray-600" />
+                              <span className="text-sm text-gray-600">
+                                Choose Files
+                              </span>
+                            </div>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*,.pdf,.doc,.docx"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                            />
+                          </label>
+                          {uploadFiles.length > 0 && (
+                            <span className="text-xs text-gray-500">
+                              {uploadFiles.length} file
+                              {uploadFiles.length > 1 ? "s" : ""} selected
+                            </span>
+                          )}
+                        </div>
+
+                        {/* ✅ Dental Chart Section */}
+
+                        <div className="mt-6">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => {
+                                setShowDentalChart(true);
+                                setDentalChartMode("chart-only");
+                              }}
+                            >
+                              <FileText className="mr-2 h-4 w-4" />
+                              Open Dental Chart
                             </Button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 p-6 overflow-y-auto">
-            <div className="max-w-4xl mx-auto">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Consultation Notes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Chief Complaint */}
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Chief Complaint
-                    </label>
-                    <Textarea
-                      placeholder="Enter patient's main complaint..."
-                      className="min-h-[100px]"
-                      value={chiefComplaint}
-                      onChange={(e) => setChiefComplaint(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Diagnosis */}
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Diagnosis
-                    </label>
-                    <Textarea
-                      placeholder="Enter diagnosis..."
-                      className="min-h-[100px]"
-                      value={diagnosis}
-                      onChange={(e) => setDiagnosis(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Prescription */}
-                  <div>
-                    <label className="text-sm font-semibold mb-3 block text-gray-800">
-                      Prescription
-                    </label>
-
-                    <div className="space-y-4">
-                      {prescriptions.map((prescription, index) => (
-                        <div
-                          key={index}
-                          className="border border-gray-200 rounded-2xl shadow-sm p-4 bg-white space-y-3 hover:shadow-md transition-all"
-                        >
-                          <div className="flex justify-between items-center mb-2">
-                            <h4 className="font-medium text-gray-700">
-                              Medicine {index + 1}
-                            </h4>
-                            <button
-                              type="button"
-                              onClick={() => removePrescription(index)}
-                              className="text-red-500 text-sm hover:text-red-600 transition"
-                            >
-                              Remove
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                Medicine Name
-                              </label>
-                              <input
-                                type="text"
-                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="e.g. Amoxicillin"
-                                value={prescription.medicineName}
-                                onChange={(e) =>
-                                  handlePrescriptionChange(
-                                    index,
-                                    "medicineName",
-                                    e.target.value
-                                  )
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                Dosage
-                              </label>
-                              <input
-                                type="text"
-                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="e.g. 500 mg"
-                                value={prescription.dosage}
-                                onChange={(e) =>
-                                  handlePrescriptionChange(
-                                    index,
-                                    "dosage",
-                                    e.target.value
-                                  )
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                Frequency
-                              </label>
-                              <input
-                                type="text"
-                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="e.g. 3 times/day"
-                                value={prescription.frequency}
-                                onChange={(e) =>
-                                  handlePrescriptionChange(
-                                    index,
-                                    "frequency",
-                                    e.target.value
-                                  )
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                Duration
-                              </label>
-                              <input
-                                type="text"
-                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="e.g. 5 days"
-                                value={prescription.duration}
-                                onChange={(e) =>
-                                  handlePrescriptionChange(
-                                    index,
-                                    "duration",
-                                    e.target.value
-                                  )
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">
-                              Instructions
-                            </label>
-                            <textarea
-                              className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[60px]"
-                              placeholder="e.g. Take after meals"
-                              value={prescription.instructions}
-                              onChange={(e) =>
-                                handlePrescriptionChange(
-                                  index,
-                                  "instructions",
-                                  e.target.value
-                                )
-                              }
-                            />
-                          </div>
                         </div>
-                      ))}
 
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={addPrescription}
-                          className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition"
-                        >
-                          + Add Another Medicine
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Additional Notes */}
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Additional Notes
-                    </label>
-                    <Textarea
-                      placeholder="Any additional notes or observations..."
-                      className="min-h-[100px]"
-                      value={additionalNotes}
-                      onChange={(e) => setAdditionalNotes(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Attach Files (Images, PDFs, X-rays, etc.)
-                    </label>
-
-                    <div className="flex items-center gap-3">
-                      <label className="cursor-pointer">
-                        <div className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all">
-                          <Upload className="h-4 w-4 text-gray-600" />
-                          <span className="text-sm text-gray-600">Choose Files</span>
-                        </div>
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*,.pdf,.doc,.docx"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                      </label>
-                      {uploadFiles.length > 0 && (
-                        <span className="text-xs text-gray-500">
-                          {uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} selected
-                        </span>
-                      )}
-                    </div>
-
-                    {/* ✅ Dental Chart Section */}
-            
-<div className="mt-6">
-  <div className="flex gap-2">
-    <Button
-      variant="outline"
-      className="flex-1"
-      onClick={() => {
-        setShowDentalChart(true);
-        setDentalChartMode("chart-only");
-      }}
-    >
-      <FileText className="mr-2 h-4 w-4" />
-      Open Dental Chart
-    </Button>
-    
-  
-  </div>
-</div>
-{/* Direct Treatment Plan Button */}
-<div className="mt-4">
-  <Button
-    variant="outline"
-    className="w-full"
-    onClick={() => {
-      setTreatmentPlan(null);
-      setShowTreatmentPlanForm(true);
-    }}
-  >
-    <FileText className="mr-2 h-4 w-4" />
-    Create New Treatment Plan
-  </Button>
-</div>
-                    {/* File Previews */}
-                    {filePreviews.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-                        {filePreviews.map((preview, index) => (
-                          <div
-                            key={index}
-                            className="relative border rounded-lg p-3 bg-gray-50 hover:bg-gray-100 transition-all"
+                        {/* Direct Treatment Plan Button */}
+                        <div className="mt-4">
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                              setTreatmentPlan(null);
+                              setShowTreatmentPlanForm(true);
+                            }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFile(index)}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-all shadow-md"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Create New Treatment Plan
+                          </Button>
+                        </div>
+                        <div className="mt-4">
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => setShowLabOrderModal(true)}
+                          >
+                            {/* <Flask className="mr-2 h-4 w-4" /> */}
+                            Create Lab Order
+                          </Button>
+                        </div>
+                        {/* File Previews */}
+                        {filePreviews.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                            {filePreviews.map((preview, index) => (
+                              <div
+                                key={index}
+                                className="relative border rounded-lg p-3 bg-gray-50 hover:bg-gray-100 transition-all"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFile(index)}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-all shadow-md"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
 
-                            {preview.type === 'image' && preview.url ? (
-                              <img
-                                src={preview.url}
-                                alt={preview.name}
-                                className="w-full h-24 object-cover rounded mb-2"
-                              />
-                            ) : (
-                              <div className="w-full h-24 flex items-center justify-center bg-gray-200 rounded mb-2">
-                                {preview.type === 'pdf' ? (
-                                  <FileText className="h-5 w-5 text-red-500" />
+                                {preview.type === "image" && preview.url ? (
+                                  <img
+                                    src={preview.url}
+                                    alt={preview.name}
+                                    className="w-full h-24 object-cover rounded mb-2"
+                                  />
                                 ) : (
-                                  <File className="h-5 w-5 text-gray-500" />
+                                  <div className="w-full h-24 flex items-center justify-center bg-gray-200 rounded mb-2">
+                                    {preview.type === "pdf" ? (
+                                      <FileText className="h-5 w-5 text-red-500" />
+                                    ) : (
+                                      <File className="h-5 w-5 text-gray-500" />
+                                    )}
+                                  </div>
                                 )}
+
+                                <p
+                                  className="text-xs text-gray-600 truncate"
+                                  title={preview.name}
+                                >
+                                  {preview.name}
+                                </p>
                               </div>
-                            )}
-
-                            <p className="text-xs text-gray-600 truncate" title={preview.name}>
-                              {preview.name}
-                            </p>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
 
-             
+                      {/* Treatment Plan Section */}
+                      {dentalData.treatmentPlan && (
+                        <div className="border-t border-gray-200 pt-6 mt-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                              Treatment Plan
+                            </h3>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // View full details or edit
+                                setTreatmentPlan(dentalData.treatmentPlan);
+                                setShowTreatmentPlanForm(true);
+                              }}
+                            >
+                              Edit Plan
+                            </Button>
+                          </div>
 
-{/* Treatment Plan Section */}
-{dentalData.treatmentPlan && (
-  <div className="border-t border-gray-200 pt-6 mt-4">
-    <div className="flex justify-between items-center mb-3">
-      <h3 className="text-lg font-semibold text-gray-800">Treatment Plan</h3>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          // View full details or edit
-          setTreatmentPlan(dentalData.treatmentPlan);
-          setShowTreatmentPlanForm(true);
-        }}
-      >
-        Edit Plan
-      </Button>
-    </div>
-    
-    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-      <div className="font-medium text-gray-700">
-        {dentalData.treatmentPlan.planName}
-      </div>
-      {dentalData.treatmentPlan.description && (
-        <p className="text-sm text-gray-600 mt-1">
-          {dentalData.treatmentPlan.description}
-        </p>
-      )}
-      <div className="grid grid-cols-3 gap-4 mt-3">
-        <div className="bg-white p-2 rounded text-center">
-          <div className="text-xs text-gray-500">Teeth</div>
-          <div className="font-bold">
-            {dentalData.treatmentPlan.teeth.length}
-          </div>
-        </div>
-        <div className="bg-white p-2 rounded text-center">
-          <div className="text-xs text-gray-500">Procedures</div>
-          <div className="font-bold">
-        { dentalData.treatmentPlan.teeth.reduce((sum: number, t: any) => 
-  sum + t.procedures.length, 0)}
-          </div>
-        </div>
-        <div className="bg-white p-2 rounded text-center">
-          <div className="text-xs text-gray-500">Stages</div>
-          <div className="font-bold">
-            {dentalData.treatmentPlan.stages.length}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-{/* Treatment Plan Form Modal - Standalone */}
-{/* {showTreatmentPlanForm && (
+                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <div className="font-medium text-gray-700">
+                              {dentalData.treatmentPlan.planName}
+                            </div>
+                            {dentalData.treatmentPlan.description && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                {dentalData.treatmentPlan.description}
+                              </p>
+                            )}
+                            <div className="grid grid-cols-3 gap-4 mt-3">
+                              <div className="bg-white p-2 rounded text-center">
+                                <div className="text-xs text-gray-500">
+                                  Teeth
+                                </div>
+                                <div className="font-bold">
+                                  {dentalData.treatmentPlan.teeth.length}
+                                </div>
+                              </div>
+                              <div className="bg-white p-2 rounded text-center">
+                                <div className="text-xs text-gray-500">
+                                  Procedures
+                                </div>
+                                <div className="font-bold">
+                                  {dentalData.treatmentPlan.teeth.reduce(
+                                    (sum: number, t: any) =>
+                                      sum + t.procedures.length,
+                                    0,
+                                  )}
+                                </div>
+                              </div>
+                              <div className="bg-white p-2 rounded text-center">
+                                <div className="text-xs text-gray-500">
+                                  Stages
+                                </div>
+                                <div className="font-bold">
+                                  {dentalData.treatmentPlan.stages.length}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Treatment Plan Form Modal - Standalone */}
+                      {/* {showTreatmentPlanForm && (
   <TreatmentPlanForm
     patientId={appointmentDetail?.patientId?._id || ""}
     existingConditions={dentalData.performedTeeth || []}
@@ -5182,8 +5623,8 @@ useEffect(() => {
   />
 )} */}
 
-{/* Treatment Plan Details Modal */}
-{/* {selectedTreatmentPlan && (
+                      {/* Treatment Plan Details Modal */}
+                      {/* {selectedTreatmentPlan && (
   <TreatmentPlanDetailsModal
     plan={selectedTreatmentPlan}
     onClose={() => setSelectedTreatmentPlan(null)}
@@ -5191,192 +5632,215 @@ useEffect(() => {
   />
 )} */}
 
-{/* Treatment Plan Details Modal */}
-{selectedTreatmentPlan && (
-  <TreatmentPlanDetailsModal
-    plan={selectedTreatmentPlan}
-    onClose={() => setSelectedTreatmentPlan(null)}
-    refetchTreatmentPlans={fetchPatientTreatmentPlans}
-    viewOnly={selectedTreatmentPlan._id.startsWith('temp-')}
-      onEditPlan={handleEditTreatmentPlan} 
-  />
-)}
-
-                  {/* Referral Section */}
-                  <div className="border-t border-gray-200 pt-6 mt-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                      Refer Patient
-                    </h3>
-
-                    {/* Department Select */}
-                    <select
-                      className="w-full p-2 border rounded"
-                      value={selectedDepartment}
-                      onChange={(e) => {
-                        const depName = e.target.value;
-                        console.log("🟦 Department selected:", depName);
-                        setSelectedDepartment(depName);
-                        fetchDoctorsByDepartment(depName);
-                      }}
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map((dep: any) => (
-                        <option key={dep._id} value={dep.departmentName}>
-                          {dep.departmentName}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Doctors Dropdown */}
-                    <div className="mb-4">
-                      <label className="text-sm font-medium block mb-1">
-                        Refer To Doctor
-                      </label>
-                      <select
-                        className="w-full p-2 border rounded"
-                        value={referralDoctorId}
-                        onChange={(e) => {
-                          const doctorId = e.target.value;
-                          console.log("🟩 Doctor selected:", doctorId);
-                          setReferralDoctorId(doctorId);
-                        }}
-                      >
-                        <option value="">Select Doctor</option>
-                        {doctors.map((doc) => (
-                          <option key={doc.doctorId} value={doc.doctorId}>
-                            {doc.doctor?.name || "Unnamed Doctor"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Referral Reason */}
-                    {referralDoctorId && (
-                      <div className="mb-4">
-                        <label className="text-sm font-medium block mb-1">
-                          Referral Reason
-                        </label>
-                        <textarea
-                          className="w-full border p-2 rounded-lg text-sm min-h-[80px]"
-                          placeholder="Explain why patient is being referred..."
-                          value={referralReason}
-                          onChange={(e) => setReferralReason(e.target.value)}
+                      {/* Treatment Plan Details Modal */}
+                      {selectedTreatmentPlan && (
+                        <TreatmentPlanDetailsModal
+                          plan={selectedTreatmentPlan}
+                          onClose={() => setSelectedTreatmentPlan(null)}
+                          refetchTreatmentPlans={fetchPatientTreatmentPlans}
+                          viewOnly={selectedTreatmentPlan._id.startsWith(
+                            "temp-",
+                          )}
+                          onEditPlan={handleEditTreatmentPlan}
                         />
-                      </div>
-                    )}
-                  </div>
+                      )}
 
-                  {/* Recall/Follow-up Section */}
-                  <div className="border-t border-gray-200 pt-6 mt-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        Schedule Recall/Follow-up
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowRecall((prev) => !prev)}
-                      >
-                        {showRecall ? "Hide" : "Add Recall"}
-                      </Button>
-                    </div>
+                      {/* Referral Section */}
+                      <div className="border-t border-gray-200 pt-6 mt-4">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                          Refer Patient
+                        </h3>
 
-                    {showRecall && (
-                      <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Recall Date Picker */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Recall Date
-                            </label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className="w-full justify-start text-left font-normal"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {recallDate ? (
-                                    format(recallDate, "MMM dd, yyyy")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={recallDate || undefined}
-                                  onSelect={(date) => setRecallDate(date || null)}
-                                  disabled={(date) => date < new Date()}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
+                        {/* Department Select */}
+                        <select
+                          className="w-full p-2 border rounded"
+                          value={selectedDepartment}
+                          onChange={(e) => {
+                            const depName = e.target.value;
+                            console.log("🟦 Department selected:", depName);
+                            setSelectedDepartment(depName);
+                            fetchDoctorsByDepartment(depName);
+                          }}
+                        >
+                          <option value="">Select Department</option>
+                          {departments.map((dep: any) => (
+                            <option key={dep._id} value={dep.departmentName}>
+                              {dep.departmentName}
+                            </option>
+                          ))}
+                        </select>
 
-                          {/* Recall Time */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Recall Time
-                            </label>
-                            <div className="relative">
-                              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <Input
-                                type="time"
-                                className="pl-10"
-                                value={recallTime}
-                                onChange={(e) => setRecallTime(e.target.value)}
-                              />
-                            </div>
-                          </div>
+                        {/* Doctors Dropdown */}
+                        <div className="mb-4">
+                          <label className="text-sm font-medium block mb-1">
+                            Refer To Doctor
+                          </label>
+                          <select
+                            className="w-full p-2 border rounded"
+                            value={referralDoctorId}
+                            onChange={(e) => {
+                              const doctorId = e.target.value;
+                              console.log("🟩 Doctor selected:", doctorId);
+                              setReferralDoctorId(doctorId);
+                            }}
+                          >
+                            <option value="">Select Doctor</option>
+                            {doctors.map((doc) => (
+                              <option key={doc.doctorId} value={doc.doctorId}>
+                                {doc.doctor?.name || "Unnamed Doctor"}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
-                        {/* Preview */}
-                        {recallDate && recallTime && (
-                          <div className="bg-white p-3 rounded-lg border border-blue-200">
-                            <p className="text-sm font-medium text-gray-700">
-                              Recall Appointment Preview:
-                            </p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              📅 {format(recallDate, "EEEE, MMMM dd, yyyy")} at {recallTime}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Department: {recallDepartment || appointmentDetail?.department || 'Current'}
-                            </p>
+                        {/* Referral Reason */}
+                        {referralDoctorId && (
+                          <div className="mb-4">
+                            <label className="text-sm font-medium block mb-1">
+                              Referral Reason
+                            </label>
+                            <textarea
+                              className="w-full border p-2 rounded-lg text-sm min-h-[80px]"
+                              placeholder="Explain why patient is being referred..."
+                              value={referralReason}
+                              onChange={(e) =>
+                                setReferralReason(e.target.value)
+                              }
+                            />
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Buttons */}
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={handleBackToAppointments}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="bg-primary text-white hover:bg-primary/90"
-                      onClick={handleSaveConsultation}
-                      disabled={loading}
-                    >
-                      {loading ? "Saving..." : "Save Consultation"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                      {/* Recall/Follow-up Section */}
+                      <div className="border-t border-gray-200 pt-6 mt-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            Schedule Recall/Follow-up
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowRecall((prev) => !prev)}
+                          >
+                            {showRecall ? "Hide" : "Add Recall"}
+                          </Button>
+                        </div>
+
+                        {showRecall && (
+                          <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Recall Date Picker */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Recall Date
+                                </label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-start text-left font-normal"
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {recallDate ? (
+                                        format(recallDate, "MMM dd, yyyy")
+                                      ) : (
+                                        <span>Pick a date</span>
+                                      )}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-auto p-0"
+                                    align="start"
+                                  >
+                                    <Calendar
+                                      mode="single"
+                                      selected={recallDate || undefined}
+                                      onSelect={(date) =>
+                                        setRecallDate(date || null)
+                                      }
+                                      disabled={(date) => date < new Date()}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+
+                              {/* Recall Time */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Recall Time
+                                </label>
+                                <div className="relative">
+                                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <Input
+                                    type="time"
+                                    className="pl-10"
+                                    value={recallTime}
+                                    onChange={(e) =>
+                                      setRecallTime(e.target.value)
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Preview */}
+                            {recallDate && recallTime && (
+                              <div className="bg-white p-3 rounded-lg border border-blue-200">
+                                <p className="text-sm font-medium text-gray-700">
+                                  Recall Appointment Preview:
+                                </p>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  📅 {format(recallDate, "EEEE, MMMM dd, yyyy")}{" "}
+                                  at {recallTime}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Department:{" "}
+                                  {recallDepartment ||
+                                    appointmentDetail?.department ||
+                                    "Current"}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex justify-end gap-3 pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={handleBackToAppointments}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          className="bg-primary text-white hover:bg-primary/90"
+                          onClick={handleSaveConsultation}
+                          disabled={loading}
+                        >
+                          {loading ? "Saving..." : "Save Consultation"}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+          <DentalLabOrderModal
+            isOpen={showLabOrderModal}
+            onClose={() => setShowLabOrderModal(false)}
+            appointmentId={appointmentDetail?._id}
+            patientId={appointmentDetail?.patientId?._id}
+            onSuccess={() => {
+              alert("Lab order created successfully!");
+            }}
+          />
         </div>
-      )}
-      
-    </div>
-    </>
-  );
-}
+      </>
+    );
+  }
 
   // Clinic Appointments Modal View
   if (selectedClinic) {
@@ -5448,7 +5912,7 @@ useEffect(() => {
                         "p-4 cursor-pointer hover:bg-primary/5 transition-colors",
                         selectedAppointmentId === appointment._id
                           ? "bg-primary/10 border-l-4 border-primary"
-                          : ""
+                          : "",
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -5474,12 +5938,11 @@ useEffect(() => {
                           variant="outline"
                           className={cn(
                             "text-xs",
-                            getStatusColor(appointment.status)
+                            getStatusColor(appointment.status),
                           )}
                         >
                           {getStatusLabel(appointment.status)}
                         </Badge>
-                        
                       </div>
                     </div>
                   ))}
@@ -5578,44 +6041,43 @@ useEffect(() => {
   // Clinic Cards List View
   return (
     <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle>Appointments by Clinic</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {selectedDate
+                  ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                  : "Select a date"}
+              </p>
+            </div>
 
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <CardTitle>Appointments by Clinic</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {selectedDate
-                ? format(selectedDate, "EEEE, MMMM d, yyyy")
-                : "Select a date"}
-            </p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedDate
+                    ? format(selectedDate, "MMM d, yyyy")
+                    : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate || undefined}
+                  onSelect={(date: Date | undefined) => {
+                    const normalizedDate = date ?? null;
+                    setSelectedDate(normalizedDate);
+                    fetchAppointments(1, searchQuery, true, normalizedDate);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4" />
-                {selectedDate
-                  ? format(selectedDate, "MMM d, yyyy")
-                  : "Pick a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate || undefined}
-                onSelect={(date: Date | undefined) => {
-                  const normalizedDate = date ?? null;
-                  setSelectedDate(normalizedDate);
-                  fetchAppointments(1, searchQuery, true, normalizedDate);
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* <div className="relative mt-4">
+          {/* <div className="relative mt-4">
           <Search
             className="absolute top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
             style={{ right: "10px" }}
@@ -5627,59 +6089,59 @@ useEffect(() => {
             className="pr-9"
           />
         </div> */}
-      </CardHeader>
+        </CardHeader>
 
-      <CardContent>
-        {loading ? (
-          <div className="flex items-center justify-center h-[400px]">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground">Loading appointments...</p>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-[400px]">
-            <div className="text-center space-y-4">
-              <p className="text-red-500">{error}</p>
-              <Button
-                onClick={() =>
-                  fetchAppointments(pagination.currentPage, searchQuery)
-                }
-              >
-                Retry
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {clinicAppointments.length === 0 ? (
-              <div className="flex items-center justify-center h-[400px]">
-                <div className="text-center space-y-2">
-                  <p className="text-muted-foreground text-lg">
-                    No appointments found
-                  </p>
-                  {searchQuery && (
-                    <p className="text-sm text-muted-foreground">
-                      Try adjusting your search criteria
-                    </p>
-                  )}
-                </div>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center h-[400px]">
+              <div className="text-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground">Loading appointments...</p>
               </div>
-            ) : (
-              <ScrollArea className="max-h-[80vh] overflow-y-auto pr-2 sm:pr-4">
-                <div
-                  className="
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-[400px]">
+              <div className="text-center space-y-4">
+                <p className="text-red-500">{error}</p>
+                <Button
+                  onClick={() =>
+                    fetchAppointments(pagination.currentPage, searchQuery)
+                  }
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {clinicAppointments.length === 0 ? (
+                <div className="flex items-center justify-center h-[400px]">
+                  <div className="text-center space-y-2">
+                    <p className="text-muted-foreground text-lg">
+                      No appointments found
+                    </p>
+                    {searchQuery && (
+                      <p className="text-sm text-muted-foreground">
+                        Try adjusting your search criteria
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[80vh] overflow-y-auto pr-2 sm:pr-4">
+                  <div
+                    className="
       flex flex-wrap
       gap-4 sm:gap-6
       justify-start
       items-stretch
     "
-                >
-                  {clinicAppointments.map((clinic) => (
-                    <Card
-                      key={clinic.clinicId}
-                      onClick={() => handleClinicClick(clinic)}
-                      className="
+                  >
+                    {clinicAppointments.map((clinic) => (
+                      <Card
+                        key={clinic.clinicId}
+                        onClick={() => handleClinicClick(clinic)}
+                        className="
           cursor-pointer
           flex flex-col
           justify-between
@@ -5694,42 +6156,42 @@ useEffect(() => {
           bg-card
           w-full sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1rem)] lg:w-[calc(25%-1rem)]
         "
-                    >
-                      <CardContent className="p-4 sm:p-6 flex flex-col justify-between h-full">
-                        <div className="space-y-4">
-                          {/* Header */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-primary/10 p-2.5 sm:p-3 rounded-xl">
-                                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-base sm:text-lg truncate max-w-[140px] sm:max-w-[160px]">
-                                  {clinic.clinicName}
-                                </h3>
-                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
-                                  <Phone className="h-3 w-3 flex-shrink-0" />
-                                  <span>{clinic.clinicPhone}</span>
-                                </p>
+                      >
+                        <CardContent className="p-4 sm:p-6 flex flex-col justify-between h-full">
+                          <div className="space-y-4">
+                            {/* Header */}
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="bg-primary/10 p-2.5 sm:p-3 rounded-xl">
+                                  <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-base sm:text-lg truncate max-w-[140px] sm:max-w-[160px]">
+                                    {clinic.clinicName}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                                    <Phone className="h-3 w-3 flex-shrink-0" />
+                                    <span>{clinic.clinicPhone}</span>
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Appointment Count */}
-                          <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                              <span className="text-sm sm:text-base">
-                                Appointments
-                              </span>
+                            {/* Appointment Count */}
+                            <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                                <span className="text-sm sm:text-base">
+                                  Appointments
+                                </span>
+                              </div>
+                              <Badge className="bg-primary text-primary-foreground text-sm sm:text-base px-3 py-1 rounded-md">
+                                {clinic.appointments.length}
+                              </Badge>
                             </div>
-                            <Badge className="bg-primary text-primary-foreground text-sm sm:text-base px-3 py-1 rounded-md">
-                              {clinic.appointments.length}
-                            </Badge>
-                          </div>
 
-                          {/* Appointment List Preview */}
-                          {/* <div className="pt-1 sm:pt-2">
+                            {/* Appointment List Preview */}
+                            {/* <div className="pt-1 sm:pt-2">
                             <div className="text-xs text-muted-foreground space-y-1">
                               {clinic.appointments
                                 .slice(0, 2)
@@ -5753,53 +6215,53 @@ useEffect(() => {
                               )}
                             </div>
                           </div> */}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  Page {pagination.currentPage} • Showing{" "}
-                  {clinicAppointments.length} clinic
-                  {clinicAppointments.length !== 1 ? "s" : ""}
-                </p>
-                {searchQuery && (
-                  <p className="text-xs mt-1">Filtered by: "{searchQuery}"</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange("prev")}
-                  disabled={pagination.currentPage === 1 || loading}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <div className="px-3 py-1 text-sm border rounded-md bg-muted">
-                  {pagination.currentPage}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  <p>
+                    Page {pagination.currentPage} • Showing{" "}
+                    {clinicAppointments.length} clinic
+                    {clinicAppointments.length !== 1 ? "s" : ""}
+                  </p>
+                  {searchQuery && (
+                    <p className="text-xs mt-1">Filtered by: "{searchQuery}"</p>
+                  )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange("next")}
-                  disabled={!pagination.hasMore || loading}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange("prev")}
+                    disabled={pagination.currentPage === 1 || loading}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <div className="px-3 py-1 text-sm border rounded-md bg-muted">
+                    {pagination.currentPage}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange("next")}
+                    disabled={!pagination.hasMore || loading}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }
