@@ -1,5 +1,5 @@
-// DentalChartView.tsx - For displaying existing dental data with hover effects
-import React, { useState, useMemo } from "react";
+// DentalChartView.tsx - Updated for proper full-page modal view
+import React, { useState, useMemo, useEffect } from "react";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { 
@@ -9,10 +9,19 @@ import {
   Clock,
   X,
   Stethoscope,
-  CheckSquare
+  CheckSquare,
+  Loader2,
+  ArrowLeft,
+  User,
+  FileText,
+  Grid,
+  ChevronDown
 } from "lucide-react";
+import { Button } from "./ui/button";
+import DentalLoader from './DentalLoader';
+import { useImagePreloader } from "../hooks/useImagePreloader";
 
-// Import the ToothSVG from your existing DentalChart component
+// Import ToothSVG from your existing DentalChart component
 interface ToothSVGProps {
   type: string;
   color?: string;
@@ -22,7 +31,6 @@ interface ToothSVGProps {
   opacity?: number;
 }
 
-// Use the same ToothSVG component logic from your DentalChart
 const ToothSVG: React.FC<ToothSVGProps> = ({
   type,
   color = "#4b5563",
@@ -32,8 +40,8 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
   opacity = 1,
 }) => {
   const [hasError, setHasError] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Same SVG mapping as in your DentalChart
   const TOOTH_SVGS: Record<string, string> = {
     incisor: "/assets/svg/dental/incisor.svg",
     canine: "/assets/svg/dental/canine.svg",
@@ -42,7 +50,6 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
     wisdom: "/assets/svg/dental/wisdom.svg",
   };
 
-  // Same helper function
   const getHueFromColor = (hexColor: string): number => {
     const colorMap: Record<string, number> = {
       '#ef4444': 0,    // red (caries)
@@ -50,7 +57,7 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
       '#f59e0b': 40,   // orange (crown)
       '#8b5cf6': 270,  // purple (root canal)
       '#9ca3af': 0,    // gray (missing)
-      '#22c55e': 140,  // green (selected)
+      '#22c55e': 140,  // green (hovered)
       '#4b5563': 0,    // default gray
       '#d1d5db': 0,    // light gray for no data
     };
@@ -68,8 +75,8 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
         transform: `rotate(${rotation}deg)`,
         display: "inline-block",
         position: 'relative',
-        opacity: opacity,
-        transition: 'all 0.2s ease',
+        opacity: isLoaded ? opacity : 0,
+        transition: 'opacity 0.3s ease',
       }}
     >
       {svgUrl && !hasError ? (
@@ -83,11 +90,11 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
             filter: color === '#4b5563' || color === '#d1d5db' ? 'none' : 
               `drop-shadow(0 0 2px ${color}) brightness(0.9) sepia(1) hue-rotate(${getHueFromColor(color)}deg) saturate(2)`,
           }}
+          onLoad={() => setIsLoaded(true)}
           onError={() => setHasError(true)}
           loading="lazy"
         />
       ) : (
-        // Fallback SVG (same as your DentalChart)
         <svg
           width={width}
           height={height}
@@ -108,7 +115,7 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
   );
 };
 
-// Tooth Data Arrays (same as your DentalChart)
+// Tooth Data Arrays
 const ADULT_TOOTH_DATA = [
   // Upper Right (Quadrant 1) - FDI numbers 18-11
   { number: 18, name: "Third Molar", quadrant: 1, svgName: "wisdom", rotation: 180 },
@@ -182,221 +189,113 @@ const PEDIATRIC_TOOTH_DATA = [
 ];
 
 interface DentalChartViewProps {
-  patientData: {
-    id: string;
-    name: string;
-    age: number;
-    ageGroup: string;
-    gender: string;
-    patientUniqueId: string;
-  };
-  dentalChartData: Array<{
-    toothNumber: number;
-    toothType: string;
-    ageGroup: string;
-    conditions: string[];
-    surfaceConditions: Array<{
-      surface: string;
-      conditions: string[];
-    }>;
-    procedures: Array<{
-      type: string;
-      name: string;
-      surface: string;
-      status: string;
-      conditionType?: string;
-      procedureType?: string;
-      cost?: number;
-      estimatedCost?: number;
-      notes?: string;
-      date: string;
-      performedBy: string;
-      treatmentPlanId?: string;
-      visitIds?: string[];
-    }>;
-    lastUpdated: string;
-    lastUpdatedBy: string;
-    lastVisitId?: string;
-  }>;
-  mode?: "compact" | "detailed";
-  onToothClick?: (toothData: any) => void;
+  patientId: string;
+  onClose?: () => void;
 }
-
-interface ToothTooltipProps {
-  toothData: any;
-  position: { x: number; y: number };
-  onClose: () => void;
-}
-
-const ToothTooltip: React.FC<ToothTooltipProps> = ({ toothData, position, onClose }) => {
-  return (
-    <div 
-      className="fixed z-50 bg-white border border-gray-300 rounded-lg shadow-xl max-w-sm w-full p-4"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: 'translate(-50%, -100%)'
-      }}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h4 className="font-bold text-lg">Tooth #{toothData.toothNumber}</h4>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="outline" className="text-xs">
-              {toothData.toothType}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {toothData.ageGroup}
-            </Badge>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-        <Calendar className="h-3 w-3" />
-        <span>Last updated: {new Date(toothData.lastUpdated).toLocaleDateString()}</span>
-      </div>
-
-      {toothData.conditions.length > 0 && (
-        <div className="mb-3">
-          <h5 className="font-medium text-sm mb-2 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            General Conditions
-          </h5>
-          <div className="flex flex-wrap gap-1">
-            {toothData.conditions.map((condition: string, idx: number) => (
-              <Badge key={idx} variant="secondary" className="text-xs">
-                {condition}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {toothData.surfaceConditions.length > 0 && (
-        <div className="mb-3">
-          <h5 className="font-medium text-sm mb-2">Surface Conditions</h5>
-          <div className="space-y-2">
-            {toothData.surfaceConditions.map((surface: any, idx: number) => (
-              <div key={idx} className="border-l-4 border-blue-200 pl-3">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm capitalize">{surface.surface}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {surface.conditions.length} condition(s)
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {surface.conditions.map((condition: string, cIdx: number) => (
-                    <Badge key={cIdx} variant="secondary" className="text-xs">
-                      {condition}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {toothData.procedures.length > 0 && (
-        <div className="mb-3">
-          <h5 className="font-medium text-sm mb-2 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            Procedures ({toothData.procedures.length})
-          </h5>
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-            {toothData.procedures.map((proc: any, idx: number) => (
-              <div key={idx} className={`border-l-4 ${proc.status === 'completed' ? 'border-green-200' : 'border-yellow-200'} pl-3`}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-medium text-sm">{proc.name}</div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                      <span className="capitalize">{proc.surface}</span>
-                      <span>•</span>
-                      <span className={`${proc.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                        {proc.status}
-                      </span>
-                      {proc.cost && (
-                        <>
-                          <span>•</span>
-                          <span>₹{proc.cost}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {new Date(proc.date).toLocaleDateString()}
-                  </Badge>
-                </div>
-                {proc.notes && (
-                  <p className="text-xs text-gray-600 mt-1">{proc.notes}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="pt-3 border-t flex justify-between text-xs text-gray-500">
-        <div className="flex items-center gap-2">
-          <Clock className="h-3 w-3" />
-          <span>{toothData.procedures.length} total procedures</span>
-        </div>
-        <button 
-          className="text-primary hover:text-primary/80"
-          onClick={() => console.log("View detailed history for tooth", toothData.toothNumber)}
-        >
-          View History →
-        </button>
-      </div>
-    </div>
-  );
-};
 
 const DentalChartView: React.FC<DentalChartViewProps> = ({
-  patientData,
-  dentalChartData,
-  mode = "detailed",
-  onToothClick
+  patientId,
+  onClose,
 }) => {
   const [hoveredTooth, setHoveredTooth] = useState<number | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"teeth" | "summary" | "history">("teeth");
+  
+  // Preload all SVG images
+  const allSvgUrls = React.useMemo(() => {
+    return [
+      '/assets/svg/dental/incisor.svg',
+      '/assets/svg/dental/canine.svg',
+      '/assets/svg/dental/premolar.svg',
+      '/assets/svg/dental/molar.svg',
+      '/assets/svg/dental/wisdom.svg',
+    ];
+  }, []);
+  
+  const { isLoading: imagesLoading } = useImagePreloader(allSvgUrls);
+
+  // Fetch dental chart data
+  useEffect(() => {
+    const fetchDentalChart = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(
+          `http://localhost:8002/api/v1/patient-service/patient/dental-chart/${patientId}`
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch dental chart: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          setData(result.data);
+        } else {
+          throw new Error(result.message || 'Failed to fetch dental chart data');
+        }
+      } catch (err: any) {
+        setError(err.message || 'An error occurred while fetching dental chart');
+        console.error('Error fetching dental chart:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (patientId) {
+      fetchDentalChart();
+    }
+  }, [patientId]);
+
+  // Show loader while images are loading OR data is loading
+  if (imagesLoading || loading) {
+    return (
+      <div className="fixed inset-0 bg-white z-[100] flex items-center justify-center">
+        <DentalLoader />
+      </div>
+    );
+  }
 
   // Get the appropriate tooth data based on age group
-  const toothData = patientData.ageGroup === 'pediatric' ? PEDIATRIC_TOOTH_DATA : ADULT_TOOTH_DATA;
+  const toothData = useMemo(() => {
+    if (!data) return ADULT_TOOTH_DATA;
+    return data.patient.ageGroup === 'pediatric' ? PEDIATRIC_TOOTH_DATA : ADULT_TOOTH_DATA;
+  }, [data]);
 
   // Create a map of tooth data for quick lookup
   const toothDataMap = useMemo(() => {
+    if (!data?.dentalChart) return {};
+    
     const map: Record<number, any> = {};
-    dentalChartData.forEach(tooth => {
+    data.dentalChart.forEach((tooth: any) => {
       map[tooth.toothNumber] = tooth;
     });
     return map;
-  }, [dentalChartData]);
+  }, [data]);
 
   // Get tooth by number from the tooth data array
   const getToothByNumber = (toothNumber: number) => {
     return toothData.find(t => t.number === toothNumber);
   };
 
-  // Get tooth color based on conditions and procedures (same logic as DentalChart)
+  // Get tooth color based on conditions and procedures
   const getToothColor = (toothNumber: number): string => {
-    const tooth = getToothByNumber(toothNumber);
     const toothChartData = toothDataMap[toothNumber];
     
-    if (!toothChartData) return "#d1d5db"; // Light gray for no data
+    // If no data for this tooth, return dimmed color
+    if (!toothChartData) return "#d1d5db";
 
     const conditions = toothChartData.conditions || [];
     const procedures = toothChartData.procedures || [];
 
+    // Priority-based coloring
     if (conditions.includes("Missing")) return "#9ca3af";
     if (conditions.includes("Caries")) return "#ef4444";
     if (conditions.includes("Filling")) return "#3b82f6";
@@ -410,7 +309,8 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
     if (procedures.some((p: any) => p.name === "Crown" || p.name === "crown")) return "#f59e0b";
     if (procedures.some((p: any) => p.name.includes("Root Canal"))) return "#8b5cf6";
     
-    return "#4b5563"; // Default color for teeth with data
+    // If tooth has any data but no specific condition/procedure, use default
+    return "#4b5563";
   };
 
   // Check if tooth has any data
@@ -433,47 +333,38 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
   const handleToothClick = (toothNumber: number, event: React.MouseEvent) => {
     const toothChartData = toothDataMap[toothNumber];
     if (toothChartData) {
-      if (onToothClick) {
-        onToothClick(toothChartData);
-      } else {
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
-        setTooltipData(toothChartData);
-        setShowTooltip(true);
-      }
+      setTooltipPosition({ x: event.clientX, y: event.clientY });
+      setTooltipData(toothChartData);
+      setShowTooltip(true);
     }
   };
 
-  // Statistics
-  const stats = useMemo(() => {
-    const teethWithData = dentalChartData.length;
-    const totalProcedures = dentalChartData.reduce((sum, tooth) => 
-      sum + (tooth.procedures?.length || 0), 0
-    );
-    const plannedProcedures = dentalChartData.reduce((sum, tooth) => 
-      sum + (tooth.procedures?.filter((p: any) => p.status === 'planned')?.length || 0), 0
-    );
-    const completedProcedures = dentalChartData.reduce((sum, tooth) => 
-      sum + (tooth.procedures?.filter((p: any) => p.status === 'completed')?.length || 0), 0
-    );
-    
-    const allConditions = new Set<string>();
-    dentalChartData.forEach(tooth => {
-      tooth.conditions?.forEach((cond: string) => allConditions.add(cond));
-      tooth.surfaceConditions?.forEach((sc: any) => 
-        sc.conditions?.forEach((cond: string) => allConditions.add(cond))
-      );
-    });
+  // Statistics from API response
+  const stats = data?.summary || {
+    totalTeeth: 0,
+    teethWithConditions: 0,
+    teethWithProcedures: 0,
+    totalProcedures: 0,
+    plannedProcedures: 0,
+    completedProcedures: 0,
+    uniqueConditions: [],
+    uniqueProcedureTypes: []
+  };
 
-    return {
-      teethWithData,
-      totalProcedures,
-      plannedProcedures,
-      completedProcedures,
-      uniqueConditions: Array.from(allConditions),
-    };
-  }, [dentalChartData]);
+  // Get tooth size based on screen width
+  const getToothSize = () => {
+    if (typeof window !== 'undefined') {
+      const width = window.innerWidth;
+      if (width < 640) return 42; 
+      if (width < 768) return 46; 
+      if (width < 1024) return 50; 
+      if (width < 1280) return 54; 
+      return 58; 
+    }
+    return 52;
+  };
 
-  // Render a single tooth with the same layout as DentalChart
+  // Render a single tooth
   const renderTooth = (tooth: any, index: number) => {
     const toothChartData = toothDataMap[tooth.number];
     const hasData = !!toothChartData;
@@ -501,33 +392,36 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
             <ToothSVG
               type={tooth.svgName}
               color={isHovered ? "#22c55e" : color}
-              width={mode === "compact" ? 40 : 50}
-              height={mode === "compact" ? 40 : 50}
+              width={getToothSize()}
+              height={getToothSize()}
               rotation={tooth.rotation}
               opacity={hasData ? 1 : 0.3}
             />
           </div>
           
+          {/* Indicators for teeth with data */}
           {hasData && !isHovered && (
-            <div className="absolute -top-2 sm:-top-2.5 left-1/2 transform -translate-x-1/2">
+            <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2">
               <div className="flex flex-col items-center">
                 <div
-                  className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${toothChartData.conditions?.length > 0 ? 'animate-pulse' : ''}`}
+                  className={`w-2.5 h-2.5 rounded-full ${toothChartData.conditions?.length > 0 ? 'animate-pulse' : ''}`}
                   style={{ backgroundColor: color }}
                 />
                 {toothChartData.procedures?.length > 0 && (
-                  <div className="mt-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500"></div>
+                  <div className="mt-0.5 w-2 h-2 rounded-full bg-blue-500"></div>
                 )}
               </div>
             </div>
           )}
           
+          {/* Hover effect overlay */}
           {isHovered && (
             <div className="absolute inset-0 bg-green-500/20 rounded-md pointer-events-none"></div>
           )}
         </button>
         
-        <div className={`mt-1.5 text-[11px] sm:text-xs font-semibold mb-2 ${
+        {/* Tooth number */}
+        <div className={`mt-1.5 text-xs font-semibold mb-2 ${
           hasData 
             ? isHovered 
               ? 'text-green-600 scale-110' 
@@ -535,27 +429,6 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
             : 'text-gray-400'
         } transition-all`}>
           {tooth.number}
-        </div>
-        
-        {/* Quick info badge for compact mode */}
-        {mode === "compact" && hasData && (
-          <div className="absolute -bottom-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Render quadrant in the same layout as DentalChart
-  const renderQuadrant = (teeth: any[], quadrant: number, quadrantName: string) => {
-    return (
-      <div className="w-full">
-        <div className="mb-2">
-          <h4 className="text-sm font-medium text-gray-600">{quadrantName}</h4>
-        </div>
-        <div className="flex justify-center items-center gap-1.5 sm:gap-2">
-          {teeth.map((tooth, index) => renderTooth(tooth, index))}
         </div>
       </div>
     );
@@ -567,200 +440,512 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
   const lowerLeftTeeth = toothData.filter(t => t.quadrant === 3);
   const lowerRightTeeth = toothData.filter(t => t.quadrant === 4);
 
+  // Error state
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-white z-[100] flex flex-col">
+        <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Consultation
+              </Button>
+            )}
+            <h1 className="text-2xl font-semibold">Dental History</h1>
+          </div>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full text-center">
+            <div className="mb-4">
+              <AlertCircle className="h-16 w-16 text-red-500 mx-auto" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2 text-gray-800">Error Loading Dental History</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <div className="flex gap-3 justify-center">
+              {onClose && (
+                <Button variant="outline" onClick={onClose}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Go Back
+                </Button>
+              )}
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative">
-      <Card className="border shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-lg">Dental Chart Summary</CardTitle>
-              <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                <div>
-                  <span className="font-medium">Patient:</span> {patientData.name}
+    <div className="fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden">
+      {/* Header - Fixed at top */}
+      <div className="bg-white border-b px-4 sm:px-6 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back to Consultation</span>
+            </Button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold">Dental History</h1>
+            {data?.patient && (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mt-1">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate max-w-[120px] sm:max-w-none">
+                    {data.patient.name}
+                  </span>
                 </div>
-                <div>
-                  <span className="font-medium">Age:</span> {patientData.age} ({patientData.ageGroup})
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <span>Age: {data.patient.age}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {data.patient.ageGroup === 'pediatric' ? 'Pediatric' : 'Adult'}
+                  </Badge>
                 </div>
-                <div>
-                  <span className="font-medium">ID:</span> {patientData.patientUniqueId}
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate max-w-[100px] sm:max-w-none">
+                    ID: {data.patient.patientUniqueId}
+                  </span>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-50">
-                {patientData.ageGroup === 'pediatric' ? 'Pediatric' : 'Adult'} Dentition
-              </Badge>
-            </div>
+            )}
           </div>
-        </CardHeader>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-blue-50 text-xs">
+            View Only
+          </Badge>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 flex items-center justify-center"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
 
-        <CardContent>
-          {/* Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <div className="text-sm text-blue-600">Teeth with Data</div>
-              <div className="text-2xl font-bold text-blue-700">{stats.teethWithData}</div>
-            </div>
-            <div className="bg-green-50 border border-green-100 rounded-lg p-3">
-              <div className="text-sm text-green-600">Total Procedures</div>
-              <div className="text-2xl font-bold text-green-700">{stats.totalProcedures}</div>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
-              <div className="text-sm text-yellow-600">Planned</div>
-              <div className="text-2xl font-bold text-yellow-700">{stats.plannedProcedures}</div>
-            </div>
-            <div className="bg-purple-50 border border-purple-100 rounded-lg p-3">
-              <div className="text-sm text-purple-600">Completed</div>
-              <div className="text-2xl font-bold text-purple-700">{stats.completedProcedures}</div>
-            </div>
+      {/* Tab Navigation */}
+      <div className="border-b bg-gray-50">
+        <div className="px-4 sm:px-6 py-2">
+          <div className="flex overflow-x-auto scrollbar-hide">
+            <button
+              type="button"
+              onClick={() => setActiveTab("teeth")}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                activeTab === "teeth"
+                  ? "bg-white border border-b-0 border-gray-300 text-primary rounded-t-lg"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Grid className="h-3 w-3 sm:h-4 sm:w-4" />
+              Teeth Chart
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("summary")}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                activeTab === "summary"
+                  ? "bg-white border border-b-0 border-gray-300 text-primary rounded-t-lg"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4" />
+              Summary
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                activeTab === "history"
+                  ? "bg-white border border-b-0 border-gray-300 text-primary rounded-t-lg"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+              History
+            </button>
           </div>
+        </div>
+      </div>
 
-          {/* Dental Chart - Same layout as your DentalChart component */}
-          <div className="border rounded-lg bg-white p-3 md:p-5">
-            {/* Vertical midline */}
-            <div className="absolute left-1/2 top-0 bottom-0 transform -translate-x-1/2">
-              <div className="w-px h-full bg-gray-200"></div>
-            </div>
-
-            {/* Upper Arch */}
-            {(upperRightTeeth.length > 0 || upperLeftTeeth.length > 0) && (
-              <div className="flex justify-center items-center gap-1.5 sm:gap-2 md:gap-2.5 mb-6 sm:mb-8 md:mb-10">
-                {/* Quadrant 1 - Upper Right */}
-                <div className="flex justify-end items-center gap-1.5 sm:gap-2">
-                  {upperRightTeeth.map((tooth, index) => renderTooth(tooth, index))}
+      {/* Content Area - Scrollable */}
+      <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
+        {activeTab === "teeth" ? (
+          <div className="max-w-6xl mx-auto">
+            {/* Statistics Cards */}
+            {data?.summary && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 sm:p-4">
+                  <div className="text-xs sm:text-sm text-blue-600 font-medium">Teeth with Data</div>
+                  <div className="text-xl sm:text-2xl font-bold text-blue-700 mt-1">{stats.totalTeeth}</div>
                 </div>
+                <div className="bg-green-50 border border-green-100 rounded-lg p-3 sm:p-4">
+                  <div className="text-xs sm:text-sm text-green-600 font-medium">Total Procedures</div>
+                  <div className="text-xl sm:text-2xl font-bold text-green-700 mt-1">{stats.totalProcedures}</div>
+                </div>
+                <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 sm:p-4">
+                  <div className="text-xs sm:text-sm text-yellow-600 font-medium">Planned</div>
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-700 mt-1">{stats.plannedProcedures}</div>
+                </div>
+                <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 sm:p-4">
+                  <div className="text-xs sm:text-sm text-purple-600 font-medium">Completed</div>
+                  <div className="text-xl sm:text-2xl font-bold text-purple-700 mt-1">{stats.completedProcedures}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Dental Chart */}
+            <div className="border border-gray-300 rounded-xl bg-white p-3 sm:p-4 md:p-5 relative mb-6">
+              {/* Vertical midline */}
+              <div className="absolute left-1/2 top-0 bottom-0 transform -translate-x-1/2">
+                <div className="w-px h-full bg-gray-200"></div>
+              </div>
+
+              {/* Upper Arch */}
+              <div className="flex justify-center items-center gap-1 sm:gap-1.5 md:gap-2.5 mb-4 sm:mb-6 md:mb-10">
+                {/* Quadrant 1 - Upper Right */}
+                {upperRightTeeth.map((tooth, index) => renderTooth(tooth, index))}
 
                 {/* Quadrant 2 - Upper Left */}
-                <div className="flex justify-start items-center gap-1.5 sm:gap-2">
-                  {upperLeftTeeth.map((tooth, index) => renderTooth(tooth, index))}
-                </div>
+                {upperLeftTeeth.map((tooth, index) => renderTooth(tooth, index))}
               </div>
-            )}
 
-            {/* Lower Arch */}
-            {(lowerRightTeeth.length > 0 || lowerLeftTeeth.length > 0) && (
-              <div className="flex justify-center items-center gap-1.5 sm:gap-2 md:gap-2.5 mt-6 sm:mt-8 md:mt-10">
-                {/* Quadrant 3 - Lower Left */}
-                <div className="flex justify-end items-center gap-1.5 sm:gap-2">
-                  {lowerLeftTeeth.map((tooth, index) => renderTooth(tooth, index))}
-                </div>
-
+              {/* Lower Arch */}
+              <div className="flex justify-center items-center gap-1 sm:gap-1.5 md:gap-2.5 mt-4 sm:mt-6 md:mt-10">
                 {/* Quadrant 4 - Lower Right */}
-                <div className="flex justify-start items-center gap-1.5 sm:gap-2">
-                  {lowerRightTeeth.map((tooth, index) => renderTooth(tooth, index))}
-                </div>
+                {lowerRightTeeth.map((tooth, index) => renderTooth(tooth, index))}
+
+                {/* Quadrant 3 - Lower Left */}
+                {lowerLeftTeeth.map((tooth, index) => renderTooth(tooth, index))}
               </div>
-            )}
 
-            {/* Quadrant Labels - Same as DentalChart */}
-            <div className="absolute top-2 left-2">
-              <Badge className="bg-blue-50 text-blue-700 text-xs border border-blue-200">
-                Q1(UL)
-              </Badge>
-            </div>
-            
-            <div className="absolute top-2 right-2">
-              <Badge className="bg-green-50 text-green-700 text-xs border border-green-200">
-                Q2(UR)
-              </Badge>
-            </div>
-            
-            <div className="absolute bottom-2 left-2">
-              <Badge className="bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">
-                Q3(LL)
-              </Badge>
-            </div>
-            
-            <div className="absolute bottom-2 right-2">
-              <Badge className="bg-red-50 text-red-700 text-xs border border-red-200">
-                Q4(LR)
-              </Badge>
-            </div>
-          </div>
-
-          {/* Legend - Same colors as DentalChart */}
-          <div className="mt-6 flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#ef4444]"></div>
-              <span className="text-gray-700">Caries</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#3b82f6]"></div>
-              <span className="text-gray-700">Filling</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#f59e0b]"></div>
-              <span className="text-gray-700">Crown</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#8b5cf6]"></div>
-              <span className="text-gray-700">Root Canal</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#9ca3af]"></div>
-              <span className="text-gray-700">Missing</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#d1d5db]"></div>
-              <span className="text-gray-700">No Data</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#22c55e]"></div>
-              <span className="text-gray-700">Hovered</span>
-            </div>
-          </div>
-
-          {/* Summary of all teeth with data */}
-          {mode === "detailed" && dentalChartData.length > 0 && (
-            <div className="mt-6">
-              <h4 className="font-medium mb-3">Teeth with Dental History</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {dentalChartData.map((tooth) => (
-                  <div 
-                    key={tooth.toothNumber}
-                    className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
-                    onClick={(e) => handleToothClick(tooth.toothNumber, e)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">Tooth #{tooth.toothNumber}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          {tooth.conditions.slice(0, 2).map((cond, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
-                              {cond}
-                            </Badge>
-                          ))}
-                          {tooth.conditions.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{tooth.conditions.length - 2}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-500">
-                          {tooth.procedures.length} procedures
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {new Date(tooth.lastUpdated).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
+              {/* Quadrant Labels */}
+              {/* {selectedQuadrant === "all" && (
+                <>
+                  <div className="absolute top-2 left-2">
+                    <Badge className="bg-blue-50 text-blue-700 text-xs border border-blue-200">
+                      Q1(UL)
+                    </Badge>
                   </div>
+                  
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-green-50 text-green-700 text-xs border border-green-200">
+                      Q2(UR)
+                    </Badge>
+                  </div>
+                  
+                  <div className="absolute bottom-2 left-2">
+                    <Badge className="bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">
+                      Q3(LL)
+                    </Badge>
+                  </div>
+                  
+                  <div className="absolute bottom-2 right-2">
+                    <Badge className="bg-red-50 text-red-700 text-xs border border-red-200">
+                      Q4(LR)
+                    </Badge>
+                  </div>
+                </>
+              )} */}
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#ef4444]"></div>
+                <span className="text-gray-700">Caries</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#3b82f6]"></div>
+                <span className="text-gray-700">Filling</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#f59e0b]"></div>
+                <span className="text-gray-700">Crown</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#8b5cf6]"></div>
+                <span className="text-gray-700">Root Canal</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#9ca3af]"></div>
+                <span className="text-gray-700">Missing</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#d1d5db]"></div>
+                <span className="text-gray-700">No Data</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#22c55e]"></div>
+                <span className="text-gray-700">Hovered</span>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === "summary" ? (
+          <div className="max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {/* Conditions Summary */}
+              <Card>
+                <CardHeader className="py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Conditions Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="py-3 sm:py-4">
+                  {stats.uniqueConditions && stats.uniqueConditions.length > 0 ? (
+                    <div className="space-y-2 sm:space-y-3">
+                      {stats.uniqueConditions.map((condition: string, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between">
+                          <span className="text-xs sm:text-sm">{condition}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {toothData.filter(t => 
+                              toothDataMap[t.number]?.conditions?.includes(condition)
+                            ).length}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-xs sm:text-sm">No conditions recorded</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Procedures Summary */}
+              <Card>
+                <CardHeader className="py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Procedures Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="py-3 sm:py-4">
+                  {stats.uniqueProcedureTypes && stats.uniqueProcedureTypes.length > 0 ? (
+                    <div className="space-y-2 sm:space-y-3">
+                      {stats.uniqueProcedureTypes.map((procedure: string, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between">
+                          <span className="text-xs sm:text-sm">{procedure}</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {data.dentalChart.reduce((count: number, tooth: any) => 
+                                count + (tooth.procedures?.filter((p: any) => 
+                                  p.name === procedure
+                                ).length || 0), 0)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-xs sm:text-sm">No procedures recorded</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Teeth with History */}
+            {data?.dentalChart && data.dentalChart.length > 0 && (
+              <Card className="mt-4 sm:mt-6">
+                <CardHeader className="py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base">Teeth with Dental History</CardTitle>
+                </CardHeader>
+                <CardContent className="py-3 sm:py-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    {data.dentalChart.map((tooth: any) => (
+                      <div 
+                        key={tooth.toothNumber}
+                        className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                        onClick={(e) => handleToothClick(tooth.toothNumber, e)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-sm sm:text-base">Tooth #{tooth.toothNumber}</div>
+                            <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2">
+                              {tooth.conditions.slice(0, 2).map((cond: string, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {cond}
+                                </Badge>
+                              ))}
+                              {tooth.conditions.length > 2 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{tooth.conditions.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs sm:text-sm font-medium text-gray-900">
+                              {tooth.procedures.length} procedures
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Last: {new Date(tooth.lastUpdated).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto">
+            {/* Treatment Timeline */}
+            <Card>
+              <CardHeader className="py-3 sm:py-4">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Treatment History Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-3 sm:py-4">
+                {data?.dentalChart && data.dentalChart.length > 0 ? (
+                  <div className="space-y-3 sm:space-y-4">
+                    {data.dentalChart
+                      .flatMap((tooth: any) => 
+                        (tooth.procedures || []).map((proc: any) => ({
+                          ...proc,
+                          toothNumber: tooth.toothNumber
+                        }))
+                      )
+                      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((procedure: any, idx: number) => (
+                        <div key={idx} className="border-l-4 border-blue-200 pl-3 sm:pl-4 py-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-sm sm:text-base">Tooth #{procedure.toothNumber}: {procedure.name}</div>
+                              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600 mt-1">
+                                <span className="capitalize">{procedure.surface}</span>
+                                <span>•</span>
+                                <span className={`${procedure.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                  {procedure.status}
+                                </span>
+                                {procedure.cost && (
+                                  <>
+                                    <span>•</span>
+                                    <span>₹{procedure.cost}</span>
+                                  </>
+                                )}
+                              </div>
+                              {procedure.notes && (
+                                <p className="text-xs sm:text-sm text-gray-600 mt-2">{procedure.notes}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs sm:text-sm font-medium">
+                                {new Date(procedure.date).toLocaleDateString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(procedure.date).toLocaleTimeString()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">No treatment history available</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Footer - Fixed at bottom */}
+      <div className="border-t px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0 flex-shrink-0 bg-white">
+        <div className="text-xs sm:text-sm text-gray-500">
+          {data?.dentalChart?.length || 0} teeth with dental history
+          {stats.totalProcedures > 0 && (
+            <span className="ml-2 sm:ml-3">
+              • {stats.totalProcedures} total procedures
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+            Print Report
+          </Button>
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+            Export as PDF
+          </Button>
+          {onClose && (
+            <Button onClick={onClose} size="sm" className="text-xs sm:text-sm">
+              Close
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tooltip */}
+      {showTooltip && tooltipData && (
+        <div
+          className="fixed z-[1000] bg-gray-900 text-white p-3 rounded-lg shadow-lg max-w-xs"
+          style={{
+            left: `${tooltipPosition.x + 10}px`,
+            top: `${tooltipPosition.y + 10}px`,
+          }}
+        >
+          <div className="font-semibold mb-1">Tooth #{tooltipData.toothNumber}</div>
+          {tooltipData.conditions && tooltipData.conditions.length > 0 && (
+            <div className="mb-2">
+              <div className="text-xs text-gray-300 mb-1">Conditions:</div>
+              <div className="flex flex-wrap gap-1">
+                {tooltipData.conditions.map((cond: string, idx: number) => (
+                  <span key={idx} className="px-2 py-1 bg-gray-700 rounded text-xs">
+                    {cond}
+                  </span>
                 ))}
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Tooltip */}
-      {showTooltip && tooltipData && (
-        <ToothTooltip
-          toothData={tooltipData}
-          position={tooltipPosition}
-          onClose={() => setShowTooltip(false)}
-        />
+          {tooltipData.procedures && tooltipData.procedures.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-300 mb-1">Procedures:</div>
+              {tooltipData.procedures.map((proc: any, idx: number) => (
+                <div key={idx} className="text-xs mb-1">
+                  • {proc.name} ({proc.surface})
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="text-xs text-gray-400 mt-2">
+            Click for details
+          </div>
+        </div>
       )}
     </div>
   );

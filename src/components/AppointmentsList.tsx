@@ -42,6 +42,8 @@ import axios from "axios";
 import clinicServiceBaseUrl from "../clinicServiceUrl";
 import { DashboardHeader } from "./DashboardHeader";
 import DentalChart from "./DentalChart";
+import DentalChartView from "./DentalChartView";
+import { log } from "console";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -3422,6 +3424,7 @@ export function AppointmentsList() {
   const [selectedTeethForPlan, setSelectedTeethForPlan] = useState<number[]>(
     [],
   );
+  const[viewDentalHistory,setViewDentalHistory]=useState(false);
   console.log("ded", selectedHistory);
 
   const formatTime = (time: string) => {
@@ -3551,7 +3554,9 @@ export function AppointmentsList() {
           "Content-Type": "application/json",
         },
       });
-
+// console.log("helloo",appointmentData)
+// console.log("patientId type:", typeof appointmentData?.patientId);
+// console.log("patientId value:", appointmentData?.patientId);
       const historyResult = historyResponse.data;
       console.log("32323232", historyResult);
       if (historyResult.success) {
@@ -4864,9 +4869,54 @@ export function AppointmentsList() {
                   {appointmentDetail.patientId.name}
                 </p>
               </div>
+            <Button
+        //      variant="outline"
+        // className="gap-2"
+        onClick={() => setViewDentalHistory(!viewDentalHistory)}
+            >Dental History</Button>
             </div>
           </div>
+{viewDentalHistory && (
+  <div className="fixed inset-0 z-[100] bg-white">
+    {/* Dental History Header - Similar styling */}
+    <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setViewDentalHistory(false)}
+          className="gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Consultation
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold">Dental History</h1>
+          <p className="text-sm text-muted-foreground">
+            Patient: {appointmentDetail.patientId.name} • ID:{" "}
+            {appointmentDetail.patientId.patientUniqueId}
+          </p>
+        </div>
+      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => setViewDentalHistory(false)}
+      >
+        Close
+      </Button>
+    </div>
 
+    {/* Full-screen Dental History Container with loader */}
+    <div className="h-[calc(100vh-60px)] w-full">
+      <DentalChartView
+        patientId={appointmentDetail.patientId._id}
+        onClose={() => setViewDentalHistory(false)}
+      />
+    </div>
+  </div>
+)}
+      
           {/* Full-screen Dental Chart Mode */}
           {showDentalChart ? (
             <div className="fixed inset-0 z-[100] bg-white">
