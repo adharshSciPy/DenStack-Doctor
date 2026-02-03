@@ -26,15 +26,40 @@ import {
   Hash,
   CalendarDays,
   ChevronLeft,
-  ChevronRight,
-
+  ChevronDown,
   Stethoscope,
   CreditCard,
   Receipt,
+  Users,
 } from "lucide-react";
 import axios from "axios";
 import patientServiceBaseUrl from "../patientServiceBaseUrl";
 
+// Doctor ID (you can get this from props or context)
+const DOCTOR_ID = "68e4e9e80b2eb07b3a355125";
+
+// Interface for Consulted Patients API response
+interface ConsultedPatient {
+  patientId: string;
+  patientName: string;
+  clinicId: string;
+  clinicName: string;
+  clinicEmail: string;
+  clinicPhone: number;
+  lastVisitDate: string;
+}
+
+interface ConsultedPatientsResponse {
+  success: boolean;
+  count: number;
+  data: ConsultedPatient[];
+  nextCursor: {
+    visitDate: string;
+    _id: string;
+  } | null;
+  hasNextPage: boolean;
+  totalCount: number;
+}
 interface DentalChart {
   toothNumber: number;
   conditions: string[];
@@ -144,20 +169,30 @@ export function PatientRecords() {
     hasNextPage: false,
     nextCursor: null as { visitDate: string; _id: string } | null,
   });
+  
+  // New state for consulted patients
+  const [consultedPatients, setConsultedPatients] = useState<ConsultedPatient[]>([]);
+  const [loadingConsultedPatients, setLoadingConsultedPatients] = useState(false);
+  const [showConsultedPatients, setShowConsultedPatients] = useState(false);
+  const [consultedPagination, setConsultedPagination] = useState({
+  hasNextPage: false,
+  nextCursor: null as { visitDate: string; _id: string } | null,
+  totalCount: 0,
+});
 
-  // Dummy medical history data (you can replace with real API later)
-  const dummyMedicalHistory: MedicalHistory = {
-    bloodGroup: "O+",
-    height: "175 cm",
-    weight: "72 kg",
-    bloodPressure: "120/80 mmHg",
-    allergies: ["Penicillin", "Dust mites"],
-    chronicConditions: ["Hypertension", "Type 2 Diabetes"],
-    medications: ["Metformin 500mg", "Lisinopril 10mg"],
-    lastCheckup: "2024-01-15",
-    smokingStatus: "Former smoker",
-    alcoholConsumption: "Occasionally",
-  };
+  // Dummy medical history data
+  // const dummyMedicalHistory: MedicalHistory = {
+  //   bloodGroup: "O+",
+  //   height: "175 cm",
+  //   weight: "72 kg",
+  //   bloodPressure: "120/80 mmHg",
+  //   allergies: ["Penicillin", "Dust mites"],
+  //   chronicConditions: ["Hypertension", "Type 2 Diabetes"],
+  //   medications: ["Metformin 500mg", "Lisinopril 10mg"],
+  //   lastCheckup: "2024-01-15",
+  //   smokingStatus: "Former smoker",
+  //   alcoholConsumption: "Occasionally",
+  // };
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -207,9 +242,54 @@ export function PatientRecords() {
     return { totalConditions, totalProcedures, plannedProcedures, completedProcedures };
   };
 
+  // Fetch consulted patients by doctor ID
+ const fetchConsultedPatients = async (loadMore = false) => {
+  try {
+    setLoadingConsultedPatients(true);
+    
+    let url = `${patientServiceBaseUrl}/api/v1/patient-service/consultation/consulted-patients/${DOCTOR_ID}`;
+    
+    // Add cursor for pagination if loading more
+    if (loadMore && consultedPagination.nextCursor) {
+      const cursor = consultedPagination.nextCursor;
+      url += `?cursorDate=${cursor.visitDate}&cursorId=${cursor._id}&limit=10`;
+    }
+
+    const res = await axios.get<ConsultedPatientsResponse>(url);
+
+    if (res.data.success) {
+      if (loadMore) {
+        setConsultedPatients(prev => [...prev, ...res.data.data]);
+      } else {
+        setConsultedPatients(res.data.data);
+      }
+      
+      setConsultedPagination({
+        hasNextPage: res.data.hasNextPage,
+        nextCursor: res.data.nextCursor,
+        totalCount: res.data.totalCount,
+      });
+      setShowConsultedPatients(true);
+    }
+  } catch (error: any) {
+    console.error("Error fetching consulted patients:", error);
+    alert(error.response?.data?.message || "Error fetching consulted patients");
+  } finally {
+    setLoadingConsultedPatients(false);
+  }
+};
+const handleLoadMoreConsulted = () => {
+  if (consultedPagination.hasNextPage) {
+    fetchConsultedPatients(true);
+  }
+};
+
   // Search patient by Random ID
   const handlePatientSearch = async () => {
-    if (!patientSearchQuery.trim()) return alert("Enter Patient ID");
+    if (!patientSearchQuery.trim()) {
+      alert("Enter Patient ID");
+      return;
+    }
 
     try {
       setSearchLoading(true);
@@ -217,6 +297,7 @@ export function PatientRecords() {
       setViewMode("details");
       setShowVisitDrawer(false);
       setVisitHistory([]);
+      setShowConsultedPatients(false);
 
       const res = await axios.get(
         `${patientServiceBaseUrl}/api/v1/patient-service/patient/patient-by-randomId/${patientSearchQuery}`
@@ -227,6 +308,34 @@ export function PatientRecords() {
         // Select the first record by default
         if (res.data.data.records.length > 0) {
           setSelectedRecord(res.data.data.records[0]);
+        }
+      } else {
+        alert("No patient found");
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Error fetching patient");
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Fetch patient by ID from consulted patients list
+  const handleSelectConsultedPatient = async (patientId: string) => {
+    try {
+      setSearchLoading(true);
+      setShowConsultedPatients(false);
+      setSelectedRecord(null);
+      setViewMode("details");
+
+      const res = await axios.get(
+        `${patientServiceBaseUrl}/api/v1/patient-service/patient/patient-by-id/${patientId}`
+      );
+
+      if (res.data.success) {
+        const patientData = res.data.data;
+        setPatientData(patientData);
+        if (patientData.records.length > 0) {
+          setSelectedRecord(patientData.records[0]);
         }
       } else {
         alert("No patient found");
@@ -283,6 +392,16 @@ export function PatientRecords() {
     setViewMode("details");
     setShowVisitDrawer(false);
     setVisitHistory([]);
+    setShowConsultedPatients(false);
+  };
+
+  // Toggle consulted patients view
+  const handleShowConsultedPatients = () => {
+    if (!showConsultedPatients) {
+      fetchConsultedPatients();
+    } else {
+      setShowConsultedPatients(false);
+    }
   };
 
   // Open visit details drawer
@@ -314,6 +433,11 @@ export function PatientRecords() {
     }
   };
 
+  // Initial load - fetch consulted patients
+  useEffect(() => {
+    fetchConsultedPatients();
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Search Section */}
@@ -340,7 +464,15 @@ export function PatientRecords() {
               <Search className="w-4 h-4 mr-2" />
               {searchLoading ? "Searching..." : "Search"}
             </Button>
-            {patientData && (
+            <Button
+              variant="outline"
+              onClick={handleShowConsultedPatients}
+              className="h-12 min-w-[180px]"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              {showConsultedPatients ? "Hide Consulted" : "Show Consulted"}
+            </Button>
+            {(patientData || showConsultedPatients) && (
               <Button
                 variant="outline"
                 onClick={handleClearSearch}
@@ -352,6 +484,108 @@ export function PatientRecords() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Consulted Patients Section */}
+     {/* Consulted Patients Section */}
+{showConsultedPatients && !patientData && (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Users className="w-5 h-5" />
+        Recently Consulted Patients
+        {consultedPagination.totalCount > 0 && (
+          <Badge variant="secondary" className="ml-2">
+            {consultedPatients.length} of {consultedPagination.totalCount}
+          </Badge>
+        )}
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      {loadingConsultedPatients && !consultedPatients.length ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading consulted patients...</p>
+        </div>
+      ) : consultedPatients.length > 0 ? (
+        <>
+          <div className="space-y-4">
+            {consultedPatients.map((patient) => (
+              <Card 
+                key={`${patient.patientId}-${patient.clinicId}`}
+                className="hover:shadow-md transition-all duration-200 cursor-pointer"
+                onClick={() => handleSelectConsultedPatient(patient.patientId)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-lg">{patient.patientName}</h4>
+                          <p className="text-sm text-gray-500">Patient ID: {patient.patientId}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1">
+                          <Building className="w-4 h-4 text-gray-400" />
+                          <span>{patient.clinicName}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          <span>Last visit: {formatSimpleDate(patient.lastVisitDate)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button size="sm">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Load More Button - Inside CardContent */}
+          {consultedPagination.hasNextPage && (
+            <div className="text-center pt-6 border-t mt-6">
+              <Button 
+                variant="outline" 
+                onClick={handleLoadMoreConsulted}
+                disabled={loadingConsultedPatients}
+                className="w-full max-w-xs mx-auto"
+              >
+                {loadingConsultedPatients ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                    Loading More Patients...
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-4 h-4 mr-2" />
+                    Load More Patients
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-center py-12">
+          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+            No Consulted Patients Found
+          </h3>
+          <p className="text-gray-500">
+            You haven't consulted any patients recently.
+          </p>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+)}
 
       {/* Patient Info Header */}
       {patientData && (
