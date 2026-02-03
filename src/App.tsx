@@ -378,7 +378,7 @@ export default function App() {
 
               <Route path="/appointments" element={<AppointmentsList />} />
               <Route path="/patients" element={<PatientRecords />} />
-              {/* <Route path="/prescriptions" element={<EPrescription />} /> */}
+              <Route path="/prescriptions" element={<EPrescription />} />
               <Route path="/analytics" element={<ProductivityCharts />} />
               <Route
                 path="/alerts"
