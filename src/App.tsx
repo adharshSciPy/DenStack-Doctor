@@ -12,6 +12,9 @@ import {
   LayoutDashboard,
   LogOut,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Stethoscope,
 } from "lucide-react";
 
 import {
@@ -28,6 +31,7 @@ import {
 } from "./components/ui/sidebar";
 
 import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { AppointmentsList } from "./components/AppointmentsList";
 import { PatientRecords } from "./components/PatientRecords";
@@ -115,9 +119,17 @@ export default function App() {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Default to collapsed
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  /* -------------------- AUTO COLLAPSE ON NAVIGATION -------------------- */
+  
+  useEffect(() => {
+    // Collapse sidebar whenever location changes (navigation)
+    setSidebarCollapsed(true);
+  }, [location.pathname]);
 
   /* -------------------- CLEAN CORRUPTED DOCTOR ID -------------------- */
 
@@ -250,7 +262,7 @@ export default function App() {
       { path: "/dashboard", title: "Overview", icon: LayoutDashboard },
       { path: "/appointments", title: "Appointments", icon: Calendar },
       { path: "/patients", title: "Patient Records", icon: FileText },
-      { path: "/prescriptions", title: "E-Prescription", icon: ClipboardList },
+      // { path: "/prescriptions", title: "E-Prescription", icon: ClipboardList },
       {
         path: "/alerts",
         title: "Alerts",
@@ -259,7 +271,7 @@ export default function App() {
       },
       { path: "/analytics", title: "Productivity", icon: TrendingUp },
       { path: "/blog", title: "Blog", icon: BookOpen },
-      // { path: "/myblogs", title: "My Blogs", icon: BookOpen },
+      { path: "/myblogs", title: "My Blogs", icon: BookOpen },
     ];
 
     if (authState.role === "600") {
@@ -306,103 +318,176 @@ export default function App() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <Sidebar className="border-r bg-white">
-          <SidebarContent>
-            <div className="px-6 py-4 border-b">
-              <h2 className="text-xl font-medium">Doctor Portal</h2>
-              <p className="text-sm text-muted-foreground">
-                Hospital Management System
-              </p>
+        {/* Sidebar - Always visible but collapsed/expanded */}
+        <div
+          className={`bg-white border-r h-full flex flex-col transition-all duration-300 ${
+            sidebarCollapsed ? "w-16" : "w-64"
+          }`}
+          style={{ scrollbarWidth: "none" }}
+        >
+          {/* HEADER - Simplified when collapsed */}
+<div className="p-4 border-b flex items-center">
+  {!sidebarCollapsed ? (
+    // Expanded state - show logo and title on left, chevron on right
+    <>
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+          <Stethoscope className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <h2 className="text-sm font-medium text-primary">Doctor Portal</h2>
+          <p className="text-xs text-muted-foreground">Hospital Management</p>
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        className="p-1 h-auto ml-auto"
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </Button>
+    </>
+  ) : (
+    // Collapsed state - centered chevron only
+    <div className="w-full flex justify-center">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        className="p-1 h-auto"
+      >
+        <ChevronRight className="w-5 h-5" />
+      </Button>
+    </div>
+  )}
+</div>
+
+          {/* NAVIGATION */}
+          <nav className="flex-1 p-2 space-y-1" style={{ overflow: "scroll", scrollbarWidth: "none" }}>
+            {menuItems.map((item, index) => (
+              <button
+                key={item.path || `action-${index}`}
+                onClick={() => {
+                  if (item.onClick) {
+                    item.onClick();
+                  } else if (item.path) {
+                    navigate(item.path);
+                  }
+                }}
+                className={`w-full flex items-center ${
+                  sidebarCollapsed ? "justify-center px-3" : "justify-start px-3 gap-3"
+                } py-2.5 rounded-lg transition-all duration-200 ${
+                  item.path && location.pathname === item.path
+                    ? "bg-primary text-white"
+                    : "hover:bg-muted hover:text-primary"
+                }`}
+              >
+                <div className="relative">
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  {item.showBadge && unreadCount > 0 && sidebarCollapsed && (
+                    <Badge 
+                      className="absolute -top-1 -right-1 min-w-4 h-4 p-0 text-xs flex items-center justify-center bg-red-500 text-white" 
+                      variant="destructive"
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Show text only when not collapsed */}
+                {!sidebarCollapsed && (
+                  <>
+                    <span className="text-sm">{item.title}</span>
+                    {item.showBadge && unreadCount > 0 && (
+                      <Badge className="ml-auto bg-white text-primary">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {/* USER SECTION - Only show when expanded */}
+          {!sidebarCollapsed && (
+            <div className="p-4 border-t">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                  {authState.doctorId ? authState.doctorId.charAt(0).toUpperCase() : "D"}
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Welcome Doctor</p>
+                  <p className="text-sm truncate">
+                    {authState.doctorId || "Doctor ID"}
+                  </p>
+                </div>
+              </div>
             </div>
-
-            <SidebarGroup>
-              <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {menuItems.map((item, index) => (
-                    <SidebarMenuItem key={item.path || `action-${index}`}>
-                      <SidebarMenuButton
-                        isActive={item.path ? location.pathname === item.path : false}
-                        onClick={() => {
-                          if (item.onClick) {
-                            item.onClick();
-                          } else if (item.path) {
-                            navigate(item.path);
-                          }
-                        }}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-
-                        {item.showBadge && unreadCount > 0 && (
-                          <Badge className="ml-auto" variant="destructive">
-                            {unreadCount}
-                          </Badge>
-                        )}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </Sidebar>
-
-        <SidebarInset className="flex flex-col flex-1">
-          {isValidDoctorId(authState.doctorId) && (
-            <DashboardHeader
-              doctorName="Emily Parker"
-              doctorId={authState.doctorId}
-              userRole={authState.role || "doctor"}
-              notificationServiceUrl={NOTIFICATION_SERVICE_URL}
-              onNotificationsUpdate={handleNotificationsUpdate}
-            />
           )}
+        </div>
 
-          <main className="flex-1 p-4 md:p-6 overflow-auto">
-            <Routes>
-              <Route
-                path="/dashboard"
-                element={
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <AppointmentsList />
-                    <AlertsPanel
-                      notifications={notifications}
-                      unreadCount={unreadCount}
-                      onMarkAsRead={handleMarkAsRead}
-                      onDismiss={handleDismiss}
-                    />
-                  </div>
-                }
-              />
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col">
+            <SidebarInset className="flex flex-col flex-1">
+              {isValidDoctorId(authState.doctorId) && (
+                <DashboardHeader
+                  doctorName="Emily Parker"
+                  doctorId={authState.doctorId}
+                  userRole={authState.role || "doctor"}
+                  notificationServiceUrl={NOTIFICATION_SERVICE_URL}
+                  onNotificationsUpdate={handleNotificationsUpdate}
+                />
+              )}
 
-              <Route path="/appointments" element={<AppointmentsList />} />
-              <Route path="/patients" element={<PatientRecords />} />
-              <Route path="/prescriptions" element={<EPrescription />} />
-              <Route path="/analytics" element={<ProductivityCharts />} />
-              <Route
-                path="/alerts"
-                element={
-                  <AlertsPanel
-                    notifications={notifications}
-                    unreadCount={unreadCount}
-                    onMarkAsRead={handleMarkAsRead}
-                    onDismiss={handleDismiss}
+              <main className="flex-1 p-4 md:p-6 overflow-auto">
+                <Routes>
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <AppointmentsList />
+                        <AlertsPanel
+                          notifications={notifications}
+                          unreadCount={unreadCount}
+                          onMarkAsRead={handleMarkAsRead}
+                          onDismiss={handleDismiss}
+                        />
+                      </div>
+                    }
                   />
-                }
-              />
-              <Route path="/blog" element={<BlogList />} />
-              <Route path="/myblogs" element={<MyBlogList />} />
-              <Route path="/blogs/create" element={<CreateBlog />} />
-              <Route path="/blogs/edit/:id" element={<CreateBlog />} />
-              <Route path="/blogs/:id" element={<BlogDetail />} />
-              <Route path="/marketplace" element={<Marketplace />} />
 
-              <Route path="/" element={<AppointmentsList />} />
-              <Route path="*" element={<AppointmentsList />} />
-            </Routes>
-          </main>
-        </SidebarInset>
+                  <Route path="/appointments" element={<AppointmentsList />} />
+                  <Route path="/patients" element={<PatientRecords />} />
+                  <Route path="/prescriptions" element={<EPrescription />} />
+                  <Route path="/analytics" element={<ProductivityCharts />} />
+                  <Route
+                    path="/alerts"
+                    element={
+                      <AlertsPanel
+                        notifications={notifications}
+                        unreadCount={unreadCount}
+                        onMarkAsRead={handleMarkAsRead}
+                        onDismiss={handleDismiss}
+                      />
+                    }
+                  />
+                  <Route path="/blog" element={<BlogList />} />
+                  <Route path="/myblogs" element={<MyBlogList />} />
+                  <Route path="/blogs/create" element={<CreateBlog />} />
+                  <Route path="/blogs/edit/:id" element={<CreateBlog />} />
+                  <Route path="/blogs/:id" element={<BlogDetail />} />
+                  <Route path="/marketplace" element={<Marketplace />} />
+
+                  <Route path="/" element={<AppointmentsList />} />
+                  <Route path="*" element={<AppointmentsList />} />
+                </Routes>
+              </main>
+            </SidebarInset>
+          </div>
+        </div>
       </div>
     </SidebarProvider>
   );
