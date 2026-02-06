@@ -679,7 +679,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                               </div>
                               <div>
                                 <h4 className="font-bold text-lg">{patient.patientName}</h4>
-                                <p className="text-sm text-gray-500">Patient ID: {patient.patientId}</p>
+                            
                               </div>
                             </div>
                             <div className="flex items-center gap-4 text-sm">
@@ -1186,67 +1186,78 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
   ) : visitHistory.length > 0 ? (
     <div className="border rounded-lg overflow-hidden">
       {/* Table Header */}
-      <div className="grid grid-cols-12 bg-gray-50 text-sm font-medium text-gray-600 border-b">
-        <div className="col-span-2 p-3">Date & Time</div>
-        <div className="col-span-3 p-3">Diagnosis & Treatment</div>
-        <div className="col-span-1 p-3 text-right">View</div>
-      </div>
-
+   <div className="grid grid-cols-8 bg-gray-50 text-sm font-medium text-gray-600 border-b">
+  <div className="col-span-2 p-3">Date & Time</div>
+  <div className="col-span-4 p-3">Diagnosis & Treatment</div>
+  <div className="col-span-2 p-3 text-right">Actions</div>
+</div>
       {/* Table Rows */}
       <div className="divide-y">
         {visitHistory.map((visit) => (
-          <div 
-            key={visit._id}
-            className="grid grid-cols-12 hover:bg-gray-50 transition-colors cursor-pointer"
-            onClick={() => handleViewVisitDetails(visit)}
-          >
-            {/* Date & Time */}
-            <div className="col-span-2 p-3">
-              <div className="text-sm font-medium">{formatSimpleDate(visit.visitDate)}</div>
-              <div className="text-xs text-gray-500">
-                {new Date(visit.visitDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
+       <div 
+  key={visit._id}
+  className="grid grid-cols-8 hover:bg-gray-50 transition-colors cursor-pointer"
+  onClick={() => handleViewVisitDetails(visit)}
+>
+  {/* Date & Time */}
+  <div className="col-span-2 p-3">
+    <div className="text-sm font-medium">
+      {formatSimpleDate(visit.visitDate)}
+    </div>
+    <div className="text-xs text-gray-500">
+      {new Date(visit.visitDate).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </div>
+  </div>
 
-            {/* Diagnosis & Treatment */}
-            <div className="col-span-3 p-3">
-              <div className="space-y-1">
-                {visit.diagnosis.length > 0 ? (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500">Diagnosis:</div>
-                    <div className="text-sm truncate">{visit.diagnosis[0]}</div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-400">No diagnosis</div>
-                )}
-                
-                {visit.dentalWork && visit.dentalWork.length > 0 && (
-                  <div className="mt-1">
-                    <div className="text-xs font-medium text-gray-500">Teeth treated:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {visit.dentalWork.slice(0, 3).map((work, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          #{work.toothNumber}
-                        </Badge>
-                      ))}
-                      {visit.dentalWork.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{visit.dentalWork.length - 3}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="col-span-1 p-3 text-right">
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                <Eye className="w-4 h-4" />
-              </Button>
-            </div>
+  {/* Diagnosis & Treatment */}
+  <div className="col-span-4 p-3">
+    <div className="space-y-1">
+      {visit.diagnosis.length > 0 ? (
+        <div>
+          <div className="text-xs font-medium text-gray-500">
+            Diagnosis:
           </div>
+          <div className="text-sm line-clamp-2">
+            {visit.diagnosis[0]}
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm text-gray-400">No diagnosis</div>
+      )}
+
+      {visit.dentalWork?.length > 0 && (
+        <div className="mt-1">
+          <div className="text-xs font-medium text-gray-500">
+            Teeth treated:
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {visit.dentalWork.slice(0, 5).map((work, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                #{work.toothNumber}
+              </Badge>
+            ))}
+            {visit.dentalWork.length > 5 && (
+              <Badge variant="secondary" className="text-xs">
+                +{visit.dentalWork.length - 5}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* Actions */}
+  <div className="col-span-2 p-3 flex justify-end items-center gap-2">
+    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+      <Eye className="w-4 h-4" />
+    </Button>
+  </div>
+</div>
+
         ))}
       </div>
 
@@ -1335,7 +1346,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
+                    {/* <div>
                       <Label className="text-xs text-gray-500">Status</Label>
                       <Badge 
                         className="mt-1"
@@ -1343,8 +1354,8 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                       >
                         {selectedVisit.status}
                       </Badge>
-                    </div>
-                    <div>
+                    </div> */}
+                    {/* <div>
                       <Label className="text-xs text-gray-500">Payment</Label>
                       <Badge 
                         className="mt-1"
@@ -1352,11 +1363,11 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                       >
                         {selectedVisit.isPaid ? "Paid" : "Unpaid"}
                       </Badge>
-                    </div>
-                    <div>
+                    </div> */}
+                    {/* <div>
                       <Label className="text-xs text-gray-500">Appointment ID</Label>
                       <p className="text-sm font-mono mt-1 truncate">{selectedVisit.appointmentId}</p>
-                    </div>
+                    </div> */}
                     <div>
                       <Label className="text-xs text-gray-500">Visit Date</Label>
                       <p className="text-sm mt-1">{formatSimpleDate(selectedVisit.visitDate)}</p>
@@ -1498,66 +1509,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
               )}
 
               {/* Billing Information */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="w-5 h-5" />
-                    Billing Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Consultation Fee */}
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="text-gray-700">Consultation Fee</span>
-                      <span className="font-bold">${selectedVisit.consultationFee}</span>
-                    </div>
-
-                    {/* Doctor Procedures */}
-                    {selectedVisit.procedures.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Doctor Procedures</h4>
-                        <div className="space-y-2">
-                          {selectedVisit.procedures.map((proc, idx) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                              <span>{proc.name}</span>
-                              <span>${proc.fee}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Reception Billing */}
-                    {(selectedVisit.receptionBilling.procedureCharges.length > 0 || 
-                      selectedVisit.receptionBilling.consumableCharges.length > 0) && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Additional Charges</h4>
-                        {selectedVisit.receptionBilling.procedureCharges.map((charge, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span>{charge.name}</span>
-                            <span>${charge.fee}</span>
-                          </div>
-                        ))}
-                        {selectedVisit.receptionBilling.consumableCharges.map((charge, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span>{charge.item} (Consumable)</span>
-                            <span>${charge.fee}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Total Amount */}
-                    <div className="pt-4 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold">Total Amount</span>
-                        <span className="text-2xl font-bold text-blue-600">${selectedVisit.totalAmount}</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              
 
               {/* Files Attached */}
               {selectedVisit.files.length > 0 && (
@@ -1599,10 +1551,10 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
               <Button variant="outline" onClick={handleCloseVisitDrawer}>
                 Close
               </Button>
-              <Button>
+              {/* <Button>
                 <Download className="w-4 h-4 mr-2" />
                 Download Report
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
