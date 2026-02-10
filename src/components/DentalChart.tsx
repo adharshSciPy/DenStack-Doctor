@@ -21,28 +21,32 @@ import {
 import { Badge } from "./ui/badge";
 import { useImagePreloader } from "../hooks/useImagePreloader"; 
 import DentalLoader from './DentalLoader';
+import { ToothSVG, SoftTissueSVG, TMJSVG } from "./DentalSvgComponents";
+import { preloadAllDentalSvgs } from "../utils/dentalSvgCache"; 
+import { getSvgUrlFromCache } from "../utils/dentalSvgCache";
+
 
 // Import Tooth SVG components
-const incisorSvg = "/assets/svg/dental/incisor.svg";
-const canineSvg = "/assets/svg/dental/canine.svg";
-const premolarSvg = "/assets/svg/dental/premolar.svg";
-const molarSvg = "/assets/svg/dental/molar.svg";
-const wisdomSvg = "/assets/svg/dental/wisdom.svg";
+// const incisorSvg = "/assets/svg/dental/incisor.svg";
+// const canineSvg = "/assets/svg/dental/canine.svg";
+// const premolarSvg = "/assets/svg/dental/premolar.svg";
+// const molarSvg = "/assets/svg/dental/molar.svg";
+// const wisdomSvg = "/assets/svg/dental/wisdom.svg";
 
 // Import Soft Tissue SVG components
-const tongueSvg = "/assets/svg/softTissue/Tongue.svg";
-const gingivaSvg = "/assets/svg/softTissue/Gingiva.svg";
-const palateSVG = "/assets/svg/softTissue/Palate.svg";
-const buccalMucosaSVG = "/assets/svg/softTissue/BuccalMucosa.svg";
-const floorOfMouthSVG = "/assets/svg/softTissue/FloorOfTheMouth.svg";
-const labialMucosaSVG = "/assets/svg/softTissue/LabialMucosa.svg";
-const salivaryGlandsSVG = "/assets/svg/softTissue/SalivaryGlands.svg";
-const frenumSVG ="/assets/svg/softTissue/Frenum.svg";
+// const tongueSvg = "/assets/svg/softTissue/Tongue.svg";
+// const gingivaSvg = "/assets/svg/softTissue/Gingiva.svg";
+// const palateSVG = "/assets/svg/softTissue/Palate.svg";
+// const buccalMucosaSVG = "/assets/svg/softTissue/BuccalMucosa.svg";
+// const floorOfMouthSVG = "/assets/svg/softTissue/FloorOfTheMouth.svg";
+// const labialMucosaSVG = "/assets/svg/softTissue/LabialMucosa.svg";
+// const salivaryGlandsSVG = "/assets/svg/softTissue/SalivaryGlands.svg";
+// const frenumSVG ="/assets/svg/softTissue/Frenum.svg";
 
 // Import TMJ SVG components - FIXED PATHS
-const tmjLeftSVG = "/assets/svg/tmj/LeftTMJ.svg";
-const tmjRightSVG = "/assets/svg/tmj/RightTMJ.svg";
-const tmjBothSVG = "/assets/svg/tmj/BothTMJ.svg";
+// const tmjLeftSVG = "/assets/svg/tmj/LeftTMJ.svg";
+// const tmjRightSVG = "/assets/svg/tmj/RightTMJ.svg";
+// const tmjBothSVG = "/assets/svg/tmj/BothTMJ.svg";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -936,128 +940,97 @@ const TMJ_TREATMENT_OPTIONS = [
   "Referral to Specialist",
 ];
 
-// SVG mapping for Teeth
-const TOOTH_SVGS: Record<string, string> = {
-  incisor: "/assets/svg/dental/incisor.svg",
-  canine: "/assets/svg/dental/canine.svg",
-  premolar: "/assets/svg/dental/premolar.svg",
-  molar: "/assets/svg/dental/molar.svg",
-  wisdom: "/assets/svg/dental/wisdom.svg",
-};
+// // SVG mapping for Teeth
+// const TOOTH_SVGS: Record<string, string> = {
+//   incisor: "/assets/svg/dental/incisor.svg",
+//   canine: "/assets/svg/dental/canine.svg",
+//   premolar: "/assets/svg/dental/premolar.svg",
+//   molar: "/assets/svg/dental/molar.svg",
+//   wisdom: "/assets/svg/dental/wisdom.svg",
+// };
 
-const SOFT_TISSUE_SVGS: Record<string, string> = {
-  tongue: "/assets/svg/softTissue/Tongue.svg",
-  gingiva: "/assets/svg/softTissue/Gingiva.svg",
-  palate: "/assets/svg/softTissue/Palate.svg",
-  "buccal-mucosa": "/assets/svg/softTissue/BuccalMucosa.svg",
-  "floor-of-mouth": "/assets/svg/softTissue/FloorOfTheMouth.svg",
-  "labial-mucosa": "/assets/svg/softTissue/LabialMucosa.svg",
-  "salivary-glands": "/assets/svg/softTissue/SalivaryGlands.svg",
-  frenum: "/assets/svg/softTissue/Frenum.svg",
-};
-// SVG mapping for TMJ
-const TMJ_SVGS: Record<string, string> = {
-  "tmj-left": "/assets/svg/tmj/LeftTMJ.svg",
-  "tmj-right": "/assets/svg/tmj/RightTMJ.svg",
-  "tmj-both": "/assets/svg/tmj/BothTMJ.svg",
-};
+// const SOFT_TISSUE_SVGS: Record<string, string> = {
+//   tongue: "/assets/svg/softTissue/Tongue.svg",
+//   gingiva: "/assets/svg/softTissue/Gingiva.svg",
+//   palate: "/assets/svg/softTissue/Palate.svg",
+//   "buccal-mucosa": "/assets/svg/softTissue/BuccalMucosa.svg",
+//   "floor-of-mouth": "/assets/svg/softTissue/FloorOfTheMouth.svg",
+//   "labial-mucosa": "/assets/svg/softTissue/LabialMucosa.svg",
+//   "salivary-glands": "/assets/svg/softTissue/SalivaryGlands.svg",
+//   frenum: "/assets/svg/softTissue/Frenum.svg",
+// };
+// // SVG mapping for TMJ
+// const TMJ_SVGS: Record<string, string> = {
+//   "tmj-left": "/assets/svg/tmj/LeftTMJ.svg",
+//   "tmj-right": "/assets/svg/tmj/RightTMJ.svg",
+//   "tmj-both": "/assets/svg/tmj/BothTMJ.svg",
+// };
 // Helper function to get SVG URLs
-const getSvgUrlByType = (type: string, category: 'tooth' | 'softTissue' | 'tmj') => {
-  switch (category) {
-    case 'tooth':
-      switch (type.toLowerCase()) {
-        case 'incisor': return incisorSvg;
-        case 'canine': return canineSvg;
-        case 'premolar': return premolarSvg;
-        case 'molar': return molarSvg;
-        case 'wisdom': return wisdomSvg;
-        default: return null;
-      }
-    case 'softTissue':
-      switch (type.toLowerCase()) {
-        case 'tongue': return tongueSvg;
-        case 'gingiva': return gingivaSvg;
-        case 'palate': return palateSVG;
-        case 'buccal-mucosa': return buccalMucosaSVG;
-        case 'floor-of-mouth': return floorOfMouthSVG;
-        case 'labial-mucosa': return labialMucosaSVG;
-        case 'salivary-glands': return salivaryGlandsSVG;
-        case 'frenum': return frenumSVG;
-        default: return null;
-      }
-    case 'tmj':
-      switch (type.toLowerCase()) {
-        case 'tmj-left': return tmjLeftSVG;
-        case 'tmj-right': return tmjRightSVG;
-        case 'tmj-both': return tmjBothSVG;
-        default: return null;
-      }
-    default:
-      return null;
-  }
-};
+// const getSvgUrlByType = (type: string, category: 'tooth' | 'softTissue' | 'tmj') => {
+//   return getSvgUrlFromCache(type, category);
+// };
 // Tooth SVG Component
-const ToothSVG = ({
-  type,
-  color = "#4b5563",
-  width = 60,
-  height = 60,
-  rotation = 0,
-}: {
-  type: string;
-  color?: string;
-  width?: number;
-  height?: number;
-  rotation?: number;
-}) => {
-  const svgUrl = getSvgUrlByType(type, 'tooth');
-  const [hasError, setHasError] = useState(false);
+// const ToothSVG = ({
+//   type,
+//   color = "#4b5563",
+//   width = 60,
+//   height = 60,
+//   rotation = 0,
+// }: {
+//   type: string;
+//   color?: string;
+//   width?: number;
+//   height?: number;
+//   rotation?: number;
+// }) => {
+//   const svgUrl = getSvgUrlByType(type, 'tooth');
+//   const [hasError, setHasError] = useState(false);
 
-  return (
-    <div
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        transform: `rotate(${rotation}deg)`,
-        display: "inline-block",
-        position: 'relative',
-      }}
-    >
-      {svgUrl && !hasError ? (
-        <img
-          src={svgUrl}
-          alt={`${type} tooth`}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: color === '#4b5563' ? 'none' : 
-              `drop-shadow(0 0 2px ${color}) brightness(0.9) sepia(1) hue-rotate(${getHueFromColor(color)}deg) saturate(2)`,
-          }}
-          onError={() => setHasError(true)}
-          loading="lazy"
-        />
-      ) : (
-        // Fallback SVG
-        <svg
-          width={width}
-          height={height}
-          viewBox="0 0 100 100"
-          style={{ transform: `rotate(${rotation}deg)` }}
-        >
-          <circle
-            cx="50"
-            cy="50"
-            r="40"
-            fill="none"
-            stroke={color}
-            strokeWidth="4"
-          />
-        </svg>
-      )}
-    </div>
-  );
-};
+//   return (
+//     <div
+//       style={{
+//         width: `${width}px`,
+//         height: `${height}px`,
+//         transform: `rotate(${rotation}deg)`,
+//         display: "inline-block",
+//         position: 'relative',
+//       }}
+//     >
+//       {svgUrl && !hasError ? (
+//         <img
+//           src={svgUrl}
+//           alt={`${type} tooth`}
+//           style={{
+//             width: '100%',
+//             height: '100%',
+//             objectFit: 'contain',
+//             filter: color === '#4b5563' ? 'none' : 
+//               `drop-shadow(0 0 2px ${color}) brightness(0.9) sepia(1) hue-rotate(${getHueFromColor(color)}deg) saturate(2)`,
+//           }}
+//           onError={() => setHasError(true)}
+//           loading="lazy"
+//         />
+//       ) : (
+//         // Fallback SVG
+//         <svg
+//           width={width}
+//           height={height}
+//           viewBox="0 0 100 100"
+//           style={{ transform: `rotate(${rotation}deg)` }}
+//         >
+//           <circle
+//             cx="50"
+//             cy="50"
+//             r="40"
+//             fill="none"
+//             stroke={color}
+//             strokeWidth="4"
+//           />
+//         </svg>
+//       )}
+//     </div>
+//   );
+// };
 
 // Helper to convert hex color to hue value for filter
 const getHueFromColor = (hexColor: string): number => {
@@ -1074,116 +1047,116 @@ const getHueFromColor = (hexColor: string): number => {
   return colorMap[hexColor.toLowerCase()] || 0;
 };
 
-const SoftTissueSVG = ({
-  type,
-  color = "#4b5563",
-  width = 60,
-  height = 60,
-}: {
-  type: string;
-  color?: string;
-  width?: number;
-  height?: number;
-}) => {
-  const svgUrl = getSvgUrlByType(type, 'softTissue');
-  const [hasError, setHasError] = useState(false);
+// const SoftTissueSVG = ({
+//   type,
+//   color = "#4b5563",
+//   width = 60,
+//   height = 60,
+// }: {
+//   type: string;
+//   color?: string;
+//   width?: number;
+//   height?: number;
+// }) => {
+//   const svgUrl = getSvgUrlByType(type, 'softTissue');
+//   const [hasError, setHasError] = useState(false);
 
-  return (
-    <div
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        display: "inline-block",
-        position: 'relative',
-      }}
-    >
-      {svgUrl && !hasError ? (
-        <img
-          src={svgUrl}
-          alt={`${type} soft tissue`}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: color === '#4b5563' || color === '#3b82f6' ? 'none' : 
-              `drop-shadow(0 0 1px ${color})`,
-          }}
-          onError={() => setHasError(true)}
-          loading="lazy"
-        />
-      ) : (
-        // Fallback for soft tissue
-        <svg width={width} height={height} viewBox="0 0 100 100">
-          <rect
-            x="10"
-            y="10"
-            width="80"
-            height="80"
-            fill="none"
-            stroke={color}
-            strokeWidth="4"
-            rx="10"
-          />
-        </svg>
-      )}
-    </div>
-  );
-};
+//   return (
+//     <div
+//       style={{
+//         width: `${width}px`,
+//         height: `${height}px`,
+//         display: "inline-block",
+//         position: 'relative',
+//       }}
+//     >
+//       {svgUrl && !hasError ? (
+//         <img
+//           src={svgUrl}
+//           alt={`${type} soft tissue`}
+//           style={{
+//             width: '100%',
+//             height: '100%',
+//             objectFit: 'contain',
+//             filter: color === '#4b5563' || color === '#3b82f6' ? 'none' : 
+//               `drop-shadow(0 0 1px ${color})`,
+//           }}
+//           onError={() => setHasError(true)}
+//           loading="lazy"
+//         />
+//       ) : (
+//         // Fallback for soft tissue
+//         <svg width={width} height={height} viewBox="0 0 100 100">
+//           <rect
+//             x="10"
+//             y="10"
+//             width="80"
+//             height="80"
+//             fill="none"
+//             stroke={color}
+//             strokeWidth="4"
+//             rx="10"
+//           />
+//         </svg>
+//       )}
+//     </div>
+//   );
+// };
 
 // TMJ SVG Component
-const TMJSVG = ({
-  type,
-  color = "#4b5563",
-  width = 60,
-  height = 60,
-}: {
-  type: string;
-  color?: string;
-  width?: number;
-  height?: number;
-}) => {
-  const svgUrl = getSvgUrlByType(type, 'tmj');
-  const [hasError, setHasError] = useState(false);
+// const TMJSVG = ({
+//   type,
+//   color = "#4b5563",
+//   width = 60,
+//   height = 60,
+// }: {
+//   type: string;
+//   color?: string;
+//   width?: number;
+//   height?: number;
+// }) => {
+//   const svgUrl = getSvgUrlByType(type, 'tmj');
+//   const [hasError, setHasError] = useState(false);
 
-  return (
-    <div
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        display: "inline-block",
-        position: 'relative',
-      }}
-    >
-      {svgUrl && !hasError ? (
-        <img
-          src={svgUrl}
-          alt={`${type} TMJ`}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: color === '#4b5563' || color === '#8b5cf6' ? 'none' : 
-              `drop-shadow(0 0 1px ${color})`,
-          }}
-          onError={() => setHasError(true)}
-          loading="lazy"
-        />
-      ) : (
-        // Fallback for TMJ
-        <svg width={width} height={height} viewBox="0 0 100 100">
-          <circle
-            cx="50"
-            cy="50"
-            r="40"
-            fill="none"
-            stroke={color}
-            strokeWidth="4"
-          />
-        </svg>
-      )}
-    </div>
-  );
-};
+//   return (
+//     <div
+//       style={{
+//         width: `${width}px`,
+//         height: `${height}px`,
+//         display: "inline-block",
+//         position: 'relative',
+//       }}
+//     >
+//       {svgUrl && !hasError ? (
+//         <img
+//           src={svgUrl}
+//           alt={`${type} TMJ`}
+//           style={{
+//             width: '100%',
+//             height: '100%',
+//             objectFit: 'contain',
+//             filter: color === '#4b5563' || color === '#8b5cf6' ? 'none' : 
+//               `drop-shadow(0 0 1px ${color})`,
+//           }}
+//           onError={() => setHasError(true)}
+//           loading="lazy"
+//         />
+//       ) : (
+//         // Fallback for TMJ
+//         <svg width={width} height={height} viewBox="0 0 100 100">
+//           <circle
+//             cx="50"
+//             cy="50"
+//             r="40"
+//             fill="none"
+//             stroke={color}
+//             strokeWidth="4"
+//           />
+//         </svg>
+//       )}
+//     </div>
+//   );
+// };
 
 // Preload all SVG images hook
 // const useSVGPreloader = () => {
@@ -1976,6 +1949,7 @@ const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useSta
           {mode === "edit" && (
             <Button onClick={handleSave}>Save Changes</Button>
           )}
+         
         </div>
       </div>
     </div>
@@ -3756,29 +3730,51 @@ export default function DentalChart({
   existingTMJExaminations = [],
 }: DentalChartProps) {
   // ✅ Move the image preloader hook to the TOP and call it unconditionally
-  const allSvgUrls = React.useMemo(() => {
-    const urls = [
-      '/assets/svg/dental/incisor.svg',
-      '/assets/svg/dental/canine.svg',
-      '/assets/svg/dental/premolar.svg',
-      '/assets/svg/dental/molar.svg',
-      '/assets/svg/dental/wisdom.svg',
-      '/assets/svg/softTissue/Tongue.svg',
-      '/assets/svg/softTissue/Gingiva.svg',
-      '/assets/svg/softTissue/Palate.svg',
-      '/assets/svg/softTissue/BuccalMucosa.svg',
-      '/assets/svg/softTissue/FloorOfTheMouth.svg',
-      '/assets/svg/softTissue/LabialMucosa.svg',
-      '/assets/svg/softTissue/SalivaryGlands.svg',
-      '/assets/svg/softTissue/Frenum.svg',
-      '/assets/svg/tmj/LeftTMJ.svg',
-      '/assets/svg/tmj/RightTMJ.svg',
-      '/assets/svg/tmj/BothTMJ.svg',
-    ];
-    return [...new Set(urls.filter(url => url))];
-  }, []);
+  // const allSvgUrls = React.useMemo(() => {
+  //   const urls = [
+  //     '/assets/svg/dental/incisor.svg',
+  //     '/assets/svg/dental/canine.svg',
+  //     '/assets/svg/dental/premolar.svg',
+  //     '/assets/svg/dental/molar.svg',
+  //     '/assets/svg/dental/wisdom.svg',
+  //     '/assets/svg/softTissue/Tongue.svg',
+  //     '/assets/svg/softTissue/Gingiva.svg',
+  //     '/assets/svg/softTissue/Palate.svg',
+  //     '/assets/svg/softTissue/BuccalMucosa.svg',
+  //     '/assets/svg/softTissue/FloorOfTheMouth.svg',
+  //     '/assets/svg/softTissue/LabialMucosa.svg',
+  //     '/assets/svg/softTissue/SalivaryGlands.svg',
+  //     '/assets/svg/softTissue/Frenum.svg',
+  //     '/assets/svg/tmj/LeftTMJ.svg',
+  //     '/assets/svg/tmj/RightTMJ.svg',
+  //     '/assets/svg/tmj/BothTMJ.svg',
+  //   ];
+  //   return [...new Set(urls.filter(url => url))];
+  // }, []);
 
-  const { isLoading } = useImagePreloader(allSvgUrls);
+  // const { isLoading } = useImagePreloader(allSvgUrls);
+  
+  //   if (!isReady) {
+  //   return (
+  //     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+  //       <div className="bg-white rounded-xl p-8 shadow-2xl">
+  //         <div className="animate-pulse flex flex-col items-center space-y-4">
+  //           <div className="flex space-x-2">
+  //             {[1, 2, 3].map((i) => (
+  //               <div
+  //                 key={i}
+  //                 className="h-8 w-8 rounded-full bg-blue-100"
+  //                 style={{ animationDelay: `${i * 0.1}s` }}
+  //               />
+  //             ))}
+  //           </div>
+  //           <p className="text-sm text-gray-600">Opening dental chart...</p>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null);
   const [toothConditions, setToothConditions] =
     useState<ToothCondition[]>(existingConditions);
@@ -3856,6 +3852,21 @@ export default function DentalChart({
   const [procedureNotes, setProcedureNotes] = useState("");
   const [procedureCost, setProcedureCost] = useState<number>(0);
   const [useDropdownView, setUseDropdownView] = useState(false);
+  const [isReady, setIsReady] = useState(true);
+  
+  // ✅ Now the effect hook
+  // useEffect(() => {
+  //   // Trigger extra preloading if needed
+  //   preloadAllDentalSvgs();
+    
+  //   // Mark as ready almost immediately
+  //   const timer = setTimeout(() => {
+  //     setIsReady(true);
+  //   }, 50);
+    
+  //   return () => clearTimeout(timer);
+  // }, []);
+  
   //  const { loaded: imagesLoaded } = useImagePreloader(allSvgUrls);
 // Remove the useSVGPreloader hook entirely
   // const [isLoading, setIsLoading] = useState(true);
@@ -5523,9 +5534,30 @@ const renderTeethTab = () => (
       )}
     </div>
   );
-    if (isLoading) {
-    return <DentalLoader />;
-  }
+  //   if (isLoading) {
+  //   return <DentalLoader />;
+  // }
+  //   if (!isReady) {
+  //   return (
+  //     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+  //       <div className="bg-white rounded-xl p-8 shadow-2xl">
+  //         <div className="animate-pulse flex flex-col items-center space-y-4">
+  //           <div className="flex space-x-2">
+  //             {[1, 2, 3].map((i) => (
+  //               <div
+  //                 key={i}
+  //                 className="h-8 w-8 rounded-full bg-blue-100"
+  //                 style={{ animationDelay: `${i * 0.1}s` }}
+  //               />
+  //             ))}
+  //           </div>
+  //           <p className="text-sm text-gray-600">Opening dental chart...</p>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
   return (
     
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2">

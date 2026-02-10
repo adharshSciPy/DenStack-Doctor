@@ -46,6 +46,7 @@ import DentalChartView from "./DentalChartView";
 import MedicineInput from "./MedicineInput";
 import labBaseUrl from "../labBaseUrl";
 import ThreeDCBCTViewer from "./nifti/Niftiviewer";
+import { preloadAllDentalSvgs } from '../utils/dentalSvgCache';
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -3506,7 +3507,15 @@ export function AppointmentsList() {
       year: "numeric",
     });
   };
-
+useEffect(() => {
+  // Preload dental chart when user views appointments
+  // This ensures it's loaded before they click the button
+  const timer = setTimeout(() => {
+    preloadAllDentalSvgs();
+  }, 2000); // Wait 2 seconds after page load
+  
+  return () => clearTimeout(timer);
+}, []);
   const [showLabOrderModal, setShowLabOrderModal] = useState(false);
   //  useEffect(()=>(
   // console.log("clnicId",selectedClinic?.clinicId)
