@@ -42,7 +42,7 @@ import { AlertsPanel } from "./components/AlertsPanel";
 import BlogList from "./components/BlogList";
 import CreateBlog from "./components/CreateBlog";
 import BlogDetail from "./components/BlogDetail";
-
+import CBCTViewerPage from "./components/CBCTViewerPage";
 /* -------------------------------- CONSTANTS -------------------------------- */
 
 const MAIN_APP_ORIGIN = "http://localhost:3000";
@@ -125,7 +125,7 @@ export default function App() {
   const location = useLocation();
 
   /* -------------------- AUTO COLLAPSE ON NAVIGATION -------------------- */
-  
+
   useEffect(() => {
     // Collapse sidebar whenever location changes (navigation)
     setSidebarCollapsed(true);
@@ -152,7 +152,7 @@ export default function App() {
       role: string,
       doctorId?: string,
       clinicId?: string,
-      persistent = false
+      persistent = false,
     ) => {
       clearStorage();
 
@@ -175,7 +175,7 @@ export default function App() {
 
       navigate("/dashboard", { replace: true });
     },
-    [navigate]
+    [navigate],
   );
 
   /* -------------------- AUTH + ROUTING CORE -------------------- */
@@ -204,7 +204,13 @@ export default function App() {
     const clinicId = params.get("clinicId");
 
     if (token && role) {
-      handleAuthUpdate(token, role, urlDoctorId || undefined, clinicId || undefined, true);
+      handleAuthUpdate(
+        token,
+        role,
+        urlDoctorId || undefined,
+        clinicId || undefined,
+        true,
+      );
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       /* -------- PERSISTENT LOGIN -------- */
@@ -239,7 +245,13 @@ export default function App() {
     const clinicId = params.get("clinicId");
 
     if (token && role) {
-      handleAuthUpdate(token, role, urlDoctorId || undefined, clinicId || undefined, true);
+      handleAuthUpdate(
+        token,
+        role,
+        urlDoctorId || undefined,
+        clinicId || undefined,
+        true,
+      );
     }
   }, [location, handleAuthUpdate]);
 
@@ -298,12 +310,12 @@ export default function App() {
       setNotifications(data);
       setUnreadCount(count);
     },
-    []
+    [],
   );
 
   const handleMarkAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)),
     );
     setUnreadCount((c) => Math.max(0, c - 1));
   }, []);
@@ -326,45 +338,52 @@ export default function App() {
           style={{ scrollbarWidth: "none" }}
         >
           {/* HEADER - Simplified when collapsed */}
-<div className="p-4 border-b flex items-center">
-  {!sidebarCollapsed ? (
-    // Expanded state - show logo and title on left, chevron on right
-    <>
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-          <Stethoscope className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <h2 className="text-sm font-medium text-primary">Doctor Portal</h2>
-          <p className="text-xs text-muted-foreground">Hospital Management</p>
-        </div>
-      </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-        className="p-1 h-auto ml-auto"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </Button>
-    </>
-  ) : (
-    // Collapsed state - centered chevron only
-    <div className="w-full flex justify-center">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-        className="p-1 h-auto"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </Button>
-    </div>
-  )}
-</div>
+          <div className="p-4 border-b flex items-center">
+            {!sidebarCollapsed ? (
+              // Expanded state - show logo and title on left, chevron on right
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                    <Stethoscope className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-medium text-primary">
+                      Doctor Portal
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Hospital Management
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="p-1 h-auto ml-auto"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </Button>
+              </>
+            ) : (
+              // Collapsed state - centered chevron only
+              <div className="w-full flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="p-1 h-auto"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
+          </div>
 
           {/* NAVIGATION */}
-          <nav className="flex-1 p-2 space-y-1" style={{ overflow: "scroll", scrollbarWidth: "none" }}>
+          <nav
+            className="flex-1 p-2 space-y-1"
+            style={{ overflow: "scroll", scrollbarWidth: "none" }}
+          >
             {menuItems.map((item, index) => (
               <button
                 key={item.path || `action-${index}`}
@@ -376,7 +395,9 @@ export default function App() {
                   }
                 }}
                 className={`w-full flex items-center ${
-                  sidebarCollapsed ? "justify-center px-3" : "justify-start px-3 gap-3"
+                  sidebarCollapsed
+                    ? "justify-center px-3"
+                    : "justify-start px-3 gap-3"
                 } py-2.5 rounded-lg transition-all duration-200 ${
                   item.path && location.pathname === item.path
                     ? "bg-primary text-white"
@@ -386,8 +407,8 @@ export default function App() {
                 <div className="relative">
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   {item.showBadge && unreadCount > 0 && sidebarCollapsed && (
-                    <Badge 
-                      className="absolute -top-1 -right-1 min-w-4 h-4 p-0 text-xs flex items-center justify-center bg-red-500 text-white" 
+                    <Badge
+                      className="absolute -top-1 -right-1 min-w-4 h-4 p-0 text-xs flex items-center justify-center bg-red-500 text-white"
                       variant="destructive"
                     >
                       {unreadCount > 9 ? "9+" : unreadCount}
@@ -415,10 +436,14 @@ export default function App() {
             <div className="p-4 border-t">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                  {authState.doctorId ? authState.doctorId.charAt(0).toUpperCase() : "D"}
+                  {authState.doctorId
+                    ? authState.doctorId.charAt(0).toUpperCase()
+                    : "D"}
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground">Welcome Doctor</p>
+                  <p className="text-xs text-muted-foreground">
+                    Welcome Doctor
+                  </p>
                   <p className="text-sm truncate">
                     {authState.doctorId || "Doctor ID"}
                   </p>
@@ -480,7 +505,10 @@ export default function App() {
                   <Route path="/blogs/edit/:id" element={<CreateBlog />} />
                   <Route path="/blogs/:id" element={<BlogDetail />} />
                   <Route path="/marketplace" element={<Marketplace />} />
-
+                  <Route
+                    path="/dashboard/cbct-viewer"
+                    element={<CBCTViewerPage />}
+                  />
                   <Route path="/" element={<AppointmentsList />} />
                   <Route path="*" element={<AppointmentsList />} />
                 </Routes>
