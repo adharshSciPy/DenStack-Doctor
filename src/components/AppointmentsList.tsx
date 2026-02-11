@@ -21,6 +21,8 @@ import {
   PlayCircle,
   CheckCircle,
   Trash2,
+  Check,
+  ChevronDown
 } from "lucide-react";
 
 import DentalLabOrderModal from "./DentalLabOrderModal";
@@ -30,7 +32,7 @@ import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { ScrollArea } from "./ui/scroll-area";
 import { Input } from "./ui/input";
-import { useState, useEffect } from "react";
+import { useState, useEffect,useCallback,useRef } from "react";
 import patientServiceBaseUrl from "../patientServiceBaseUrl";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
@@ -150,6 +152,34 @@ interface TreatmentPlanChangeData {
   stageStatusChanges: TreatmentPlanStageChange[];
   addedStages: any[];
   removedStages: any[];
+}
+// Add these interfaces near your other interface definitions
+interface ComplaintItem {
+  id: string;
+  name: string;
+  code?: string;
+  category?: string;
+  description?: string;
+  isCustom: boolean;
+  selectedAt?: string;
+}
+
+interface ExaminationFindingItem {
+  id: string;
+  name: string;
+  code?: string;
+  category?: string;
+  isCustom: boolean;
+  selectedAt?: string;
+}
+
+interface DentalHistoryItem {
+  id: string;
+  name: string;
+  code?: string;
+  category?: string;
+  isCustom: boolean;
+  selectedAt?: string;
 }
 const ADULT_TOOTH_DATA: ToothData[] = [
   // Upper Right (Quadrant 1) - FDI numbers 18-11
@@ -3391,7 +3421,296 @@ const generateObjectId = (): string => {
   ).join("");
   return timestamp + random;
 };
+// ==================== Reusable MultiSelect Dropdown Component ====================
+const MultiSelectDropdown = ({
+  label,
+  value = [],
+  onChange,
+  fetchOptions,
+  placeholder = "Select options...",
+  disabled = false,
+  loading = false,
+  allowCustom = true
+}: {
+  label: string;
+  value: any[];
+  onChange: (items: any[]) => void;
+  fetchOptions: (search: string) => Promise<any[]>;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  allowCustom?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [options, setOptions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [customMode, setCustomMode] = useState(false);
+  const [customInput, setCustomInput] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Load ALL options when dropdown opens (not just on search)
+  useEffect(() => {
+    const loadOptions = async () => {
+      if (!isOpen) return;
+      
+      setIsLoading(true);
+      // Pass empty string to get ALL results
+      const results = await fetchOptions(''); 
+      setOptions(results);
+      setIsLoading(false);
+    };
+
+    loadOptions();
+  }, [isOpen, fetchOptions]); // Only re-run when isOpen changes
+
+  // Handle search filtering locally
+  const filteredOptions = searchTerm.trim() 
+    ? options.filter(opt => 
+        opt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    : options;
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm('');
+        setCustomMode(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectItem = (item: any) => {
+    if (!value.some(v => v.id === item.id)) {
+      onChange([...value, { ...item, selectedAt: new Date().toISOString() }]);
+    }
+    // Don't close dropdown after selection to allow multiple selections
+    setSearchTerm('');
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    onChange(value.filter(v => v.id !== itemId));
+  };
+
+  const handleAddCustom = () => {
+    if (!customInput.trim()) return;
+    
+    const customItem = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: customInput.trim(),
+      isCustom: true,
+      selectedAt: new Date().toISOString()
+    };
+
+    onChange([...value, customItem]);
+    setCustomInput('');
+    setCustomMode(false);
+  };
+
+  const handleClearAll = () => {
+    onChange([]);
+  };
+
+  return (
+    <div className="space-y-2" ref={dropdownRef}>
+      <label className="text-sm font-medium mb-2 block">{label}</label>
+      
+      {/* Selected Items Tags */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200 mb-2">
+          {value.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm group hover:bg-blue-200 transition-all"
+            >
+              <span className="font-medium">{item.name}</span>
+              {item.code && (
+                <span className="text-xs bg-blue-200 px-1.5 py-0.5 rounded-full ml-1">
+                  {item.code}
+                </span>
+              )}
+              {item.isCustom && (
+                <span className="text-xs bg-purple-200 px-1.5 py-0.5 rounded-full ml-1">
+                  Custom
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleRemoveItem(item.id)}
+                className="ml-1 p-0.5 rounded-full hover:bg-blue-300 transition-colors"
+                disabled={disabled}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          
+          {value.length > 1 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Dropdown Trigger Button */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          className={`
+            w-full px-4 py-2.5 text-left border rounded-lg flex items-center justify-between
+            ${isOpen ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300'}
+            ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-gray-400'}
+            transition-all
+          `}
+        >
+          <span className={value.length === 0 ? 'text-gray-400' : 'text-gray-700'}>
+            {value.length === 0 
+              ? placeholder 
+              : `${value.length} item${value.length > 1 ? 's' : ''} selected`}
+          </span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Dropdown Menu */}
+        {isOpen && (
+          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-96 flex flex-col">
+            {/* Search Input - Now for filtering loaded options */}
+            <div className="p-2 border-b flex-shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  className="w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={`Filter ${label.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCustomMode(false);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Options List - Shows ALL loaded options, filtered by search */}
+            <div className="overflow-y-auto flex-1">
+              {isLoading || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                </div>
+              ) : filteredOptions.length > 0 ? (
+                filteredOptions.map((option) => {
+                  const isSelected = value.some(v => v.id === option.id);
+                  return (
+                    <div
+                      key={option.id}
+                      onClick={() => handleSelectItem(option)}
+                      className={`
+                        flex items-start gap-3 p-3 border-b last:border-b-0 cursor-pointer
+                        ${isSelected 
+                          ? 'bg-blue-50 hover:bg-blue-100' 
+                          : 'hover:bg-gray-50'
+                        }
+                        transition-colors
+                      `}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{option.name}</span>
+                          {option.code && (
+                            <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                              {option.code}
+                            </span>
+                          )}
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-blue-500 ml-auto" />
+                          )}
+                        </div>
+                        {option.category && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {option.category}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No results found
+                </div>
+              )}
+            </div>
+
+            {/* Custom Entry Option */}
+            {allowCustom && searchTerm.trim() && !customMode && (
+              <div className="border-t p-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCustomMode(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add "{searchTerm}" as custom
+                </button>
+              </div>
+            )}
+
+            {/* Custom Input Mode */}
+            {allowCustom && customMode && (
+              <div className="border-t p-2 flex-shrink-0">
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-lg text-sm"
+                    placeholder="Enter custom value..."
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddCustom();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCustomMode(false)}
+                      className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCustom}
+                      disabled={!customInput.trim()}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 export function AppointmentsList() {
   const [clinicAppointments, setClinicAppointments] = useState<
     ClinicAppointments[]
@@ -3488,6 +3807,15 @@ export function AppointmentsList() {
   const [labHistory, setLabHistory] = useState<LabOrder[]>([]);
   const [labDetails, setLabDetails] = useState<ResultFile | undefined>();
   const [ishandleResult, setHandleResult] = useState(false);
+  // Add these state variables with your other useState declarations
+const [chiefComplaints, setChiefComplaints] = useState<ComplaintItem[]>([]);
+const [examinationFindings, setExaminationFindings] = useState<ExaminationFindingItem[]>([]);
+const [dentalHistoryItems, setDentalHistoryItems] = useState<DentalHistoryItem[]>([]);
+
+// Loading states for each dropdown
+const [loadingComplaints, setLoadingComplaints] = useState(false);
+const [loadingExaminations, setLoadingExaminations] = useState(false);
+const [loadingDentalHistory, setLoadingDentalHistory] = useState(false);
 
   console.log("ded", selectedHistory);
 
@@ -3664,6 +3992,12 @@ useEffect(() => {
   };
 
   const handleBackToAppointments = () => {
+    setChiefComplaints([]);
+  setExaminationFindings([]);
+  setDentalHistoryItems([]);
+  setLoadingComplaints(false);
+  setLoadingExaminations(false);
+  setLoadingDentalHistory(false);
     setSelectedAppointmentId(null);
     setAppointmentDetail(null);
     setPatientHistory([]);
@@ -3732,7 +4066,21 @@ useEffect(() => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [searchQuery, selectedDate]);
+ useEffect(() => {
+    if (selectedClinic?.clinicId) {
+      console.log("🏥 Clinic selected, pre-fetching dropdown options...");
+      // Pre-fetch initial options for better UX
+      fetchChiefComplaints('');
+      fetchExaminationFindings('');
+      fetchDentalHistory('');
+    }
+  }, [selectedClinic?.clinicId]);
 
+  // ✅ Existing useEffect for departments
+  useEffect(() => {
+    console.log("🏥 Selected Clinic changed:", selectedClinic);
+    if (selectedClinic) fetchDepartments();
+  }, [selectedClinic]);
   const handlePageChange = (direction: "prev" | "next") => {
     const newPage =
       direction === "next"
@@ -3974,16 +4322,16 @@ useEffect(() => {
       const formData = new FormData();
 
       // Append basic fields
-      const symptomsArray = chiefComplaint
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+    const symptomsArray = chiefComplaints.map(c => c.name);
       const diagnosisArray = diagnosis
         .split(",")
         .map((d) => d.trim())
         .filter(Boolean);
-
+         const examinationFindingsArray = examinationFindings.map(e => e.name);
+    const dentalHistoryArray = dentalHistoryItems.map(d => d.name);
       formData.append("symptoms", JSON.stringify(symptomsArray));
+      formData.append("examinationFindings", JSON.stringify(examinationFindingsArray));
+    formData.append("dentalHistory", JSON.stringify(dentalHistoryArray));
       formData.append("diagnosis", JSON.stringify(diagnosisArray));
 
       // Filter out empty prescriptions
@@ -4550,6 +4898,144 @@ useEffect(() => {
       setLoading(false);
     }
   };
+  // ==================== Fetch Chief Complaints ====================
+const fetchChiefComplaints = useCallback(async (search: string = '') => {
+  if (!selectedClinic?.clinicId) {
+    console.warn("⚠ No clinic ID available for fetching complaints");
+    return [];
+  }
+
+  setLoadingComplaints(true);
+  try {
+    const token = localStorage.getItem("authToken");
+    const params = new URLSearchParams({
+      clinicId: selectedClinic.clinicId,
+      ...(search && { search }),
+      limit: '50',
+      type: 'complaint'
+    });
+
+    const response = await axios.get(
+      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/treatment-procedures?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+console.log("Hitler",response.data)
+    const data = response.data;
+    
+    // Transform the data based on your API response structure
+    const transformedComplaints = (data.data || data.results || []).map((item: any) => ({
+      id: item._id || item.id || `complaint_${Date.now()}_${Math.random()}`,
+      name: item.procedureName || item.name || item.title,
+      code: item.procedureCode || item.code,
+      category: item.category,
+      description: item.description,
+      isCustom: false
+    }));
+
+    return transformedComplaints;
+  } catch (err) {
+    console.error("❌ Error fetching chief complaints:", err);
+    return [];
+  } finally {
+    setLoadingComplaints(false);
+  }
+}, [selectedClinic?.clinicId]);
+
+// ==================== Fetch Examination Findings ====================
+const fetchExaminationFindings = useCallback(async (search: string = '') => {
+  if (!selectedClinic?.clinicId) {
+    console.warn("⚠ No clinic ID available for fetching examination findings");
+    return [];
+  }
+
+  setLoadingExaminations(true);
+  try {
+    const token = localStorage.getItem("authToken");
+    const params = new URLSearchParams({
+      clinicId: selectedClinic.clinicId,
+      ...(search && { search }),
+      limit: '50'
+    });
+
+    const response = await axios.get(
+      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/examination-findings?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const data = response.data;
+    
+    const transformedFindings = (data.data || data.results || []).map((item: any) => ({
+      id: item._id || item.id || `finding_${Date.now()}_${Math.random()}`,
+      name: item.findingName || item.name || item.title,
+      code: item.findingCode || item.code,
+      category: item.category,
+      isCustom: false
+    }));
+
+    return transformedFindings;
+  } catch (err) {
+    console.error("❌ Error fetching examination findings:", err);
+    return [];
+  } finally {
+    setLoadingExaminations(false);
+  }
+}, [selectedClinic?.clinicId]);
+
+// ==================== Fetch Dental History ====================
+const fetchDentalHistory = useCallback(async (search: string = '') => {
+  if (!selectedClinic?.clinicId) {
+    console.warn("⚠ No clinic ID available for fetching dental history");
+    return [];
+  }
+
+  setLoadingDentalHistory(true);
+  try {
+    const token = localStorage.getItem("authToken");
+    const params = new URLSearchParams({
+      clinicId: selectedClinic.clinicId,
+      ...(search && { search }),
+      limit: '50'
+    });
+
+    const response = await axios.get(
+      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/dental-history?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const data = response.data;
+    
+    const transformedHistory = (data.data || data.results || []).map((item: any) => ({
+      id: item._id || item.id || `history_${Date.now()}_${Math.random()}`,
+      name: item.historyName || item.name || item.title,
+      code: item.historyCode || item.code,
+      category: item.category,
+      isCustom: false
+    }));
+
+    return transformedHistory;
+  } catch (err) {
+    console.error("❌ Error fetching dental history:", err);
+    return [];
+  } finally {
+    setLoadingDentalHistory(false);
+  }
+}, [selectedClinic?.clinicId]);
+
   const handleEditTreatmentPlan = (plan: TreatmentPlan) => {
     console.log("✏️ Editing treatment plan:", plan.planName);
 
@@ -5587,18 +6073,76 @@ useEffect(() => {
                     </CardHeader>
                     <CardContent className="space-y-6">
                       {/* Chief Complaint */}
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">
-                          Chief Complaint
-                        </label>
-                        <Textarea
-                          placeholder="Enter patient's main complaint..."
-                          className="min-h-[100px]"
-                          value={chiefComplaint}
-                          onChange={(e) => setChiefComplaint(e.target.value)}
-                        />
-                      </div>
+        {/* Chief Complaint - Multi-select Dropdown */}
+<div className="space-y-4">
+  <MultiSelectDropdown
+    label="Chief Complaint"
+    value={chiefComplaints}
+    onChange={setChiefComplaints}
+    fetchOptions={fetchChiefComplaints}
+    placeholder="Search and select chief complaints..."
+    loading={loadingComplaints}
+    allowCustom={true}
+  />
+  
+  {/* Display count of selected complaints */}
+  {chiefComplaints.length > 0 && (
+    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+      <p className="text-sm font-medium text-blue-800">
+        Selected Complaints: {chiefComplaints.length}
+      </p>
+      <div className="flex flex-wrap gap-2 mt-2">
+        {chiefComplaints.map((complaint, idx) => (
+          <Badge key={complaint.id} variant="outline" className="bg-white">
+            {complaint.name}
+            {complaint.isCustom && (
+              <span className="ml-1 text-xs text-purple-600">(Custom)</span>
+            )}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
 
+{/* Diagnosis (Keep as is or convert to multi-select if needed) */}
+<div>
+  <label className="text-sm font-medium mb-2 block">
+    Diagnosis
+  </label>
+  <Textarea
+    placeholder="Enter diagnosis..."
+    className="min-h-[100px]"
+    value={diagnosis}
+    onChange={(e) => setDiagnosis(e.target.value)}
+  />
+</div>
+
+{/* Examination Findings - Multi-select Dropdown */}
+<div className="mt-6">
+  <MultiSelectDropdown
+    label="Examination Findings"
+    value={examinationFindings}
+    onChange={setExaminationFindings}
+    fetchOptions={fetchExaminationFindings}
+    placeholder="Search and select examination findings..."
+    loading={loadingExaminations}
+    allowCustom={true}
+  />
+</div>
+
+{/* Dental History - Multi-select Dropdown */}
+<div className="mt-6">
+  <MultiSelectDropdown
+    label="Dental History"
+    value={dentalHistoryItems}
+    onChange={setDentalHistoryItems}
+    fetchOptions={fetchDentalHistory}
+    placeholder="Search and select dental history items..."
+    loading={loadingDentalHistory}
+    allowCustom={true}
+  />
+</div>
                       {/* Diagnosis */}
                       <div>
                         <label className="text-sm font-medium mb-2 block">
