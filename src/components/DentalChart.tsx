@@ -1,5 +1,5 @@
 // DentalChart.tsx - COMPLETE CODE WITH SOFT TISSUE AND TMJ SUPPORT
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef,useCallback } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -16,7 +16,8 @@ import {
   ChevronDown,
   Menu,
   ChevronUp,
-  Check
+  Check,
+  Search
 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { useImagePreloader } from "../hooks/useImagePreloader"; 
@@ -24,29 +25,9 @@ import DentalLoader from './DentalLoader';
 import { ToothSVG, SoftTissueSVG, TMJSVG } from "./DentalSvgComponents";
 import { preloadAllDentalSvgs } from "../utils/dentalSvgCache"; 
 import { getSvgUrlFromCache } from "../utils/dentalSvgCache";
+import clinicServiceBaseUrl from "../clinicServiceUrl";
+import axios from "axios";
 
-
-// Import Tooth SVG components
-// const incisorSvg = "/assets/svg/dental/incisor.svg";
-// const canineSvg = "/assets/svg/dental/canine.svg";
-// const premolarSvg = "/assets/svg/dental/premolar.svg";
-// const molarSvg = "/assets/svg/dental/molar.svg";
-// const wisdomSvg = "/assets/svg/dental/wisdom.svg";
-
-// Import Soft Tissue SVG components
-// const tongueSvg = "/assets/svg/softTissue/Tongue.svg";
-// const gingivaSvg = "/assets/svg/softTissue/Gingiva.svg";
-// const palateSVG = "/assets/svg/softTissue/Palate.svg";
-// const buccalMucosaSVG = "/assets/svg/softTissue/BuccalMucosa.svg";
-// const floorOfMouthSVG = "/assets/svg/softTissue/FloorOfTheMouth.svg";
-// const labialMucosaSVG = "/assets/svg/softTissue/LabialMucosa.svg";
-// const salivaryGlandsSVG = "/assets/svg/softTissue/SalivaryGlands.svg";
-// const frenumSVG ="/assets/svg/softTissue/Frenum.svg";
-
-// Import TMJ SVG components - FIXED PATHS
-// const tmjLeftSVG = "/assets/svg/tmj/LeftTMJ.svg";
-// const tmjRightSVG = "/assets/svg/tmj/RightTMJ.svg";
-// const tmjBothSVG = "/assets/svg/tmj/BothTMJ.svg";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -134,6 +115,7 @@ interface TreatmentPlanData {
 interface DentalChartProps {
   patientId: string;
   visitId?: string;
+   clinicId: string;
   mode: "view" | "edit";
   patientName?: string;
   patientUniqueId?: string;
@@ -1200,6 +1182,536 @@ const getHueFromColor = (hexColor: string): number => {
 //   return { loaded };
 // };
 
+// ==================== Reusable MultiSelect Dropdown Component ====================
+
+const MultiSelectDropdown = ({
+  label,
+  value = [],
+  onChange,
+  fetchOptions,
+  placeholder = "Select options...",
+  disabled = false,
+  loading = false,
+  allowCustom = true,
+}: {
+  label: string;
+  value: any[];
+  onChange: (items: any[]) => void;
+  fetchOptions: (search: string) => Promise<any[]>;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  allowCustom?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [options, setOptions] = useState<any[]>([]);
+  const [filteredOptions, setFilteredOptions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [customMode, setCustomMode] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const customOptionRef = useRef<HTMLDivElement | null>(null);
+
+  // Load ALL options when dropdown opens
+  useEffect(() => {
+    const loadOptions = async () => {
+      if (!isOpen) return;
+
+      setIsLoading(true);
+      const results = await fetchOptions("");
+      setOptions(results);
+      setIsLoading(false);
+    };
+
+    loadOptions();
+  }, [isOpen, fetchOptions]);
+
+  // Filter options locally when search term changes
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const filtered = options.filter(
+        (opt) =>
+          opt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      setFilteredOptions(filtered);
+    } else {
+      setFilteredOptions(options);
+    }
+  }, [searchTerm, options]);
+
+  // Reset highlighted index when filtered options change
+  useEffect(() => {
+    setHighlightedIndex(-1);
+    optionRefs.current = new Array(filteredOptions.length).fill(null);
+  }, [filteredOptions]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0) {
+      if (highlightedIndex < filteredOptions.length) {
+        optionRefs.current[highlightedIndex]?.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth'
+        });
+      } else if (highlightedIndex === filteredOptions.length && allowCustom && searchTerm.trim()) {
+        customOptionRef.current?.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [highlightedIndex, filteredOptions.length, allowCustom, searchTerm]);
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+        setSearchTerm("");
+        setCustomMode(false);
+        setHighlightedIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isOpen]);
+
+  const handleSelectItem = (item: any) => {
+    if (!value.some((v) => v.id === item.id)) {
+      onChange([...value, { ...item, selectedAt: new Date().toISOString() }]);
+    }
+    // Don't close dropdown after selection to allow multiple selections
+    setSearchTerm("");
+    setHighlightedIndex(-1);
+    
+    // Keep focus on search input
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 10);
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    onChange(value.filter((v) => v.id !== itemId));
+  };
+
+  const handleAddCustom = () => {
+    if (!customInput.trim()) return;
+
+    const customItem = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: customInput.trim(),
+      isCustom: true,
+      selectedAt: new Date().toISOString(),
+    };
+
+    onChange([...value, customItem]);
+    setCustomInput("");
+    setCustomMode(false);
+    setHighlightedIndex(-1);
+  };
+
+  const handleClearAll = () => {
+    onChange([]);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const totalItems = filteredOptions.length + (allowCustom && searchTerm.trim() ? 1 : 0);
+
+    // Arrow Down: Navigate down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (totalItems > 0) {
+        setHighlightedIndex(prev => {
+          const next = prev < totalItems - 1 ? prev + 1 : 0;
+          return next;
+        });
+      }
+      return;
+    }
+
+    // Arrow Up: Navigate up
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (totalItems > 0) {
+        setHighlightedIndex(prev => {
+          const next = prev > 0 ? prev - 1 : totalItems - 1;
+          return next;
+        });
+      }
+      return;
+    }
+
+    // Enter: Select highlighted item
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      if (highlightedIndex >= 0) {
+        if (highlightedIndex < filteredOptions.length) {
+          // Select an option
+          handleSelectItem(filteredOptions[highlightedIndex]);
+        } else if (highlightedIndex === filteredOptions.length && allowCustom && searchTerm.trim()) {
+          // Open custom mode
+          setCustomMode(true);
+          setCustomInput(searchTerm);
+        }
+      } else if (filteredOptions.length > 0) {
+        // No highlight, select first option
+        handleSelectItem(filteredOptions[0]);
+      } else if (allowCustom && searchTerm.trim().length >= 2) {
+        // No options, go to custom
+        setCustomMode(true);
+        setCustomInput(searchTerm);
+      }
+      return;
+    }
+
+    // Escape: Close dropdown
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    // Tab: Close dropdown
+    if (e.key === 'Tab') {
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, item: any, index: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSelectItem(item);
+    }
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = index + 1;
+      if (nextIndex < filteredOptions.length + (allowCustom && searchTerm.trim() ? 1 : 0)) {
+        setHighlightedIndex(nextIndex);
+      }
+    }
+    
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (index > 0) {
+        setHighlightedIndex(index - 1);
+      } else {
+        searchInputRef.current?.focus();
+        setHighlightedIndex(-1);
+      }
+    }
+    
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  const handleToggleDropdown = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  return (
+    <div className="space-y-2" ref={dropdownRef}>
+      <label className="text-sm font-medium mb-2 block">{label}</label>
+
+      {/* Selected Items Tags */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200 mb-2">
+          {value.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm group hover:bg-blue-200 transition-all"
+            >
+              <span className="font-medium">{item.name}</span>
+              {item.code && (
+                <span className="text-xs bg-blue-200 px-1.5 py-0.5 rounded-full ml-1">
+                  {item.code}
+                </span>
+              )}
+              {item.isCustom && (
+                <span className="text-xs bg-purple-200 px-1.5 py-0.5 rounded-full ml-1">
+                  Custom
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleRemoveItem(item.id)}
+                className="ml-1 p-0.5 rounded-full hover:bg-blue-300 transition-colors"
+                disabled={disabled}
+                aria-label={`Remove ${item.name}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+
+          {value.length > 1 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Dropdown Trigger Button */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={handleToggleDropdown}
+          className={`
+            w-full px-4 py-2.5 text-left border rounded-lg flex items-center justify-between
+            ${isOpen ? "ring-2 ring-blue-500 border-blue-500" : "border-gray-300"}
+            ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white hover:border-gray-400"}
+            transition-all
+          `}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+        >
+          <span
+            className={value.length === 0 ? "text-gray-400" : "text-gray-700"}
+          >
+            {value.length === 0
+              ? placeholder
+              : `${value.length} item${value.length > 1 ? "s" : ""} selected`}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {/* Dropdown Menu */}
+        {isOpen && (
+          <div 
+            className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-96 flex flex-col"
+            role="listbox"
+            aria-label={`${label} options`}
+          >
+            {/* Search Input */}
+            <div className="p-2 border-b flex-shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  className="w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={`Filter ${label.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCustomMode(false);
+                    setHighlightedIndex(-1);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                  aria-autocomplete="list"
+                  aria-controls="multi-select-options"
+                  aria-expanded={true}
+                  aria-activedescendant={
+                    highlightedIndex >= 0 
+                      ? highlightedIndex < filteredOptions.length
+                        ? `option-${filteredOptions[highlightedIndex]?.id}`
+                        : `custom-option`
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Options List */}
+            <div 
+              id="multi-select-options"
+              className="overflow-y-auto flex-1"
+              role="listbox"
+              aria-multiselectable="true"
+            >
+              {isLoading || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                </div>
+              ) : filteredOptions.length > 0 ? (
+                filteredOptions.map((option, index) => {
+                  const isSelected = value.some((v) => v.id === option.id);
+                  const isHighlighted = highlightedIndex === index;
+                  
+                  return (
+                    <div
+                      key={option.id}
+                      id={`option-${option.id}`}
+                      ref={el => { optionRefs.current[index] = el; }}
+                      onClick={() => handleSelectItem(option)}
+                      onKeyDown={(e) => handleOptionKeyDown(e, option, index)}
+                      className={`
+                        flex items-start gap-3 p-3 border-b last:border-b-0 cursor-pointer
+                        ${isSelected ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-gray-50"}
+                        ${isHighlighted ? "bg-gray-100 ring-2 ring-blue-500" : ""}
+                        transition-colors
+                      `}
+                      tabIndex={0}
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{option.name}</span>
+                          {option.code && (
+                            <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                              {option.code}
+                            </span>
+                          )}
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-blue-500 ml-auto" />
+                          )}
+                        </div>
+                        {option.category && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {option.category}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No results found
+                </div>
+              )}
+            </div>
+
+            {/* Custom Entry Option */}
+            {allowCustom && searchTerm.trim() && !customMode && (
+              <div 
+                ref={customOptionRef}
+                id="custom-option"
+                onClick={() => {
+                  setCustomMode(true);
+                  setCustomInput(searchTerm);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setCustomMode(true);
+                    setCustomInput(searchTerm);
+                  }
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    // Stay at this item or wrap to first
+                    setHighlightedIndex(filteredOptions.length);
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (filteredOptions.length > 0) {
+                      setHighlightedIndex(filteredOptions.length - 1);
+                    } else {
+                      searchInputRef.current?.focus();
+                      setHighlightedIndex(-1);
+                    }
+                  }
+                }}
+                className={`
+                  border-t p-2 flex-shrink-0 cursor-pointer
+                  ${highlightedIndex === filteredOptions.length ? 'bg-gray-100 ring-2 ring-blue-500' : ''}
+                `}
+                tabIndex={0}
+                role="option"
+              >
+                <div className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded">
+                  <Plus className="h-4 w-4" />
+                  Add "{searchTerm}" as custom
+                </div>
+              </div>
+            )}
+
+            {/* Custom Input Mode */}
+            {allowCustom && customMode && (
+              <div className="border-t p-2 flex-shrink-0">
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-lg text-sm"
+                    placeholder="Enter custom value..."
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddCustom();
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setCustomMode(false);
+                        setHighlightedIndex(-1);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                        }, 10);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomMode(false);
+                        setHighlightedIndex(-1);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                        }, 10);
+                      }}
+                      className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCustom}
+                      disabled={!customInput.trim()}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Tooth Diagram with Area Markers Component - Segmented Circle Design
 const ToothDiagram: React.FC<{
   toothType: string;
@@ -1471,87 +1983,70 @@ const ToothDiagram: React.FC<{
 interface ToothPopupProps {
   tooth: ToothData;
   condition: ToothCondition | null;
+    clinicId: string; 
   mode: "view" | "edit";
   onClose: () => void;
   onSave: (data: Partial<ToothCondition>) => void;
+    fetchExaminationFindings: (search: string) => Promise<any[]>;
+  fetchDiagnoses: (search: string) => Promise<any[]>;
+  fetchTreatments: (search: string) => Promise<any[]>;
+  loadingExaminations?: boolean;
+  loadingDiagnoses?: boolean;
+  loadingTreatments?: boolean;
 }
 
 const ToothPopup: React.FC<ToothPopupProps> = ({
   tooth,
   condition,
   mode,
+  clinicId,
   onClose,
   onSave,
+  fetchExaminationFindings,
+  fetchDiagnoses,
+  fetchTreatments,
+  loadingExaminations,
+  loadingDiagnoses,
+  loadingTreatments,
 }) => {
-  const [selectedConditions, setSelectedConditions] = useState<string[]>(
-    condition?.conditions || [],
+  const [selectedExaminations, setSelectedExaminations] = useState<any[]>(
+    condition?.surfaceConditions?.[0]?.conditions?.map(c => ({ id: c, name: c })) || []
+  );
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<any[]>(
+    condition?.conditions?.map(c => ({ id: c, name: c })) || []
+  );
+  const [selectedTreatments, setSelectedTreatments] = useState<any[]>(
+    condition?.procedures?.map(p => ({ id: p.name, name: p.name })) || []
   );
   const [notes, setNotes] = useState(condition?.notes || "");
+  const [selectedAreas, setSelectedAreas] = useState<string[]>(
+    condition?.surfaceConditions?.map(sc => sc.surface) || []
+  );
   const [surfaceConditions, setSurfaceConditions] = useState<
     { surface: string; conditions: string[] }[]
   >(condition?.surfaceConditions || []);
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [procedures, setProcedures] = useState<
-    {
-      name: string;
-      surface: string;
-      cost?: number;
-      notes?: string;
-      date?: string;
-    }[]
-  >(condition?.procedures || []);
-const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useState(false);
-  // Handle condition toggle
-  const handleConditionToggle = (conditionName: string) => {
-    setSelectedConditions((prev) =>
-      prev.includes(conditionName)
-        ? prev.filter((c) => c !== conditionName)
-        : [...prev, conditionName],
-    );
-  };
 
   // Handle area click - TOGGLE multiple areas
   const handleAreaClick = (area: string) => {
     setSelectedAreas((prev) => {
       if (prev.includes(area)) {
-        return prev.filter((a) => a !== area);
+        // Remove area and its conditions
+        setSurfaceConditions(prev => prev.filter(sc => sc.surface !== area));
+        return prev.filter(a => a !== area);
       } else {
         return [...prev, area];
       }
     });
   };
 
-  // Handle surface condition toggle for a specific area
-  const handleSurfaceConditionToggle = (
-    surface: string,
-    conditionName: string,
-  ) => {
-    setSurfaceConditions((prev) => {
-      const surfaceIndex = prev.findIndex((sc) => sc.surface === surface);
-
-      if (surfaceIndex === -1) {
-        return [...prev, { surface, conditions: [conditionName] }];
-      } else {
-        const updated = [...prev];
-        const currentConditions = updated[surfaceIndex].conditions;
-
-        if (currentConditions.includes(conditionName)) {
-          updated[surfaceIndex].conditions = currentConditions.filter(
-            (c) => c !== conditionName,
-          );
-          if (updated[surfaceIndex].conditions.length === 0) {
-            return prev.filter((_, i) => i !== surfaceIndex);
-          }
-        } else {
-          updated[surfaceIndex].conditions = [
-            ...currentConditions,
-            conditionName,
-          ];
-        }
-        return updated;
-      }
-    });
-  };
+  // Update surface conditions when examinations change
+  useEffect(() => {
+    const newSurfaceConditions = selectedAreas.map(area => ({
+      surface: area,
+      conditions: selectedExaminations.map(e => e.name)
+    }));
+    setSurfaceConditions(newSurfaceConditions);
+  }, [selectedAreas, selectedExaminations]);
 
   // Get conditions by area for the diagram
   const conditionsByArea: Record<string, string[]> = {};
@@ -1559,34 +2054,37 @@ const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useSta
     conditionsByArea[sc.surface] = sc.conditions;
   });
 
-  // Handle save with formatted data
   const handleSave = () => {
     const toothData: Partial<ToothCondition> = {
       toothNumber: tooth.number,
-      conditions: selectedConditions,
+      conditions: selectedDiagnoses.map(d => d.name),
       notes,
       surfaceConditions,
-      procedures: procedures,
+      procedures: selectedTreatments.map(t => ({
+        name: t.name,
+        surface: selectedAreas[0] || 'occlusal',
+        notes: `Examination: ${selectedExaminations.map(e => e.name).join(', ')} | Diagnosis: ${selectedDiagnoses.map(d => d.name).join(', ')}`,
+        date: new Date().toISOString(),
+        cost: 0
+      })),
+      color: getToothColor(tooth.number, selectedDiagnoses)
     };
 
     onSave(toothData);
   };
 
-  // Get the correct color for the tooth in the modal
-  const getToothColorForModal = () => {
-    if (!condition) return "#4b5563";
-
-    if (condition.conditions.includes("Missing")) return "#9ca3af";
-    if (condition.conditions.includes("Caries")) return "#ef4444";
-    if (condition.conditions.includes("Filling")) return "#3b82f6";
-    if (condition.conditions.includes("Crown")) return "#f59e0b";
-    if (condition.conditions.includes("Root Canal")) return "#8b5cf6";
-    return condition.color || "#4b5563";
+  const getToothColor = (toothNumber: number, diagnoses: any[]) => {
+    if (diagnoses.some(d => d.name.includes("Missing"))) return "#9ca3af";
+    if (diagnoses.some(d => d.name.includes("Caries"))) return "#ef4444";
+    if (diagnoses.some(d => d.name.includes("Filling"))) return "#3b82f6";
+    if (diagnoses.some(d => d.name.includes("Crown"))) return "#f59e0b";
+    if (diagnoses.some(d => d.name.includes("Root Canal"))) return "#8b5cf6";
+    return "#4b5563";
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-lg">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-lg">
         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">
@@ -1603,342 +2101,145 @@ const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useSta
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {/* TWO CONTAINERS LAYOUT */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-          {/* Left Container: Tooth SVG and General Conditions */}
-<div className="space-y-6">
-  {/* Tooth SVG Container */}
-  <div className="border rounded-xl p-4 bg-gray-50">
-    <div className="flex items-start gap-4">
-      {/* Tooth SVG - Original dental chart size */}
-      <div className="flex-shrink-0">
-        <div className="relative">
-            <ToothSVG
-                        type={tooth.svgName}
-                        width={80}
-                        height={80}
-                        rotation={tooth.rotation || 0}
-                        color={getToothColorForModal()}
-                      />
-        </div>
-        <div className="text-center mt-2">
-          <div className="text-xl font-bold text-gray-800">
-            #{tooth.number}
-          </div>
-          <div className="text-xs text-gray-600">{tooth.name}</div>
-        </div>
-      </div>
-      
-      {/* General Conditions Section with Dropdown */}
-      <div className="flex-1">
-        <div className="mt-1">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium text-sm">General Conditions</h4>
-            {mode === "edit" && (
-              <button
-                type="button"
-                onClick={() => setShowGeneralConditionsDropdown(!showGeneralConditionsDropdown)}
-                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
-              >
-                {showGeneralConditionsDropdown ? (
-                  <>
-                    <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
-                  <span className="text-sm font-medium">Hide Conditions</span>
-                  </>
-                ) : (
-                  <>
-                   <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
-                     <span className="text-sm font-medium">Select Conditions</span>
-                  </>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Tooth Visualization with Circular Diagram */}
+            <div className="space-y-6">
+              {/* Tooth SVG and Circular Diagram */}
+              <div className="border rounded-xl p-6 bg-gray-50">
+                <div className="flex flex-col items-center">
+                  <ToothSVG
+                    type={tooth.svgName}
+                    width={100}
+                    height={100}
+                    rotation={tooth.rotation || 0}
+                    color={getToothColor(tooth.number, selectedDiagnoses)}
+                  />
+                  <div className="text-center mt-2">
+                    <div className="text-xl font-bold text-gray-800">
+                      #{tooth.number}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Circular Surface Selection Diagram */}
+                <div className="mt-6">
+                  <h4 className="font-medium mb-3 text-center">Surface Selection</h4>
+                  <div className="flex justify-center">
+                    <ToothDiagram
+                      toothType={tooth.svgName}
+                      rotation={tooth.rotation || 0}
+                      selectedAreas={selectedAreas}
+                      onAreaClick={handleAreaClick}
+                      mode={mode}
+                      conditionsByArea={conditionsByArea}
+                      size={120}
+                    />
+                  </div>
+                </div>
+
+                {/* Selected Surfaces Summary */}
+                {selectedAreas.length > 0 && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <h5 className="text-xs font-medium mb-2 text-gray-700">
+                      Selected Surfaces:
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedAreas.map(area => (
+                        <Badge 
+                          key={area} 
+                          variant="secondary" 
+                          className="capitalize"
+                        >
+                          {area}
+                          <button
+                            type="button"
+                            onClick={() => handleAreaClick(area)}
+                            className="ml-1 text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </button>
-            )}
-          </div>
-          
-          {/* Current selected conditions display */}
-          <div className="mb-3">
-            <div className="flex flex-wrap gap-1.5">
-              {selectedConditions.map((cond) => (
-                <Badge 
-                  key={cond} 
-                  variant="secondary" 
-                  className="text-xs py-1 px-2"
-                >
-                  {cond}
-                  {mode === "edit" && (
-                    <button
-                      type="button"
-                      onClick={() => handleConditionToggle(cond)}
-                      className="ml-1.5 text-red-500 hover:text-red-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </Badge>
-              ))}
-              {selectedConditions.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">
-                  No general conditions
-                </p>
+              </div>
+
+              {/* Notes Section */}
+              <div>
+                <h4 className="font-medium mb-2">Notes</h4>
+                <textarea
+                  className="w-full border rounded-lg p-3 text-sm min-h-[120px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add notes about this tooth..."
+                  readOnly={mode === "view"}
+                />
+              </div>
+            </div>
+
+            {/* Right Column: Three Dropdowns */}
+            <div className="space-y-6">
+              {/* 1. Examination Findings Dropdown */}
+              <MultiSelectDropdown
+                label="On Examination"
+                value={selectedExaminations}
+                onChange={setSelectedExaminations}
+                fetchOptions={fetchExaminationFindings}
+                placeholder="Select examination findings..."
+                disabled={mode === "view"}
+                loading={loadingExaminations}
+              />
+
+              {/* 2. Diagnosis Dropdown */}
+              <MultiSelectDropdown
+                label="Diagnosis"
+                value={selectedDiagnoses}
+                onChange={setSelectedDiagnoses}
+                fetchOptions={fetchDiagnoses}
+                placeholder="Select diagnoses..."
+                disabled={mode === "view"}
+                loading={loadingDiagnoses}
+              />
+
+              {/* 3. Treatment Dropdown */}
+              <MultiSelectDropdown
+                label="Treatment Plan"
+                value={selectedTreatments}
+                onChange={setSelectedTreatments}
+                fetchOptions={fetchTreatments}
+                placeholder="Select treatments..."
+                disabled={mode === "view"}
+                loading={loadingTreatments}
+              />
+
+              {/* Summary Card */}
+              {selectedAreas.length > 0 && selectedExaminations.length > 0 && (
+                <div className="border rounded-lg p-4 bg-green-50">
+                  <h4 className="font-medium mb-2 text-sm">Current Selection</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Surfaces:</span>{' '}
+                      <span className="font-medium capitalize">
+                        {selectedAreas.join(', ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Findings:</span>{' '}
+                      <span className="font-medium">
+                        {selectedExaminations.map(e => e.name).join(', ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Diagnosis:</span>{' '}
+                      <span className="font-medium">
+                        {selectedDiagnoses.map(d => d.name).join(', ')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-
-          {/* Dropdown for adding conditions - Only visible when toggled */}
-          {mode === "edit" && showGeneralConditionsDropdown && (
-            <div className="border rounded-lg p-3 bg-white shadow-sm animate-in fade-in duration-200">
-              <h5 className="text-xs font-medium mb-2 text-gray-600">
-                Select Conditions:
-              </h5>
-             <div className="grid grid-cols-2 gap-2">
-                            {DENTAL_CONDITIONS.map((cond) => {
-                              const isSelected = selectedConditions.includes(cond);
-                              return (
-                                <button
-                                  key={cond}
-                                  type="button"
-                                  onClick={() => handleConditionToggle(cond)}
-                                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
-                                    isSelected
-                                      ? "bg-blue-500 text-white border-blue-500 shadow-sm"
-                                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  {isSelected ? (
-                                    <>
-                                      <Check className="h-3 w-3" />
-                                      {cond}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="h-3 w-3" />
-                                      {cond}
-                                    </>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-              
-              {/* Quick Actions */}
-              <div className="mt-3 pt-3 border-t">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedConditions([])}
-                    className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded border hover:bg-gray-200 transition-colors"
-                  >
-                    Clear All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedConditions([...DENTAL_CONDITIONS])}
-                    className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
-                  >
-                    Select All
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {/* Notes Section */}
-  <div>
-    <h4 className="font-medium mb-2">Notes</h4>
-    <textarea
-      className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
-      value={notes}
-      onChange={(e) => setNotes(e.target.value)}
-      placeholder="Add notes about this tooth..."
-      readOnly={mode === "view"}
-    />
-  </div>
-</div>
-
-          {/* RIGHT CONTAINER: Surface Selection Diagram - COMPACT SIZE */}
-<div className="space-y-4">
-  <div className="border rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white shadow-sm">
-    <h4 className="font-semibold mb-4 text-base text-gray-800 text-center">Surface Selection</h4>
-
-    {/* Surface Selection Diagram - Centered */}
-    <div className="flex justify-center">
-      <ToothDiagram
-        toothType={tooth.svgName}
-        rotation={tooth.rotation || 0}
-        selectedAreas={selectedAreas}
-        onAreaClick={handleAreaClick}
-        mode={mode}
-        conditionsByArea={conditionsByArea}
-        size={95}
-      />
-    </div>
-
-
-
-    {/* Selected Areas Display - COMPACT */}
-    {selectedAreas.length > 0 && mode === "edit" && (
-      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <h5 className="font-medium mb-2 text-xs text-gray-700">
-          Surface Conditions:
-        </h5>
-
-        {/* Show each selected area in REVERSE ORDER */}
-        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-          {[...selectedAreas].reverse().map((area) => {
-            const areaConditions =
-              surfaceConditions.find((sc) => sc.surface === area)
-                ?.conditions || [];
-            const areaColor = {
-              mesial: "#3b82f6",
-              distal: "#10b981",
-              buccal: "#f59e0b",
-              lingual: "#8b5cf6",
-              occlusal: "#ef4444",
-            }[area];
-
-            return (
-              <div key={area} className="border rounded p-2 bg-white">
-                <div className="flex items-center gap-2 mb-1">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: areaColor }}
-                  />
-                  <span className="font-medium capitalize text-xs">
-                    {area}
-                  </span>
-                </div>
-
-                {/* Current conditions - COMPACT */}
-              <div className="flex flex-wrap gap-1 mb-2">
-  {areaConditions.length > 0 ? (
-    areaConditions.map((cond) => (
-      <Badge
-        key={cond}
-        variant="secondary"
-        className="text-[10px] py-0.5 px-1.5 h-auto"
-      >
-        {cond}
-        <button
-          type="button"
-          onClick={() => handleSurfaceConditionToggle(area, cond)}
-          className="ml-1 text-red-500 hover:text-red-700"
-        >
-          <X className="h-2.5 w-2.5" />
-        </button>
-      </Badge>
-    ))
-  ) : (
-    <span className="text-[10px] text-gray-400 italic">
-      No conditions
-    </span>
-  )}
-</div>
-
-{/* Quick condition buttons - TAB STYLE */}
-<div className="flex flex-wrap gap-1">
-  {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
-    const isApplied = areaConditions.includes(cond);
-    return (
-      <button
-        key={cond}
-        type="button"
-        onClick={() => handleSurfaceConditionToggle(area, cond)}
-        className={`px-2 py-1 text-[10px] font-medium rounded-full transition-all ${
-          isApplied
-            ? "bg-red-500 text-white shadow-sm"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-        }`}
-      >
-        {isApplied ? (
-          <span className="flex items-center gap-1">
-            <X className="h-2.5 w-2.5" />
-            {cond}
-          </span>
-        ) : (
-          <span className="flex items-center gap-1">
-            <Plus className="h-2.5 w-2.5" />
-            {cond}
-          </span>
-        )}
-      </button>
-    );
-  })}
-</div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Quick actions for ALL selected areas - COMPACT */}
-        <div className="mt-2 pt-2 border-t border-blue-300">
-          <h6 className="text-[10px] font-medium mb-1 text-gray-600">
-            Quick Actions:
-          </h6>
-          <div className="grid grid-cols-2 gap-1">
-            {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
-              const isAppliedToAny = selectedAreas.some((area) => {
-                const areaConditions =
-                  surfaceConditions.find((sc) => sc.surface === area)
-                    ?.conditions || [];
-                return areaConditions.includes(cond);
-              });
-
-              return (
-                <button
-                  key={cond}
-                  type="button"
-                  onClick={() => {
-                    if (isAppliedToAny) {
-                      selectedAreas.forEach((area) => {
-                        const areaConditions =
-                          surfaceConditions.find((sc) => sc.surface === area)
-                            ?.conditions || [];
-                        if (areaConditions.includes(cond)) {
-                          handleSurfaceConditionToggle(area, cond);
-                        }
-                      });
-                    } else {
-                      selectedAreas.forEach((area) => {
-                        const areaConditions =
-                          surfaceConditions.find((sc) => sc.surface === area)
-                            ?.conditions || [];
-                        if (!areaConditions.includes(cond)) {
-                          handleSurfaceConditionToggle(area, cond);
-                        }
-                      });
-                    }
-                  }}
-                  className={`px-1.5 py-0.5 text-[10px] border rounded transition-all truncate ${
-                    isAppliedToAny
-                      ? "bg-red-100 text-red-700 border-red-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {isAppliedToAny ? (
-                    <span className="flex items-center justify-center gap-0.5">
-                      <X className="h-2 w-2" />
-                      Remove {cond}
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-0.5">
-                      <span>+</span>
-                      Add {cond}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
-</div>
           </div>
         </div>
 
@@ -1947,9 +2248,10 @@ const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useSta
             Cancel
           </Button>
           {mode === "edit" && (
-            <Button onClick={handleSave}>Save Changes</Button>
+            <Button onClick={handleSave}>
+              Save Changes
+            </Button>
           )}
-         
         </div>
       </div>
     </div>
@@ -1959,6 +2261,7 @@ const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useSta
 interface MultiToothPopupProps {
   selectedTeeth: number[];
   toothData: ToothData[];
+    clinicId: string; 
   mode: "view" | "edit";
   onClose: () => void;
   onSave: (data: {
@@ -1968,77 +2271,61 @@ interface MultiToothPopupProps {
     surfaceConditions: { surface: string; conditions: string[] }[];
     notes?: string;
   }) => void;
+    fetchExaminationFindings: (search: string) => Promise<any[]>;
+  fetchDiagnoses: (search: string) => Promise<any[]>;
+  fetchTreatments: (search: string) => Promise<any[]>;
+  loadingExaminations?: boolean;
+  loadingDiagnoses?: boolean;
+  loadingTreatments?: boolean;
 }
 
 const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
   selectedTeeth,
   toothData,
   mode,
+  clinicId,
   onClose,
   onSave,
+  fetchExaminationFindings,
+  fetchDiagnoses,
+  fetchTreatments,
+  loadingExaminations,
+  loadingDiagnoses,
+  loadingTreatments,
 }) => {
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [selectedExaminations, setSelectedExaminations] = useState<any[]>([]);
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<any[]>([]);
+  const [selectedTreatments, setSelectedTreatments] = useState<any[]>([]);
   const [notes, setNotes] = useState("");
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [surfaceConditions, setSurfaceConditions] = useState<
     { surface: string; conditions: string[] }[]
   >([]);
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [showGeneralConditionsDropdown, setShowGeneralConditionsDropdown] = useState(false);
 
   // Sort teeth numbers
   const sortedTeethNumbers = [...selectedTeeth].sort((a, b) => a - b);
-
-  // Handle condition toggle
-  const handleConditionToggle = (conditionName: string) => {
-    setSelectedConditions((prev) =>
-      prev.includes(conditionName)
-        ? prev.filter((c) => c !== conditionName)
-        : [...prev, conditionName],
-    );
-  };
 
   // Handle area click - TOGGLE multiple areas
   const handleAreaClick = (area: string) => {
     setSelectedAreas((prev) => {
       if (prev.includes(area)) {
-        return prev.filter((a) => a !== area);
+        // Remove area and its conditions
+        setSurfaceConditions(prev => prev.filter(sc => sc.surface !== area));
+        return prev.filter(a => a !== area);
       } else {
         return [...prev, area];
       }
     });
   };
 
-  // Handle surface condition toggle for a specific area
-  const handleSurfaceConditionToggle = (
-    surface: string,
-    conditionName: string,
-  ) => {
-    setSurfaceConditions((prev) => {
-      const surfaceIndex = prev.findIndex((sc) => sc.surface === surface);
-
-      if (surfaceIndex === -1) {
-        return [...prev, { surface, conditions: [conditionName] }];
-      } else {
-        const updated = [...prev];
-        const currentConditions = updated[surfaceIndex].conditions;
-
-        if (currentConditions.includes(conditionName)) {
-          updated[surfaceIndex].conditions = currentConditions.filter(
-            (c) => c !== conditionName,
-          );
-          if (updated[surfaceIndex].conditions.length === 0) {
-            return prev.filter((_, i) => i !== surfaceIndex);
-          }
-        } else {
-          updated[surfaceIndex].conditions = [
-            ...currentConditions,
-            conditionName,
-          ];
-        }
-        return updated;
-      }
-    });
-  };
+  // Update surface conditions when examinations change
+  useEffect(() => {
+    const newSurfaceConditions = selectedAreas.map(area => ({
+      surface: area,
+      conditions: selectedExaminations.map(e => e.name)
+    }));
+    setSurfaceConditions(newSurfaceConditions);
+  }, [selectedAreas, selectedExaminations]);
 
   // Get conditions by area for the diagram
   const conditionsByArea: Record<string, string[]> = {};
@@ -2048,20 +2335,26 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
 
   // Handle save with formatted data
   const handleSave = () => {
-    const toothData = {
+    const data = {
       teethNumbers: selectedTeeth,
-      conditions: selectedConditions,
+      conditions: selectedDiagnoses.map(d => d.name),
       notes,
       surfaceConditions,
-      procedures: [],
+      procedures: selectedTreatments.map(t => ({
+        name: t.name,
+        surface: selectedAreas[0] || 'occlusal',
+        notes: `Examination: ${selectedExaminations.map(e => e.name).join(', ')} | Diagnosis: ${selectedDiagnoses.map(d => d.name).join(', ')}`,
+        date: new Date().toISOString(),
+        cost: 0
+      }))
     };
 
-    onSave(toothData);
+    onSave(data);
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-lg">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-lg">
         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">
@@ -2080,159 +2373,82 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {/* TWO CONTAINERS LAYOUT */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* Left Container: Tooth Preview and General Conditions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Teeth Preview and Circular Diagram */}
             <div className="space-y-6">
-              {/* Teeth Preview Container */}
+              {/* Teeth Preview */}
               <div className="border rounded-xl p-4 bg-gray-50">
-                <div className="flex items-start gap-4">
-                  {/* Teeth SVG Preview */}
-                  <div className="flex-shrink-0">
-                    <div className="grid grid-cols-3 gap-2">
-                      {selectedTeeth.slice(0, 6).map((toothNumber) => {
-                        const tooth = toothData.find(t => t.number === toothNumber);
-                        return tooth ? (
-                          <div key={tooth.number} className="flex flex-col items-center">
-                            <ToothSVG
-                              type={tooth.svgName}
-                              width={50}
-                              height={50}
-                              rotation={tooth.rotation || 0}
-                              color="#4b5563"
-                            />
-                            <div className="text-center mt-1">
-                              <div className="text-sm font-bold text-gray-800">
-                                #{tooth.number}
-                              </div>
-                            </div>
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                    {selectedTeeth.length > 6 && (
-                      <div className="text-center mt-2 text-xs text-gray-500">
-                        +{selectedTeeth.length - 6} more teeth
+                <h4 className="font-medium mb-3">Selected Teeth</h4>
+                <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                  {selectedTeeth.slice(0, 12).map((toothNumber) => {
+                    const tooth = toothData.find(t => t.number === toothNumber);
+                    return tooth ? (
+                      <div key={tooth.number} className="flex flex-col items-center">
+                        <ToothSVG
+                          type={tooth.svgName}
+                          width={45}
+                          height={45}
+                          rotation={tooth.rotation || 0}
+                          color={selectedDiagnoses.length > 0 ? "#ef4444" : "#4b5563"}
+                        />
+                        <div className="text-xs font-semibold mt-1">
+                          #{tooth.number}
+                        </div>
                       </div>
-                    )}
+                    ) : null;
+                  })}
+                </div>
+                {selectedTeeth.length > 12 && (
+                  <div className="text-center mt-2 text-xs text-gray-500">
+                    +{selectedTeeth.length - 12} more teeth
                   </div>
-                  
-                  {/* General Conditions Section with Dropdown */}
-                  <div className="flex-1">
-                    <div className="mt-1">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-sm">General Conditions</h4>
-                        {mode === "edit" && (
+                )}
+              </div>
+
+              {/* Circular Surface Selection Diagram */}
+              <div className="border rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white shadow-sm">
+                <h4 className="font-semibold mb-4 text-base text-gray-800 text-center">
+                  Surface Selection (Applies to all selected teeth)
+                </h4>
+
+                <div className="flex justify-center">
+                  <ToothDiagram
+                    toothType="molar"
+                    rotation={0}
+                    selectedAreas={selectedAreas}
+                    onAreaClick={handleAreaClick}
+                    mode={mode}
+                    conditionsByArea={conditionsByArea}
+                    size={120}
+                  />
+                </div>
+
+                {/* Selected Surfaces Summary */}
+                {selectedAreas.length > 0 && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <h5 className="text-xs font-medium mb-2 text-gray-700">
+                      Selected Surfaces:
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedAreas.map(area => (
+                        <Badge 
+                          key={area} 
+                          variant="secondary" 
+                          className="capitalize"
+                        >
+                          {area}
                           <button
                             type="button"
-                            onClick={() => setShowGeneralConditionsDropdown(!showGeneralConditionsDropdown)}
-                            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                            onClick={() => handleAreaClick(area)}
+                            className="ml-1 text-red-500 hover:text-red-700"
                           >
-                            {showGeneralConditionsDropdown ? (
-                              <>
-                                <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
-                                <span className="text-sm font-medium">Hide Conditions</span>
-                              </>
-                            ) : (
-                              <>
-                                <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
-                                <span className="text-sm font-medium">Select Conditions</span>
-                              </>
-                            )}
+                            <X className="h-3 w-3" />
                           </button>
-                        )}
-                      </div>
-                      
-                      {/* Current selected conditions display */}
-                      <div className="mb-3">
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedConditions.map((cond) => (
-                            <Badge 
-                              key={cond} 
-                              variant="secondary" 
-                              className="text-xs py-1 px-2"
-                            >
-                              {cond}
-                              {mode === "edit" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleConditionToggle(cond)}
-                                  className="ml-1.5 text-red-500 hover:text-red-700"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </Badge>
-                          ))}
-                          {selectedConditions.length === 0 && (
-                            <p className="text-sm text-muted-foreground italic">
-                              No general conditions
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Dropdown for adding conditions - Only visible when toggled */}
-                      {mode === "edit" && showGeneralConditionsDropdown && (
-                        <div className="border rounded-lg p-3 bg-white shadow-sm animate-in fade-in duration-200">
-                          <h5 className="text-xs font-medium mb-2 text-gray-600">
-                            Select Conditions:
-                          </h5>
-                          <div className="grid grid-cols-2 gap-2">
-                            {DENTAL_CONDITIONS.map((cond) => {
-                              const isSelected = selectedConditions.includes(cond);
-                              return (
-                                <button
-                                  key={cond}
-                                  type="button"
-                                  onClick={() => handleConditionToggle(cond)}
-                                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
-                                    isSelected
-                                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  {isSelected ? (
-                                    <>
-                                      <Check className="h-3 w-3" />
-                                      {cond}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="h-3 w-3" />
-                                      {cond}
-                                    </>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          
-                          {/* Quick Actions */}
-                          <div className="mt-3 pt-3 border-t">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedConditions([])}
-                                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded border hover:bg-gray-200 transition-colors"
-                              >
-                                Clear All
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedConditions([...DENTAL_CONDITIONS])}
-                                className="text-xs px-2 py-1 bg-primary/10 text-primary rounded border border-primary/20 hover:bg-primary/20 transition-colors"
-                              >
-                                Select All
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Notes Section */}
@@ -2248,184 +2464,73 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
               </div>
             </div>
 
-            {/* RIGHT CONTAINER: Surface Selection Diagram */}
-            <div className="space-y-4">
-              <div className="border rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white shadow-sm">
-                <h4 className="font-semibold mb-4 text-base text-gray-800 text-center">
-                  Surface Selection
-                </h4>
+            {/* Right Column: Three Dropdowns */}
+            <div className="space-y-6">
+              {/* 1. Examination Findings Dropdown */}
+              <MultiSelectDropdown
+                label="On Examination"
+                value={selectedExaminations}
+                onChange={setSelectedExaminations}
+                fetchOptions={fetchExaminationFindings}
+                placeholder="Select examination findings..."
+                disabled={mode === "view"}
+                loading={loadingExaminations}
+              />
 
-                {/* Surface Selection Diagram - Centered */}
-                <div className="flex justify-center">
-                  <ToothDiagram
-                    toothType="molar"
-                    rotation={0}
-                    selectedAreas={selectedAreas}
-                    onAreaClick={handleAreaClick}
-                    mode={mode}
-                    conditionsByArea={conditionsByArea}
-                    size={95}
-                  />
-                </div>
+              {/* 2. Diagnosis Dropdown */}
+              <MultiSelectDropdown
+                label="Diagnosis"
+                value={selectedDiagnoses}
+                onChange={setSelectedDiagnoses}
+                fetchOptions={fetchDiagnoses}
+                placeholder="Select diagnoses..."
+                disabled={mode === "view"}
+                loading={loadingDiagnoses}
+              />
 
-                {/* Selected Areas Display */}
-                {selectedAreas.length > 0 && mode === "edit" && (
-                  <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 mt-4">
-                    <h5 className="font-medium mb-2 text-xs text-gray-700">
-                      Surface Conditions:
-                    </h5>
+              {/* 3. Treatment Dropdown */}
+              <MultiSelectDropdown
+                label="Treatment Plan"
+                value={selectedTreatments}
+                onChange={setSelectedTreatments}
+                fetchOptions={fetchTreatments}
+                placeholder="Select treatments..."
+                disabled={mode === "view"}
+                loading={loadingTreatments}
+              />
 
-                    {/* Show each selected area in REVERSE ORDER */}
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                      {[...selectedAreas].reverse().map((area) => {
-                        const areaConditions =
-                          surfaceConditions.find((sc) => sc.surface === area)
-                            ?.conditions || [];
-                        const areaColor = {
-                          mesial: "#3b82f6",
-                          distal: "#10b981",
-                          buccal: "#f59e0b",
-                          lingual: "#8b5cf6",
-                          occlusal: "#ef4444",
-                        }[area];
-
-                        return (
-                          <div key={area} className="border rounded p-2 bg-white">
-                            <div className="flex items-center gap-2 mb-1">
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: areaColor }}
-                              />
-                              <span className="font-medium capitalize text-xs">
-                                {area}
-                              </span>
-                            </div>
-
-                            {/* Current conditions */}
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {areaConditions.length > 0 ? (
-                                areaConditions.map((cond) => (
-                                  <Badge
-                                    key={cond}
-                                    variant="secondary"
-                                    className="text-[10px] py-0.5 px-1.5 h-auto"
-                                  >
-                                    {cond}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSurfaceConditionToggle(area, cond)}
-                                      className="ml-1 text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="h-2.5 w-2.5" />
-                                    </button>
-                                  </Badge>
-                                ))
-                              ) : (
-                                <span className="text-[10px] text-gray-400 italic">
-                                  No conditions
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Quick condition buttons */}
-                            <div className="flex flex-wrap gap-1">
-                              {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
-                                const isApplied = areaConditions.includes(cond);
-                                return (
-                                  <button
-                                    key={cond}
-                                    type="button"
-                                    onClick={() => handleSurfaceConditionToggle(area, cond)}
-                                    className={`px-2 py-1 text-[10px] font-medium rounded-full transition-all ${
-                                      isApplied
-                                        ? "bg-destructive text-destructive-foreground shadow-sm"
-                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                    }`}
-                                  >
-                                    {isApplied ? (
-                                      <span className="flex items-center gap-1">
-                                        <X className="h-2.5 w-2.5" />
-                                        {cond}
-                                      </span>
-                                    ) : (
-                                      <span className="flex items-center gap-1">
-                                        <Plus className="h-2.5 w-2.5" />
-                                        {cond}
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
+              {/* Summary Card */}
+              {selectedAreas.length > 0 && selectedExaminations.length > 0 && (
+                <div className="border rounded-lg p-4 bg-green-50">
+                  <h4 className="font-medium mb-2 text-sm">Summary for {selectedTeeth.length} Teeth</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Surfaces:</span>{' '}
+                      <span className="font-medium capitalize">
+                        {selectedAreas.join(', ')}
+                      </span>
                     </div>
-
-                    {/* Quick actions for ALL selected areas */}
-                    <div className="mt-2 pt-2 border-t border-primary/20">
-                      <h6 className="text-[10px] font-medium mb-1 text-gray-600">
-                        Quick Actions:
-                      </h6>
-                      <div className="grid grid-cols-2 gap-1">
-                        {["Caries", "Filling", "Fractured", "Sensitive"].map((cond) => {
-                          const isAppliedToAny = selectedAreas.some((area) => {
-                            const areaConditions =
-                              surfaceConditions.find((sc) => sc.surface === area)
-                                ?.conditions || [];
-                            return areaConditions.includes(cond);
-                          });
-
-                          return (
-                            <button
-                              key={cond}
-                              type="button"
-                              onClick={() => {
-                                if (isAppliedToAny) {
-                                  selectedAreas.forEach((area) => {
-                                    const areaConditions =
-                                      surfaceConditions.find((sc) => sc.surface === area)
-                                        ?.conditions || [];
-                                    if (areaConditions.includes(cond)) {
-                                      handleSurfaceConditionToggle(area, cond);
-                                    }
-                                  });
-                                } else {
-                                  selectedAreas.forEach((area) => {
-                                    const areaConditions =
-                                      surfaceConditions.find((sc) => sc.surface === area)
-                                        ?.conditions || [];
-                                    if (!areaConditions.includes(cond)) {
-                                      handleSurfaceConditionToggle(area, cond);
-                                    }
-                                  });
-                                }
-                              }}
-                              className={`px-1.5 py-0.5 text-[10px] border rounded transition-all truncate ${
-                                isAppliedToAny
-                                  ? "bg-destructive/10 text-destructive border-destructive/20"
-                                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                              }`}
-                            >
-                              {isAppliedToAny ? (
-                                <span className="flex items-center justify-center gap-0.5">
-                                  <X className="h-2 w-2" />
-                                  Remove {cond}
-                                </span>
-                              ) : (
-                                <span className="flex items-center justify-center gap-0.5">
-                                  <span>+</span>
-                                  Add {cond}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <div>
+                      <span className="text-gray-600">Findings:</span>{' '}
+                      <span className="font-medium">
+                        {selectedExaminations.map(e => e.name).join(', ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Diagnosis:</span>{' '}
+                      <span className="font-medium">
+                        {selectedDiagnoses.map(d => d.name).join(', ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Treatments:</span>{' '}
+                      <span className="font-medium">
+                        {selectedTreatments.map(t => t.name).join(', ')}
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2435,7 +2540,9 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
             Cancel
           </Button>
           {mode === "edit" && (
-            <Button onClick={handleSave}>Save to {selectedTeeth.length} Teeth</Button>
+            <Button onClick={handleSave}>
+              Save to {selectedTeeth.length} Teeth
+            </Button>
           )}
         </div>
       </div>
@@ -2443,65 +2550,51 @@ const MultiToothPopup: React.FC<MultiToothPopupProps> = ({
   );
 };
 // NEW: Soft Tissue Popup Component
+
 interface SoftTissuePopupProps {
   tissue: SoftTissueExamination;
   mode: "view" | "edit";
+  clinicId: string; 
   onClose: () => void;
   onSave: (data: SoftTissueExamination) => void;
+  fetchExaminationFindings: (search: string) => Promise<any[]>;
+  fetchDiagnoses: (search: string) => Promise<any[]>;
+  fetchTreatments: (search: string) => Promise<any[]>;
+  loadingExaminations?: boolean;
+  loadingDiagnoses?: boolean;
+  loadingTreatments?: boolean;
 }
 
 const SoftTissuePopup: React.FC<SoftTissuePopupProps> = ({
   tissue,
   mode,
+  clinicId,
   onClose,
   onSave,
+  fetchExaminationFindings,
+  fetchDiagnoses,
+  fetchTreatments,
+  loadingExaminations,
+  loadingDiagnoses,
+  loadingTreatments,
 }) => {
-  const [onExamination, setOnExamination] = useState<string[]>(
-    tissue.onExamination || [],
+  const [selectedExaminations, setSelectedExaminations] = useState<any[]>(
+    tissue.onExamination?.map(e => ({ id: e, name: e })) || []
   );
-  const [diagnosis, setDiagnosis] = useState<string[]>(tissue.diagnosis || []);
-  const [treatment, setTreatment] = useState<string[]>(tissue.treatment || []);
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<any[]>(
+    tissue.diagnosis?.map(d => ({ id: d, name: d })) || []
+  );
+  const [selectedTreatments, setSelectedTreatments] = useState<any[]>(
+    tissue.treatment?.map(t => ({ id: t, name: t })) || []
+  );
   const [notes, setNotes] = useState(tissue.notes || "");
-  const [customExamination, setCustomExamination] = useState("");
-  const [customDiagnosis, setCustomDiagnosis] = useState("");
-  const [customTreatment, setCustomTreatment] = useState("");
-
-  const handleAddExamination = (value: string) => {
-    if (value && !onExamination.includes(value)) {
-      setOnExamination([...onExamination, value]);
-    }
-  };
-
-  const handleAddDiagnosis = (value: string) => {
-    if (value && !diagnosis.includes(value)) {
-      setDiagnosis([...diagnosis, value]);
-    }
-  };
-
-  const handleAddTreatment = (value: string) => {
-    if (value && !treatment.includes(value)) {
-      setTreatment([...treatment, value]);
-    }
-  };
-
-  const handleRemoveExamination = (value: string) => {
-    setOnExamination(onExamination.filter((item) => item !== value));
-  };
-
-  const handleRemoveDiagnosis = (value: string) => {
-    setDiagnosis(diagnosis.filter((item) => item !== value));
-  };
-
-  const handleRemoveTreatment = (value: string) => {
-    setTreatment(treatment.filter((item) => item !== value));
-  };
 
   const handleSave = () => {
     const updatedTissue: SoftTissueExamination = {
       ...tissue,
-      onExamination,
-      diagnosis,
-      treatment,
+      onExamination: selectedExaminations.map(e => e.name),
+      diagnosis: selectedDiagnoses.map(d => d.name),
+      treatment: selectedTreatments.map(t => t.name),
       notes,
       date: new Date().toISOString(),
     };
@@ -2532,23 +2625,21 @@ const SoftTissuePopup: React.FC<SoftTissuePopupProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column: Tissue SVG */}
             <div className="space-y-6">
-              <div className="border rounded-xl p-6 bg-gray-50">
-                <h4 className="font-medium mb-4 text-center">{tissue.name}</h4>
-                <div className="flex justify-center">
-                  <SoftTissueSVG
-                    type={tissue.svgName}
-                    width={300}
-                    height={300}
-                    color="#3b82f6"
-                  />
-                </div>
+              <div className="border rounded-xl p-6 bg-gray-50 flex flex-col items-center">
+                <SoftTissueSVG
+                  type={tissue.svgName}
+                  width={200}
+                  height={200}
+                  color={selectedDiagnoses.length > 0 ? "#3b82f6" : "#9ca3af"}
+                />
+                <h4 className="font-medium mt-4">{tissue.name}</h4>
               </div>
 
               {/* Notes Section */}
               <div>
                 <h4 className="font-medium mb-2">Notes</h4>
                 <textarea
-                  className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
+                  className="w-full border rounded-lg p-3 text-sm min-h-[120px]"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add notes about this soft tissue..."
@@ -2557,214 +2648,40 @@ const SoftTissuePopup: React.FC<SoftTissuePopupProps> = ({
               </div>
             </div>
 
-            {/* Right Column: Examination, Diagnosis, Treatment */}
+            {/* Right Column: Three Dropdowns */}
             <div className="space-y-6">
-              {/* On Examination */}
-              <div>
-                <h4 className="font-medium mb-2">On Examination</h4>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {onExamination.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        {mode === "edit" && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveExamination(item)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
+              {/* 1. Examination Findings Dropdown */}
+              <MultiSelectDropdown
+                label="On Examination"
+                value={selectedExaminations}
+                onChange={setSelectedExaminations}
+                fetchOptions={fetchExaminationFindings}
+                placeholder="Select examination findings..."
+                disabled={mode === "view"}
+                loading={loadingExaminations}
+              />
 
-                  {mode === "edit" && (
-                    <>
-                      <select
-                        className="w-full border rounded-lg p-2 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddExamination(e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="">Select from options...</option>
-                        {SOFT_TISSUE_EXAMINATION_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+              {/* 2. Diagnosis Dropdown */}
+              <MultiSelectDropdown
+                label="Diagnosis"
+                value={selectedDiagnoses}
+                onChange={setSelectedDiagnoses}
+                fetchOptions={fetchDiagnoses}
+                placeholder="Select diagnoses..."
+                disabled={mode === "view"}
+                loading={loadingDiagnoses}
+              />
 
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          value={customExamination}
-                          onChange={(e) => setCustomExamination(e.target.value)}
-                          placeholder="Or enter custom finding..."
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (customExamination.trim()) {
-                              handleAddExamination(customExamination.trim());
-                              setCustomExamination("");
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Diagnosis */}
-              <div>
-                <h4 className="font-medium mb-2">Diagnosis</h4>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {diagnosis.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        {mode === "edit" && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDiagnosis(item)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {mode === "edit" && (
-                    <>
-                      <select
-                        className="w-full border rounded-lg p-2 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddDiagnosis(e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="">Select from options...</option>
-                        {SOFT_TISSUE_DIAGNOSIS_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          value={customDiagnosis}
-                          onChange={(e) => setCustomDiagnosis(e.target.value)}
-                          placeholder="Or enter custom diagnosis..."
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (customDiagnosis.trim()) {
-                              handleAddDiagnosis(customDiagnosis.trim());
-                              setCustomDiagnosis("");
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Treatment */}
-              <div>
-                <h4 className="font-medium mb-2">Treatment</h4>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {treatment.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        {mode === "edit" && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTreatment(item)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {mode === "edit" && (
-                    <>
-                      <select
-                        className="w-full border rounded-lg p-2 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddTreatment(e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="">Select from options...</option>
-                        {SOFT_TISSUE_TREATMENT_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          value={customTreatment}
-                          onChange={(e) => setCustomTreatment(e.target.value)}
-                          placeholder="Or enter custom treatment..."
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (customTreatment.trim()) {
-                              handleAddTreatment(customTreatment.trim());
-                              setCustomTreatment("");
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+              {/* 3. Treatment Dropdown */}
+              <MultiSelectDropdown
+                label="Treatment Plan"
+                value={selectedTreatments}
+                onChange={setSelectedTreatments}
+                fetchOptions={fetchTreatments}
+                placeholder="Select treatments..."
+                disabled={mode === "view"}
+                loading={loadingTreatments}
+              />
             </div>
           </div>
         </div>
@@ -2786,62 +2703,51 @@ const SoftTissuePopup: React.FC<SoftTissuePopupProps> = ({
     </div>
   );
 };
-
 // NEW: TMJ Popup Component
 interface TMJPopupProps {
   tmj: TMJExamination;
   mode: "view" | "edit";
+  clinicId: string; 
   onClose: () => void;
   onSave: (data: TMJExamination) => void;
+  fetchExaminationFindings: (search: string) => Promise<any[]>;
+  fetchDiagnoses: (search: string) => Promise<any[]>;
+  fetchTreatments: (search: string) => Promise<any[]>;
+  loadingExaminations?: boolean;
+  loadingDiagnoses?: boolean;
+  loadingTreatments?: boolean;
 }
 
-const TMJPopup: React.FC<TMJPopupProps> = ({ tmj, mode, onClose, onSave }) => {
-  const [onExamination, setOnExamination] = useState<string[]>(
-    tmj.onExamination || [],
+const TMJPopup: React.FC<TMJPopupProps> = ({ 
+  tmj, 
+  mode, 
+  clinicId,
+  onClose, 
+  onSave,
+  fetchExaminationFindings,
+  fetchDiagnoses,
+  fetchTreatments,
+  loadingExaminations,
+  loadingDiagnoses,
+  loadingTreatments,
+}) => {
+  const [selectedExaminations, setSelectedExaminations] = useState<any[]>(
+    tmj.onExamination?.map(e => ({ id: e, name: e })) || []
   );
-  const [diagnosis, setDiagnosis] = useState<string[]>(tmj.diagnosis || []);
-  const [treatment, setTreatment] = useState<string[]>(tmj.treatment || []);
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<any[]>(
+    tmj.diagnosis?.map(d => ({ id: d, name: d })) || []
+  );
+  const [selectedTreatments, setSelectedTreatments] = useState<any[]>(
+    tmj.treatment?.map(t => ({ id: t, name: t })) || []
+  );
   const [notes, setNotes] = useState(tmj.notes || "");
-  const [customExamination, setCustomExamination] = useState("");
-  const [customDiagnosis, setCustomDiagnosis] = useState("");
-  const [customTreatment, setCustomTreatment] = useState("");
-
-  const handleAddExamination = (value: string) => {
-    if (value && !onExamination.includes(value)) {
-      setOnExamination([...onExamination, value]);
-    }
-  };
-
-  const handleAddDiagnosis = (value: string) => {
-    if (value && !diagnosis.includes(value)) {
-      setDiagnosis([...diagnosis, value]);
-    }
-  };
-
-  const handleAddTreatment = (value: string) => {
-    if (value && !treatment.includes(value)) {
-      setTreatment([...treatment, value]);
-    }
-  };
-
-  const handleRemoveExamination = (value: string) => {
-    setOnExamination(onExamination.filter((item) => item !== value));
-  };
-
-  const handleRemoveDiagnosis = (value: string) => {
-    setDiagnosis(diagnosis.filter((item) => item !== value));
-  };
-
-  const handleRemoveTreatment = (value: string) => {
-    setTreatment(treatment.filter((item) => item !== value));
-  };
 
   const handleSave = () => {
     const updatedTMJ: TMJExamination = {
       ...tmj,
-      onExamination,
-      diagnosis,
-      treatment,
+      onExamination: selectedExaminations.map(e => e.name),
+      diagnosis: selectedDiagnoses.map(d => d.name),
+      treatment: selectedTreatments.map(t => t.name),
       notes,
       date: new Date().toISOString(),
     };
@@ -2870,17 +2776,18 @@ const TMJPopup: React.FC<TMJPopupProps> = ({ tmj, mode, onClose, onSave }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column: TMJ SVG */}
             <div className="space-y-6">
-              <div className="border rounded-xl p-6 bg-gray-50">
-                <h4 className="font-medium mb-4 text-center">
-                  {tmj.name} ({tmj.side})
-                </h4>
-                <div className="flex justify-center">
-                  <TMJSVG
-                    type={tmj.svgName}
-                    width={200}
-                    height={200}
-                    color="#8b5cf6"
-                  />
+              <div className="border rounded-xl p-6 bg-gray-50 flex flex-col items-center">
+                <TMJSVG
+                  type={tmj.svgName}
+                  width={200}
+                  height={200}
+                  color={selectedDiagnoses.length > 0 ? "#8b5cf6" : "#9ca3af"}
+                />
+                <div className="text-center mt-4">
+                  <h4 className="font-medium">{tmj.name}</h4>
+                  <Badge variant="outline" className="mt-2 capitalize">
+                    {tmj.side}
+                  </Badge>
                 </div>
               </div>
 
@@ -2888,7 +2795,7 @@ const TMJPopup: React.FC<TMJPopupProps> = ({ tmj, mode, onClose, onSave }) => {
               <div>
                 <h4 className="font-medium mb-2">Notes</h4>
                 <textarea
-                  className="w-full border rounded-lg p-3 text-sm min-h-[100px]"
+                  className="w-full border rounded-lg p-3 text-sm min-h-[120px]"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add notes about this TMJ..."
@@ -2897,214 +2804,40 @@ const TMJPopup: React.FC<TMJPopupProps> = ({ tmj, mode, onClose, onSave }) => {
               </div>
             </div>
 
-            {/* Right Column: Examination, Diagnosis, Treatment */}
+            {/* Right Column: Three Dropdowns */}
             <div className="space-y-6">
-              {/* On Examination */}
-              <div>
-                <h4 className="font-medium mb-2">On Examination</h4>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {onExamination.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        {mode === "edit" && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveExamination(item)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
+              {/* 1. Examination Findings Dropdown */}
+              <MultiSelectDropdown
+                label="On Examination"
+                value={selectedExaminations}
+                onChange={setSelectedExaminations}
+                fetchOptions={fetchExaminationFindings}
+                placeholder="Select examination findings..."
+                disabled={mode === "view"}
+                loading={loadingExaminations}
+              />
 
-                  {mode === "edit" && (
-                    <>
-                      <select
-                        className="w-full border rounded-lg p-2 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddExamination(e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="">Select from options...</option>
-                        {TMJ_EXAMINATION_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+              {/* 2. Diagnosis Dropdown */}
+              <MultiSelectDropdown
+                label="Diagnosis"
+                value={selectedDiagnoses}
+                onChange={setSelectedDiagnoses}
+                fetchOptions={fetchDiagnoses}
+                placeholder="Select diagnoses..."
+                disabled={mode === "view"}
+                loading={loadingDiagnoses}
+              />
 
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          value={customExamination}
-                          onChange={(e) => setCustomExamination(e.target.value)}
-                          placeholder="Or enter custom finding..."
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (customExamination.trim()) {
-                              handleAddExamination(customExamination.trim());
-                              setCustomExamination("");
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Diagnosis */}
-              <div>
-                <h4 className="font-medium mb-2">Diagnosis</h4>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {diagnosis.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        {mode === "edit" && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDiagnosis(item)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {mode === "edit" && (
-                    <>
-                      <select
-                        className="w-full border rounded-lg p-2 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddDiagnosis(e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="">Select from options...</option>
-                        {TMJ_DIAGNOSIS_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          value={customDiagnosis}
-                          onChange={(e) => setCustomDiagnosis(e.target.value)}
-                          placeholder="Or enter custom diagnosis..."
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (customDiagnosis.trim()) {
-                              handleAddDiagnosis(customDiagnosis.trim());
-                              setCustomDiagnosis("");
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Treatment */}
-              <div>
-                <h4 className="font-medium mb-2">Treatment</h4>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {treatment.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        {mode === "edit" && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTreatment(item)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {mode === "edit" && (
-                    <>
-                      <select
-                        className="w-full border rounded-lg p-2 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddTreatment(e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="">Select from options...</option>
-                        {TMJ_TREATMENT_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          value={customTreatment}
-                          onChange={(e) => setCustomTreatment(e.target.value)}
-                          placeholder="Or enter custom treatment..."
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (customTreatment.trim()) {
-                              handleAddTreatment(customTreatment.trim());
-                              setCustomTreatment("");
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+              {/* 3. Treatment Dropdown */}
+              <MultiSelectDropdown
+                label="Treatment Plan"
+                value={selectedTreatments}
+                onChange={setSelectedTreatments}
+                fetchOptions={fetchTreatments}
+                placeholder="Select treatments..."
+                disabled={mode === "view"}
+                loading={loadingTreatments}
+              />
             </div>
           </div>
         </div>
@@ -3717,6 +3450,7 @@ const DropdownSurfaceSelector: React.FC<{
 export default function DentalChart({
   patientId,
   visitId,
+   clinicId,
   mode = "edit",
   patientName,
   patientUniqueId,
@@ -3729,51 +3463,10 @@ export default function DentalChart({
   existingSoftTissues = [],
   existingTMJExaminations = [],
 }: DentalChartProps) {
-  // ✅ Move the image preloader hook to the TOP and call it unconditionally
-  // const allSvgUrls = React.useMemo(() => {
-  //   const urls = [
-  //     '/assets/svg/dental/incisor.svg',
-  //     '/assets/svg/dental/canine.svg',
-  //     '/assets/svg/dental/premolar.svg',
-  //     '/assets/svg/dental/molar.svg',
-  //     '/assets/svg/dental/wisdom.svg',
-  //     '/assets/svg/softTissue/Tongue.svg',
-  //     '/assets/svg/softTissue/Gingiva.svg',
-  //     '/assets/svg/softTissue/Palate.svg',
-  //     '/assets/svg/softTissue/BuccalMucosa.svg',
-  //     '/assets/svg/softTissue/FloorOfTheMouth.svg',
-  //     '/assets/svg/softTissue/LabialMucosa.svg',
-  //     '/assets/svg/softTissue/SalivaryGlands.svg',
-  //     '/assets/svg/softTissue/Frenum.svg',
-  //     '/assets/svg/tmj/LeftTMJ.svg',
-  //     '/assets/svg/tmj/RightTMJ.svg',
-  //     '/assets/svg/tmj/BothTMJ.svg',
-  //   ];
-  //   return [...new Set(urls.filter(url => url))];
-  // }, []);
-
-  // const { isLoading } = useImagePreloader(allSvgUrls);
-  
-  //   if (!isReady) {
-  //   return (
-  //     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-  //       <div className="bg-white rounded-xl p-8 shadow-2xl">
-  //         <div className="animate-pulse flex flex-col items-center space-y-4">
-  //           <div className="flex space-x-2">
-  //             {[1, 2, 3].map((i) => (
-  //               <div
-  //                 key={i}
-  //                 className="h-8 w-8 rounded-full bg-blue-100"
-  //                 style={{ animationDelay: `${i * 0.1}s` }}
-  //               />
-  //             ))}
-  //           </div>
-  //           <p className="text-sm text-gray-600">Opening dental chart...</p>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+ 
+  const [loadingExaminations, setLoadingExaminations] = useState(false);
+const [loadingDiagnoses, setLoadingDiagnoses] = useState(false);
+const [loadingTreatments, setLoadingTreatments] = useState(false);
 
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null);
   const [toothConditions, setToothConditions] =
@@ -3854,43 +3547,6 @@ export default function DentalChart({
   const [useDropdownView, setUseDropdownView] = useState(false);
   const [isReady, setIsReady] = useState(true);
   
-  // ✅ Now the effect hook
-  // useEffect(() => {
-  //   // Trigger extra preloading if needed
-  //   preloadAllDentalSvgs();
-    
-  //   // Mark as ready almost immediately
-  //   const timer = setTimeout(() => {
-  //     setIsReady(true);
-  //   }, 50);
-    
-  //   return () => clearTimeout(timer);
-  // }, []);
-  
-  //  const { loaded: imagesLoaded } = useImagePreloader(allSvgUrls);
-// Remove the useSVGPreloader hook entirely
-  // const [isLoading, setIsLoading] = useState(true);
-  // useEffect(() => {
-  //   if (imagesLoaded) {
-  //     setIsLoading(false);
-  //   }
-  // }, [imagesLoaded]);
-  
-  // if (isLoading) {
-  //   return <DentalChartSkeleton />;
-  // }
-
-  // if (isLoading) {
-  //   return (
-  //     <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-  //         <h3 className="text-lg font-semibold mb-2">Loading Dental Chart</h3>
-  //         <p className="text-gray-600">Preparing dental assets...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
   const toothData =
     chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
 
@@ -3916,7 +3572,161 @@ export default function DentalChart({
     window.addEventListener("resize", checkWidth);
     return () => window.removeEventListener("resize", checkWidth);
   }, []);
+// ==================== FETCH FUNCTIONS FOR ALL POPUPS ====================
+const fetchExaminationFindings = useCallback(async (search: string = "") => {
+  if (!clinicId) {
+    console.warn("⚠ No clinic ID available for fetching examination findings");
+    return [];
+  }
 
+  setLoadingExaminations(true);
+  try {
+    const token = localStorage.getItem("authToken");
+    const params = new URLSearchParams({
+      clinicId: clinicId,
+      ...(search && { search }),
+      limit: "50",
+    });
+
+    const response = await axios.get(
+      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/examination-findings?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    const findings = (data.data || data.results || data || []);
+    
+    const transformedFindings = findings.map((item: any) => ({
+      id: item._id || item.id || `finding_${Date.now()}_${Math.random()}`,
+      name: item.findingName || item.name || item.title,
+      code: item.findingCode || item.code,
+      category: item.category || 'Examination Finding',
+      isCustom: false,
+    }));
+
+    return transformedFindings;
+  } catch (err: any) {
+    console.error("❌ Error fetching examination findings:", err);
+    if (err.response?.status === 404) {
+      console.error("Endpoint not found. Please check API URL structure.");
+    }
+    return [];
+  } finally {
+    setLoadingExaminations(false);
+  }
+}, [clinicId]);
+
+const fetchDiagnoses = useCallback(async (search: string = "") => {
+  if (!clinicId) {
+    console.warn("⚠ No clinic ID available for fetching diagnoses");
+    return [];
+  }
+
+  setLoadingDiagnoses(true);
+  try {
+    const token = localStorage.getItem("authToken");
+    const params = new URLSearchParams({
+      clinicId: clinicId,
+      ...(search && { search }),
+      limit: "50",
+      type: "diagnosis",
+    });
+
+    const response = await axios.get(
+      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/patient-diagnosis?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    const diagnoses = (data.data || data.results || data || []);
+    
+    const transformedDiagnoses = diagnoses.map((item: any) => ({
+      id: item._id || item.id || `diagnosis_${Date.now()}_${Math.random()}`,
+      name: item.procedureName || item.name || item.title,
+      code: item.procedureCode || item.code,
+      category: item.category || 'Diagnosis',
+      isCustom: false,
+    }));
+
+    return transformedDiagnoses;
+  } catch (err: any) {
+    console.error("❌ Error fetching diagnoses:", err);
+    if (err.response?.status === 404) {
+      console.error("Endpoint not found. Please check API URL structure.");
+    }
+    return [];
+  } finally {
+    setLoadingDiagnoses(false);
+  }
+}, [clinicId]);
+
+const fetchTreatments = useCallback(async (search: string = "") => {
+  if (!clinicId) {
+    console.warn("⚠ No clinic ID available for fetching treatments");
+    return [];
+  }
+
+  setLoadingTreatments(true);
+  try {
+    const token = localStorage.getItem("authToken");
+    const params = new URLSearchParams({
+      clinicId: clinicId,
+      ...(search && { search }),
+      limit: "50",
+    });
+
+    const response = await axios.get(
+      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/treatment-procedures?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+    const treatments = (data.data || data.results || data || []);
+    
+    const transformedTreatments = treatments.map((item: any) => ({
+      id: item._id || item.id || `treatment_${Date.now()}_${Math.random()}`,
+      name: item.procedureName || item.name || item.title,
+      code: item.procedureCode || item.code,
+      category: item.category || 'Treatment',
+      isCustom: false,
+    }));
+
+    return transformedTreatments;
+  } catch (err: any) {
+    console.error("❌ Error fetching treatments:", err);
+    if (err.response?.status === 404) {
+      console.error("Endpoint not found. Please check API URL structure.");
+    }
+    return [];
+  } finally {
+    setLoadingTreatments(false);
+  }
+}, [clinicId]);
+
+// Pre-fetch data when clinicId is available
+useEffect(() => {
+  if (clinicId) {
+    console.log("🏥 Clinic ID available, pre-fetching dropdown options...");
+    fetchExaminationFindings("");
+    fetchDiagnoses("");
+    fetchTreatments("");
+  }
+}, [clinicId, fetchExaminationFindings, fetchDiagnoses, fetchTreatments]);
   // Function to get tooth numbers based on selection type
   const getTeethNumbersBySelectionType = (type: string): number[] => {
     const allTeeth =
@@ -4461,49 +4271,6 @@ const handleClose = () => {
     };
     return stats;
   };
-
-  // const handleCreateTreatmentPlan = () => {
-  //   setShowTreatmentPlanForm(true);
-  // };
-
-  // const handleSaveTreatmentPlan = (plan: TreatmentPlanData) => {
-  //   console.log("✅ Received plan from form WITH TEETH:", plan);
-
-  //   // Verify that teeth data exists
-  //   if (!plan.teeth || plan.teeth.length === 0) {
-  //     console.error("❌ Treatment plan has no teeth data!");
-  //     alert(
-  //       "Error: Treatment plan must include teeth procedures. Please add procedures to teeth.",
-  //     );
-  //     return;
-  //   }
-
-  //   // CRITICAL FIX: Ensure stages have proper status from the plan
-  //   const enhancedPlan = {
-  //     ...plan,
-  //     stages: plan.stages.map((stage, index) => {
-  //       // Preserve the status from the form (which comes from the stage status toggle buttons)
-  //       const stageFromPlan = plan.stages[index];
-  //       return {
-  //         ...stage,
-  //         status: stageFromPlan?.status || "pending", // Use the status from the form
-  //         stageNumber: index + 1, // Ensure stage numbers are sequential
-  //       };
-  //     }),
-  //     teeth: plan.teeth,
-  //   };
-
-  //   console.log("✅ Enhanced treatment plan with statuses:", enhancedPlan);
-  //   console.log("📊 Stage Statuses:");
-  //   enhancedPlan.stages.forEach((stage, index) => {
-  //     console.log(
-  //       `  Stage ${index + 1}: ${stage.stageName} - Status: ${stage.status}`,
-  //     );
-  //   });
-
-  //   setTreatmentPlan(enhancedPlan);
-  //   setShowTreatmentPlanForm(false);
-  // };
 
   const stats = getConditionSummary();
 
@@ -5818,8 +5585,15 @@ const renderTeethTab = () => (
             ) || null
           }
           mode={mode}
+              clinicId={clinicId}
           onClose={() => setSelectedTooth(null)}
           onSave={handleSaveToothData}
+            fetchExaminationFindings={fetchExaminationFindings}
+    fetchDiagnoses={fetchDiagnoses}
+    fetchTreatments={fetchTreatments}
+    loadingExaminations={loadingExaminations}
+    loadingDiagnoses={loadingDiagnoses}
+    loadingTreatments={loadingTreatments}
         />
       )}
 
@@ -5829,8 +5603,15 @@ const renderTeethTab = () => (
           selectedTeeth={selectedTeeth}
           toothData={toothData}
           mode={mode}
+              clinicId={clinicId}
           onClose={() => setShowMultiToothModal(false)}
           onSave={handleSaveMultiToothData}
+            fetchExaminationFindings={fetchExaminationFindings}
+    fetchDiagnoses={fetchDiagnoses}
+    fetchTreatments={fetchTreatments}
+    loadingExaminations={loadingExaminations}
+    loadingDiagnoses={loadingDiagnoses}
+    loadingTreatments={loadingTreatments}
         />
       )}
 
@@ -5839,8 +5620,15 @@ const renderTeethTab = () => (
         <SoftTissuePopup
           tissue={selectedSoftTissue}
           mode={mode}
+              clinicId={clinicId}
           onClose={() => setSelectedSoftTissue(null)}
           onSave={handleSaveSoftTissueData}
+            fetchExaminationFindings={fetchExaminationFindings}
+    fetchDiagnoses={fetchDiagnoses}
+    fetchTreatments={fetchTreatments}
+    loadingExaminations={loadingExaminations}
+    loadingDiagnoses={loadingDiagnoses}
+    loadingTreatments={loadingTreatments}
         />
       )}
 
@@ -5849,8 +5637,15 @@ const renderTeethTab = () => (
         <TMJPopup
           tmj={selectedTMJ}
           mode={mode}
+              clinicId={clinicId}
           onClose={() => setSelectedTMJ(null)}
           onSave={handleSaveTMJData}
+            fetchExaminationFindings={fetchExaminationFindings}
+    fetchDiagnoses={fetchDiagnoses}
+    fetchTreatments={fetchTreatments}
+    loadingExaminations={loadingExaminations}
+    loadingDiagnoses={loadingDiagnoses}
+    loadingTreatments={loadingTreatments}
         />
       )}
 

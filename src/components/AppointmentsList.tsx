@@ -3422,7 +3422,7 @@ const generateObjectId = (): string => {
   return timestamp + random;
 };
 // ==================== Reusable MultiSelect Dropdown Component ====================
-// Enhanced MultiSelectDropdown with Arrow + Enter navigation
+
 const MultiSelectDropdown = ({
   label,
   value = [],
@@ -4565,19 +4565,14 @@ export function AppointmentsList() {
       const formData = new FormData();
 
       // Append basic fields
-      const symptomsArray = chiefComplaints.map((c) => c.name);
+      // const cheifComplaints = chiefComplaints.map((c) => c.name);
       const diagnosisArray = diagnosis
         .split(",")
         .map((d) => d.trim())
         .filter(Boolean);
-      const examinationFindingsArray = examinationFindings.map((e) => e.name);
-      const dentalHistoryArray = dentalHistoryItems.map((d) => d.name);
-      formData.append("symptoms", JSON.stringify(symptomsArray));
-      formData.append(
-        "examinationFindings",
-        JSON.stringify(examinationFindingsArray),
-      );
-      formData.append("dentalHistory", JSON.stringify(dentalHistoryArray));
+    formData.append("chiefComplaints", JSON.stringify(chiefComplaints));
+    formData.append("examinationFindings", JSON.stringify(examinationFindings));
+    formData.append("dentalHistory", JSON.stringify(dentalHistoryItems));
       formData.append("diagnosis", JSON.stringify(diagnosisArray));
 
       // Filter out empty prescriptions
@@ -5926,6 +5921,7 @@ export function AppointmentsList() {
                   visitId={appointmentDetail._id}
                   mode="edit"
                   patientName={appointmentDetail.patientId.name}
+                  clinicId={appointmentDetail.clinicId}
                   patientUniqueId={appointmentDetail.patientId.patientUniqueId}
                   onClose={() => {
                     setShowDentalChart(false);

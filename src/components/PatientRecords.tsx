@@ -112,6 +112,15 @@ interface DentalWork {
   _id: string;
 }
 
+// ✅ NEW: Interface for clinical dropdown entries
+interface ClinicalEntry {
+  value: string;
+  isCustom: boolean;
+  code?: string;
+  category?: string;
+  selectedAt?: string;
+}
+
 interface VisitHistory {
   _id: string;
   clinicId: string;
@@ -125,9 +134,11 @@ interface VisitHistory {
   visitDate: string;
   treatmentPlanId?: string;
   
-  // New fields from API
-  symptoms: string[];
-  diagnosis: string[];
+  // ✅ FIXED: Replace 'symptoms' with new schema fields
+  chiefComplaints: ClinicalEntry[];     // From backend - replaces symptoms
+  examinationFindings: ClinicalEntry[]; // New field
+  dentalHistory: ClinicalEntry[];       // New field
+  diagnosis: string[];                 // Still exists
   prescriptions: {
     medicineName: string;
     dosage?: string;
@@ -224,7 +235,8 @@ export function PatientRecords({ doctorId }: PatientRecordsProps) {
     nextCursor: null as { visitDate: string; _id: string } | null,
     totalCount: 0,
   });
-const [showDentalChart, setShowDentalChart] = useState(false);
+  const [showDentalChart, setShowDentalChart] = useState(false);
+  
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -1300,268 +1312,276 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
         </div>
       )}
 
-      {/* Visit Details Drawer */}
-   {showVisitDrawer && selectedVisit && (
-  <div className="fixed inset-0 z-50 overflow-hidden">
-    <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={handleCloseVisitDrawer} />
-    
-    <div className="absolute inset-y-0 right-0 flex max-w-full">
-      <div className="relative w-screen max-w-3xl">
-        <div className="flex h-full flex-col bg-white shadow-xl">
-          {/* Header */}
-          <div className="bg-primary px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/20"
-                  onClick={handleCloseVisitDrawer}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Visit Details</h2>
-                  <p className="text-white/80 text-sm">{formatDate(selectedVisit.visitDate)}</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/20"
-                onClick={handleCloseVisitDrawer}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="space-y-6">
-              {/* Visit Overview Card */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Visit Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {/* <div>
-                      <Label className="text-xs text-gray-500">Status</Label>
-                      <Badge 
-                        className="mt-1"
-                        variant={selectedVisit.status === "completed" ? "default" : "secondary"}
+      {/* ✅ FIXED: Visit Details Drawer with New Schema Fields */}
+      {showVisitDrawer && selectedVisit && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={handleCloseVisitDrawer} />
+          
+          <div className="absolute inset-y-0 right-0 flex max-w-full">
+            <div className="relative w-screen max-w-3xl">
+              <div className="flex h-full flex-col bg-white shadow-xl">
+                {/* Header */}
+                <div className="bg-primary px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-white hover:bg-white/20"
+                        onClick={handleCloseVisitDrawer}
                       >
-                        {selectedVisit.status}
-                      </Badge>
-                    </div> */}
-                    {/* <div>
-                      <Label className="text-xs text-gray-500">Payment</Label>
-                      <Badge 
-                        className="mt-1"
-                        variant={selectedVisit.isPaid ? "default" : "destructive"}
-                      >
-                        {selectedVisit.isPaid ? "Paid" : "Unpaid"}
-                      </Badge>
-                    </div> */}
-                    {/* <div>
-                      <Label className="text-xs text-gray-500">Appointment ID</Label>
-                      <p className="text-sm font-mono mt-1 truncate">{selectedVisit.appointmentId}</p>
-                    </div> */}
-                    <div>
-                      <Label className="text-xs text-gray-500">Visit Date</Label>
-                      <p className="text-sm mt-1">{formatSimpleDate(selectedVisit.visitDate)}</p>
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Visit Details</h2>
+                        <p className="text-white/80 text-sm">{formatDate(selectedVisit.visitDate)}</p>
+                      </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white hover:bg-white/20"
+                      onClick={handleCloseVisitDrawer}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* Symptoms & Diagnosis */}
-              {(selectedVisit.symptoms.length > 0 || selectedVisit.diagnosis.length > 0) && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Stethoscope className="w-5 h-5" />
-                      Clinical Assessment
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {selectedVisit.symptoms.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Symptoms</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.symptoms.map((symptom, idx) => (
-                            <Badge key={idx} variant="outline" className="text-sm">
-                              {symptom}
-                            </Badge>
-                          ))}
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="space-y-6">
+                    {/* Visit Overview Card */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Visit Overview</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="text-xs text-gray-500">Visit Date</Label>
+                            <p className="text-sm mt-1">{formatSimpleDate(selectedVisit.visitDate)}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    
-                    {selectedVisit.diagnosis.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Diagnosis</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.diagnosis.map((diag, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-sm">
-                              {diag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {selectedVisit.notes && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Doctor's Notes</Label>
-                        <p className="text-sm text-gray-600 mt-2 p-3 bg-gray-50 rounded">
-                          {selectedVisit.notes}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                      </CardContent>
+                    </Card>
 
-              {/* Prescriptions */}
-              {selectedVisit.prescriptions.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Pill className="w-5 h-5" />
-                      Prescriptions ({selectedVisit.prescriptions.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedVisit.prescriptions.map((prescription, idx) => (
-                        <div key={idx} className="p-3 border rounded-lg bg-blue-50/50">
-                          <div className="flex justify-between items-start">
+                    {/* ✅ FIXED: Chief Complaints, Examination Findings, Dental History */}
+                    {(selectedVisit.chiefComplaints?.length > 0 || 
+                      selectedVisit.examinationFindings?.length > 0 || 
+                      selectedVisit.dentalHistory?.length > 0 || 
+                      selectedVisit.diagnosis.length > 0) && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <Stethoscope className="w-5 h-5" />
+                            Clinical Assessment
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Chief Complaints - NEW */}
+                          {selectedVisit.chiefComplaints && selectedVisit.chiefComplaints.length > 0 && (
                             <div>
-                              <h4 className="font-medium text-gray-800">{prescription.medicineName}</h4>
-                              <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
-                                {prescription.dosage && (
-                                  <div>
-                                    <span className="text-gray-500">Dosage:</span>
-                                    <span className="ml-2 font-medium">{prescription.dosage}</span>
-                                  </div>
-                                )}
-                                {prescription.frequency && (
-                                  <div>
-                                    <span className="text-gray-500">Frequency:</span>
-                                    <span className="ml-2 font-medium">{prescription.frequency}</span>
-                                  </div>
-                                )}
-                                {prescription.duration && (
-                                  <div>
-                                    <span className="text-gray-500">Duration:</span>
-                                    <span className="ml-2 font-medium">{prescription.duration}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Dental Work */}
-              {selectedVisit.dentalWork && selectedVisit.dentalWork.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Activity className="w-5 h-5" />
-                      Dental Work ({selectedVisit.dentalWork.length} teeth)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedVisit.dentalWork.map((work, idx) => (
-                        <div key={idx} className="p-4 border rounded-lg">
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-bold text-lg">Tooth #{work.toothNumber}</h4>
-                            <Badge variant="outline">
-                              {work.conditions.length} condition{work.conditions.length !== 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-                          
-                          {work.conditions.length > 0 && (
-                            <div className="mb-3">
-                              <Label className="text-sm font-medium text-gray-700">Conditions:</Label>
+                              <Label className="text-sm font-medium text-gray-700">Chief Complaints</Label>
                               <div className="flex flex-wrap gap-2 mt-2">
-                                {work.conditions.map((cond, condIdx) => (
-                                  <Badge key={condIdx} variant="secondary" className="text-sm">
-                                    {cond}
+                                {selectedVisit.chiefComplaints.map((complaint, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-sm">
+                                    {complaint.value}
+                                    {complaint.isCustom && (
+                                      <span className="ml-1 text-xs bg-purple-100 px-1 rounded">custom</span>
+                                    )}
                                   </Badge>
                                 ))}
                               </div>
                             </div>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
-              {/* Billing Information */}
-              
+                          {/* Examination Findings - NEW */}
+                          {selectedVisit.examinationFindings && selectedVisit.examinationFindings.length > 0 && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Examination Findings</Label>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {selectedVisit.examinationFindings.map((finding, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-sm">
+                                    {finding.value}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-              {/* Files Attached */}
-              {selectedVisit.files.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Attached Files ({selectedVisit.files.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedVisit.files.map((file, idx) => (
-                        <div key={idx} className="p-3 border rounded-lg hover:bg-gray-50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-blue-600" />
+                          {/* Dental History - NEW */}
+                          {selectedVisit.dentalHistory && selectedVisit.dentalHistory.length > 0 && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Dental History</Label>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {selectedVisit.dentalHistory.map((history, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-sm">
+                                    {history.value}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <p className="text-sm truncate">{file.url.split('/').pop()}</p>
-                              <p className="text-xs text-gray-500">{file.type}</p>
+                          )}
+
+                          {/* Diagnosis - Existing */}
+                          {selectedVisit.diagnosis.length > 0 && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Diagnosis</Label>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {selectedVisit.diagnosis.map((diag, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-sm">
+                                    {diag}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
+                          )}
+                          
+                          {/* Notes - Existing */}
+                          {selectedVisit.notes && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Doctor's Notes</Label>
+                              <p className="text-sm text-gray-600 mt-2 p-3 bg-gray-50 rounded">
+                                {selectedVisit.notes}
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Prescriptions */}
+                    {selectedVisit.prescriptions.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <Pill className="w-5 h-5" />
+                            Prescriptions ({selectedVisit.prescriptions.length})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {selectedVisit.prescriptions.map((prescription, idx) => (
+                              <div key={idx} className="p-3 border rounded-lg bg-blue-50/50">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h4 className="font-medium text-gray-800">{prescription.medicineName}</h4>
+                                    <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
+                                      {prescription.dosage && (
+                                        <div>
+                                          <span className="text-gray-500">Dosage:</span>
+                                          <span className="ml-2 font-medium">{prescription.dosage}</span>
+                                        </div>
+                                      )}
+                                      {prescription.frequency && (
+                                        <div>
+                                          <span className="text-gray-500">Frequency:</span>
+                                          <span className="ml-2 font-medium">{prescription.frequency}</span>
+                                        </div>
+                                      )}
+                                      {prescription.duration && (
+                                        <div>
+                                          <span className="text-gray-500">Duration:</span>
+                                          <span className="ml-2 font-medium">{prescription.duration}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
+                        </CardContent>
+                      </Card>
+                    )}
 
-          {/* Footer */}
-          <div className="border-t px-6 py-4 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Created on {formatSimpleDate(selectedVisit.createdAt)}
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleCloseVisitDrawer}>
-                Close
-              </Button>
-              {/* <Button>
-                <Download className="w-4 h-4 mr-2" />
-                Download Report
-              </Button> */}
+                    {/* Dental Work */}
+                    {selectedVisit.dentalWork && selectedVisit.dentalWork.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <Activity className="w-5 h-5" />
+                            Dental Work ({selectedVisit.dentalWork.length} teeth)
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {selectedVisit.dentalWork.map((work, idx) => (
+                              <div key={idx} className="p-4 border rounded-lg">
+                                <div className="flex justify-between items-start mb-3">
+                                  <h4 className="font-bold text-lg">Tooth #{work.toothNumber}</h4>
+                                  <Badge variant="outline">
+                                    {work.conditions.length} condition{work.conditions.length !== 1 ? 's' : ''}
+                                  </Badge>
+                                </div>
+                                
+                                {work.conditions.length > 0 && (
+                                  <div className="mb-3">
+                                    <Label className="text-sm font-medium text-gray-700">Conditions:</Label>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      {work.conditions.map((cond, condIdx) => (
+                                        <Badge key={condIdx} variant="secondary" className="text-sm">
+                                          {cond}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Files Attached */}
+                    {selectedVisit.files.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <FileText className="w-5 h-5" />
+                            Attached Files ({selectedVisit.files.length})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-3">
+                            {selectedVisit.files.map((file, idx) => (
+                              <div key={idx} className="p-3 border rounded-lg hover:bg-gray-50">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center">
+                                    <FileText className="w-5 h-5 text-blue-600" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm truncate">{file.url.split('/').pop()}</p>
+                                    <p className="text-xs text-gray-500">{file.type}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t px-6 py-4 flex justify-between items-center">
+                  <div className="text-sm text-gray-500">
+                    Created on {formatSimpleDate(selectedVisit.createdAt)}
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={handleCloseVisitDrawer}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }
