@@ -22,7 +22,7 @@ import {
   CheckCircle,
   Trash2,
   Check,
-  ChevronDown
+  ChevronDown,
 } from "lucide-react";
 
 import DentalLabOrderModal from "./DentalLabOrderModal";
@@ -32,7 +32,7 @@ import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { ScrollArea } from "./ui/scroll-area";
 import { Input } from "./ui/input";
-import { useState, useEffect,useCallback,useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import patientServiceBaseUrl from "../patientServiceBaseUrl";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
@@ -48,7 +48,7 @@ import DentalChartView from "./DentalChartView";
 import MedicineInput from "./MedicineInput";
 import labBaseUrl from "../labBaseUrl";
 import ThreeDCBCTViewer from "./nifti/Niftiviewer";
-import { preloadAllDentalSvgs } from '../utils/dentalSvgCache';
+import { preloadAllDentalSvgs } from "../utils/dentalSvgCache";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -3422,6 +3422,7 @@ const generateObjectId = (): string => {
   return timestamp + random;
 };
 // ==================== Reusable MultiSelect Dropdown Component ====================
+// Enhanced MultiSelectDropdown with Arrow + Enter navigation
 const MultiSelectDropdown = ({
   label,
   value = [],
@@ -3430,7 +3431,7 @@ const MultiSelectDropdown = ({
   placeholder = "Select options...",
   disabled = false,
   loading = false,
-  allowCustom = true
+  allowCustom = true,
 }: {
   label: string;
   value: any[];
@@ -3442,84 +3443,242 @@ const MultiSelectDropdown = ({
   allowCustom?: boolean;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [options, setOptions] = useState<any[]>([]);
+  const [filteredOptions, setFilteredOptions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [customMode, setCustomMode] = useState(false);
-  const [customInput, setCustomInput] = useState('');
+  const [customInput, setCustomInput] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const customOptionRef = useRef<HTMLDivElement | null>(null);
 
-  // Load ALL options when dropdown opens (not just on search)
+  // Load ALL options when dropdown opens
   useEffect(() => {
     const loadOptions = async () => {
       if (!isOpen) return;
-      
+
       setIsLoading(true);
-      // Pass empty string to get ALL results
-      const results = await fetchOptions(''); 
+      const results = await fetchOptions("");
       setOptions(results);
       setIsLoading(false);
     };
 
     loadOptions();
-  }, [isOpen, fetchOptions]); // Only re-run when isOpen changes
+  }, [isOpen, fetchOptions]);
 
-  // Handle search filtering locally
-  const filteredOptions = searchTerm.trim() 
-    ? options.filter(opt => 
-        opt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-    : options;
+  // Filter options locally when search term changes
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const filtered = options.filter(
+        (opt) =>
+          opt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      setFilteredOptions(filtered);
+    } else {
+      setFilteredOptions(options);
+    }
+  }, [searchTerm, options]);
+
+  // Reset highlighted index when filtered options change
+  useEffect(() => {
+    setHighlightedIndex(-1);
+    optionRefs.current = new Array(filteredOptions.length).fill(null);
+  }, [filteredOptions]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0) {
+      if (highlightedIndex < filteredOptions.length) {
+        optionRefs.current[highlightedIndex]?.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth'
+        });
+      } else if (highlightedIndex === filteredOptions.length && allowCustom && searchTerm.trim()) {
+        customOptionRef.current?.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [highlightedIndex, filteredOptions.length, allowCustom, searchTerm]);
 
   // Handle click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
-        setSearchTerm('');
+        setSearchTerm("");
         setCustomMode(false);
+        setHighlightedIndex(-1);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isOpen]);
+
   const handleSelectItem = (item: any) => {
-    if (!value.some(v => v.id === item.id)) {
+    if (!value.some((v) => v.id === item.id)) {
       onChange([...value, { ...item, selectedAt: new Date().toISOString() }]);
     }
     // Don't close dropdown after selection to allow multiple selections
-    setSearchTerm('');
+    setSearchTerm("");
+    setHighlightedIndex(-1);
+    
+    // Keep focus on search input
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 10);
   };
 
   const handleRemoveItem = (itemId: string) => {
-    onChange(value.filter(v => v.id !== itemId));
+    onChange(value.filter((v) => v.id !== itemId));
   };
 
   const handleAddCustom = () => {
     if (!customInput.trim()) return;
-    
+
     const customItem = {
       id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: customInput.trim(),
       isCustom: true,
-      selectedAt: new Date().toISOString()
+      selectedAt: new Date().toISOString(),
     };
 
     onChange([...value, customItem]);
-    setCustomInput('');
+    setCustomInput("");
     setCustomMode(false);
+    setHighlightedIndex(-1);
   };
 
   const handleClearAll = () => {
     onChange([]);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const totalItems = filteredOptions.length + (allowCustom && searchTerm.trim() ? 1 : 0);
+
+    // Arrow Down: Navigate down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (totalItems > 0) {
+        setHighlightedIndex(prev => {
+          const next = prev < totalItems - 1 ? prev + 1 : 0;
+          return next;
+        });
+      }
+      return;
+    }
+
+    // Arrow Up: Navigate up
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (totalItems > 0) {
+        setHighlightedIndex(prev => {
+          const next = prev > 0 ? prev - 1 : totalItems - 1;
+          return next;
+        });
+      }
+      return;
+    }
+
+    // Enter: Select highlighted item
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      if (highlightedIndex >= 0) {
+        if (highlightedIndex < filteredOptions.length) {
+          // Select an option
+          handleSelectItem(filteredOptions[highlightedIndex]);
+        } else if (highlightedIndex === filteredOptions.length && allowCustom && searchTerm.trim()) {
+          // Open custom mode
+          setCustomMode(true);
+          setCustomInput(searchTerm);
+        }
+      } else if (filteredOptions.length > 0) {
+        // No highlight, select first option
+        handleSelectItem(filteredOptions[0]);
+      } else if (allowCustom && searchTerm.trim().length >= 2) {
+        // No options, go to custom
+        setCustomMode(true);
+        setCustomInput(searchTerm);
+      }
+      return;
+    }
+
+    // Escape: Close dropdown
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    // Tab: Close dropdown
+    if (e.key === 'Tab') {
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, item: any, index: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSelectItem(item);
+    }
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = index + 1;
+      if (nextIndex < filteredOptions.length + (allowCustom && searchTerm.trim() ? 1 : 0)) {
+        setHighlightedIndex(nextIndex);
+      }
+    }
+    
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (index > 0) {
+        setHighlightedIndex(index - 1);
+      } else {
+        searchInputRef.current?.focus();
+        setHighlightedIndex(-1);
+      }
+    }
+    
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  const handleToggleDropdown = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
+      setHighlightedIndex(-1);
+    }
+  };
+
   return (
     <div className="space-y-2" ref={dropdownRef}>
       <label className="text-sm font-medium mb-2 block">{label}</label>
-      
+
       {/* Selected Items Tags */}
       {value.length > 0 && (
         <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200 mb-2">
@@ -3544,12 +3703,13 @@ const MultiSelectDropdown = ({
                 onClick={() => handleRemoveItem(item.id)}
                 className="ml-1 p-0.5 rounded-full hover:bg-blue-300 transition-colors"
                 disabled={disabled}
+                aria-label={`Remove ${item.name}`}
               >
                 <X className="h-3 w-3" />
               </button>
             </div>
           ))}
-          
+
           {value.length > 1 && (
             <button
               type="button"
@@ -3566,30 +3726,41 @@ const MultiSelectDropdown = ({
       <div className="relative">
         <button
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={handleToggleDropdown}
           className={`
             w-full px-4 py-2.5 text-left border rounded-lg flex items-center justify-between
-            ${isOpen ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300'}
-            ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-gray-400'}
+            ${isOpen ? "ring-2 ring-blue-500 border-blue-500" : "border-gray-300"}
+            ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white hover:border-gray-400"}
             transition-all
           `}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
         >
-          <span className={value.length === 0 ? 'text-gray-400' : 'text-gray-700'}>
-            {value.length === 0 
-              ? placeholder 
-              : `${value.length} item${value.length > 1 ? 's' : ''} selected`}
+          <span
+            className={value.length === 0 ? "text-gray-400" : "text-gray-700"}
+          >
+            {value.length === 0
+              ? placeholder
+              : `${value.length} item${value.length > 1 ? "s" : ""} selected`}
           </span>
-          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          />
         </button>
 
         {/* Dropdown Menu */}
         {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-96 flex flex-col">
-            {/* Search Input - Now for filtering loaded options */}
+          <div 
+            className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-96 flex flex-col"
+            role="listbox"
+            aria-label={`${label} options`}
+          >
+            {/* Search Input */}
             <div className="p-2 border-b flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   className="w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder={`Filter ${label.toLowerCase()}...`}
@@ -3597,34 +3768,57 @@ const MultiSelectDropdown = ({
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setCustomMode(false);
+                    setHighlightedIndex(-1);
                   }}
+                  onKeyDown={handleKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   autoFocus
+                  aria-autocomplete="list"
+                  aria-controls="multi-select-options"
+                  aria-expanded={true}
+                  aria-activedescendant={
+                    highlightedIndex >= 0 
+                      ? highlightedIndex < filteredOptions.length
+                        ? `option-${filteredOptions[highlightedIndex]?.id}`
+                        : `custom-option`
+                      : undefined
+                  }
                 />
               </div>
             </div>
 
-            {/* Options List - Shows ALL loaded options, filtered by search */}
-            <div className="overflow-y-auto flex-1">
+            {/* Options List */}
+            <div 
+              id="multi-select-options"
+              className="overflow-y-auto flex-1"
+              role="listbox"
+              aria-multiselectable="true"
+            >
               {isLoading || loading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                 </div>
               ) : filteredOptions.length > 0 ? (
-                filteredOptions.map((option) => {
-                  const isSelected = value.some(v => v.id === option.id);
+                filteredOptions.map((option, index) => {
+                  const isSelected = value.some((v) => v.id === option.id);
+                  const isHighlighted = highlightedIndex === index;
+                  
                   return (
                     <div
                       key={option.id}
+                      id={`option-${option.id}`}
+                      ref={el => { optionRefs.current[index] = el; }}
                       onClick={() => handleSelectItem(option)}
+                      onKeyDown={(e) => handleOptionKeyDown(e, option, index)}
                       className={`
                         flex items-start gap-3 p-3 border-b last:border-b-0 cursor-pointer
-                        ${isSelected 
-                          ? 'bg-blue-50 hover:bg-blue-100' 
-                          : 'hover:bg-gray-50'
-                        }
+                        ${isSelected ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-gray-50"}
+                        ${isHighlighted ? "bg-gray-100 ring-2 ring-blue-500" : ""}
                         transition-colors
                       `}
+                      tabIndex={0}
+                      role="option"
+                      aria-selected={isSelected}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -3656,15 +3850,45 @@ const MultiSelectDropdown = ({
 
             {/* Custom Entry Option */}
             {allowCustom && searchTerm.trim() && !customMode && (
-              <div className="border-t p-2 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setCustomMode(true)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded"
-                >
+              <div 
+                ref={customOptionRef}
+                id="custom-option"
+                onClick={() => {
+                  setCustomMode(true);
+                  setCustomInput(searchTerm);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setCustomMode(true);
+                    setCustomInput(searchTerm);
+                  }
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    // Stay at this item or wrap to first
+                    setHighlightedIndex(filteredOptions.length);
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (filteredOptions.length > 0) {
+                      setHighlightedIndex(filteredOptions.length - 1);
+                    } else {
+                      searchInputRef.current?.focus();
+                      setHighlightedIndex(-1);
+                    }
+                  }
+                }}
+                className={`
+                  border-t p-2 flex-shrink-0 cursor-pointer
+                  ${highlightedIndex === filteredOptions.length ? 'bg-gray-100 ring-2 ring-blue-500' : ''}
+                `}
+                tabIndex={0}
+                role="option"
+              >
+                <div className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded">
                   <Plus className="h-4 w-4" />
                   Add "{searchTerm}" as custom
-                </button>
+                </div>
               </div>
             )}
 
@@ -3679,8 +3903,17 @@ const MultiSelectDropdown = ({
                     value={customInput}
                     onChange={(e) => setCustomInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
                         handleAddCustom();
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setCustomMode(false);
+                        setHighlightedIndex(-1);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                        }, 10);
                       }
                     }}
                     autoFocus
@@ -3688,7 +3921,13 @@ const MultiSelectDropdown = ({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => setCustomMode(false)}
+                      onClick={() => {
+                        setCustomMode(false);
+                        setHighlightedIndex(-1);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                        }, 10);
+                      }}
                       className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
                     >
                       Cancel
@@ -3808,14 +4047,18 @@ export function AppointmentsList() {
   const [labDetails, setLabDetails] = useState<ResultFile | undefined>();
   const [ishandleResult, setHandleResult] = useState(false);
   // Add these state variables with your other useState declarations
-const [chiefComplaints, setChiefComplaints] = useState<ComplaintItem[]>([]);
-const [examinationFindings, setExaminationFindings] = useState<ExaminationFindingItem[]>([]);
-const [dentalHistoryItems, setDentalHistoryItems] = useState<DentalHistoryItem[]>([]);
+  const [chiefComplaints, setChiefComplaints] = useState<ComplaintItem[]>([]);
+  const [examinationFindings, setExaminationFindings] = useState<
+    ExaminationFindingItem[]
+  >([]);
+  const [dentalHistoryItems, setDentalHistoryItems] = useState<
+    DentalHistoryItem[]
+  >([]);
 
-// Loading states for each dropdown
-const [loadingComplaints, setLoadingComplaints] = useState(false);
-const [loadingExaminations, setLoadingExaminations] = useState(false);
-const [loadingDentalHistory, setLoadingDentalHistory] = useState(false);
+  // Loading states for each dropdown
+  const [loadingComplaints, setLoadingComplaints] = useState(false);
+  const [loadingExaminations, setLoadingExaminations] = useState(false);
+  const [loadingDentalHistory, setLoadingDentalHistory] = useState(false);
 
   console.log("ded", selectedHistory);
 
@@ -3835,15 +4078,15 @@ const [loadingDentalHistory, setLoadingDentalHistory] = useState(false);
       year: "numeric",
     });
   };
-useEffect(() => {
-  // Preload dental chart when user views appointments
-  // This ensures it's loaded before they click the button
-  const timer = setTimeout(() => {
-    preloadAllDentalSvgs();
-  }, 2000); // Wait 2 seconds after page load
-  
-  return () => clearTimeout(timer);
-}, []);
+  useEffect(() => {
+    // Preload dental chart when user views appointments
+    // This ensures it's loaded before they click the button
+    const timer = setTimeout(() => {
+      preloadAllDentalSvgs();
+    }, 2000); // Wait 2 seconds after page load
+
+    return () => clearTimeout(timer);
+  }, []);
   const [showLabOrderModal, setShowLabOrderModal] = useState(false);
   //  useEffect(()=>(
   // console.log("clnicId",selectedClinic?.clinicId)
@@ -3993,11 +4236,11 @@ useEffect(() => {
 
   const handleBackToAppointments = () => {
     setChiefComplaints([]);
-  setExaminationFindings([]);
-  setDentalHistoryItems([]);
-  setLoadingComplaints(false);
-  setLoadingExaminations(false);
-  setLoadingDentalHistory(false);
+    setExaminationFindings([]);
+    setDentalHistoryItems([]);
+    setLoadingComplaints(false);
+    setLoadingExaminations(false);
+    setLoadingDentalHistory(false);
     setSelectedAppointmentId(null);
     setAppointmentDetail(null);
     setPatientHistory([]);
@@ -4066,13 +4309,13 @@ useEffect(() => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [searchQuery, selectedDate]);
- useEffect(() => {
+  useEffect(() => {
     if (selectedClinic?.clinicId) {
       console.log("🏥 Clinic selected, pre-fetching dropdown options...");
       // Pre-fetch initial options for better UX
-      fetchChiefComplaints('');
-      fetchExaminationFindings('');
-      fetchDentalHistory('');
+      fetchChiefComplaints("");
+      fetchExaminationFindings("");
+      fetchDentalHistory("");
     }
   }, [selectedClinic?.clinicId]);
 
@@ -4322,16 +4565,19 @@ useEffect(() => {
       const formData = new FormData();
 
       // Append basic fields
-    const symptomsArray = chiefComplaints.map(c => c.name);
+      const symptomsArray = chiefComplaints.map((c) => c.name);
       const diagnosisArray = diagnosis
         .split(",")
         .map((d) => d.trim())
         .filter(Boolean);
-         const examinationFindingsArray = examinationFindings.map(e => e.name);
-    const dentalHistoryArray = dentalHistoryItems.map(d => d.name);
+      const examinationFindingsArray = examinationFindings.map((e) => e.name);
+      const dentalHistoryArray = dentalHistoryItems.map((d) => d.name);
       formData.append("symptoms", JSON.stringify(symptomsArray));
-      formData.append("examinationFindings", JSON.stringify(examinationFindingsArray));
-    formData.append("dentalHistory", JSON.stringify(dentalHistoryArray));
+      formData.append(
+        "examinationFindings",
+        JSON.stringify(examinationFindingsArray),
+      );
+      formData.append("dentalHistory", JSON.stringify(dentalHistoryArray));
       formData.append("diagnosis", JSON.stringify(diagnosisArray));
 
       // Filter out empty prescriptions
@@ -4899,142 +5145,160 @@ useEffect(() => {
     }
   };
   // ==================== Fetch Chief Complaints ====================
-const fetchChiefComplaints = useCallback(async (search: string = '') => {
-  if (!selectedClinic?.clinicId) {
-    console.warn("⚠ No clinic ID available for fetching complaints");
-    return [];
-  }
-
-  setLoadingComplaints(true);
-  try {
-    const token = localStorage.getItem("authToken");
-    const params = new URLSearchParams({
-      clinicId: selectedClinic.clinicId,
-      ...(search && { search }),
-      limit: '50',
-      type: 'complaint'
-    });
-
-    const response = await axios.get(
-      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/treatment-procedures?${params}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+  const fetchChiefComplaints = useCallback(
+    async (search: string = "") => {
+      if (!selectedClinic?.clinicId) {
+        console.warn("⚠ No clinic ID available for fetching complaints");
+        return [];
       }
-    );
-console.log("Hitler",response.data)
-    const data = response.data;
-    
-    // Transform the data based on your API response structure
-    const transformedComplaints = (data.data || data.results || []).map((item: any) => ({
-      id: item._id || item.id || `complaint_${Date.now()}_${Math.random()}`,
-      name: item.procedureName || item.name || item.title,
-      code: item.procedureCode || item.code,
-      category: item.category,
-      description: item.description,
-      isCustom: false
-    }));
 
-    return transformedComplaints;
-  } catch (err) {
-    console.error("❌ Error fetching chief complaints:", err);
-    return [];
-  } finally {
-    setLoadingComplaints(false);
-  }
-}, [selectedClinic?.clinicId]);
+      setLoadingComplaints(true);
+      try {
+        const token = localStorage.getItem("authToken");
+        const params = new URLSearchParams({
+          clinicId: selectedClinic.clinicId,
+          ...(search && { search }),
+          limit: "50",
+          type: "complaint",
+        });
 
-// ==================== Fetch Examination Findings ====================
-const fetchExaminationFindings = useCallback(async (search: string = '') => {
-  if (!selectedClinic?.clinicId) {
-    console.warn("⚠ No clinic ID available for fetching examination findings");
-    return [];
-  }
+        const response = await axios.get(
+          `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/treatment-procedures?${params}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        console.log("Hitler", response.data);
+        const data = response.data;
 
-  setLoadingExaminations(true);
-  try {
-    const token = localStorage.getItem("authToken");
-    const params = new URLSearchParams({
-      clinicId: selectedClinic.clinicId,
-      ...(search && { search }),
-      limit: '50'
-    });
+        // Transform the data based on your API response structure
+        const transformedComplaints = (data.data || data.results || []).map(
+          (item: any) => ({
+            id:
+              item._id || item.id || `complaint_${Date.now()}_${Math.random()}`,
+            name: item.procedureName || item.name || item.title,
+            code: item.procedureCode || item.code,
+            category: item.category,
+            description: item.description,
+            isCustom: false,
+          }),
+        );
 
-    const response = await axios.get(
-      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/examination-findings?${params}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        return transformedComplaints;
+      } catch (err) {
+        console.error("❌ Error fetching chief complaints:", err);
+        return [];
+      } finally {
+        setLoadingComplaints(false);
       }
-    );
+    },
+    [selectedClinic?.clinicId],
+  );
 
-    const data = response.data;
-    
-    const transformedFindings = (data.data || data.results || []).map((item: any) => ({
-      id: item._id || item.id || `finding_${Date.now()}_${Math.random()}`,
-      name: item.findingName || item.name || item.title,
-      code: item.findingCode || item.code,
-      category: item.category,
-      isCustom: false
-    }));
-
-    return transformedFindings;
-  } catch (err) {
-    console.error("❌ Error fetching examination findings:", err);
-    return [];
-  } finally {
-    setLoadingExaminations(false);
-  }
-}, [selectedClinic?.clinicId]);
-
-// ==================== Fetch Dental History ====================
-const fetchDentalHistory = useCallback(async (search: string = '') => {
-  if (!selectedClinic?.clinicId) {
-    console.warn("⚠ No clinic ID available for fetching dental history");
-    return [];
-  }
-
-  setLoadingDentalHistory(true);
-  try {
-    const token = localStorage.getItem("authToken");
-    const params = new URLSearchParams({
-      clinicId: selectedClinic.clinicId,
-      ...(search && { search }),
-      limit: '50'
-    });
-
-    const response = await axios.get(
-      `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/dental-history?${params}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+  // ==================== Fetch Examination Findings ====================
+  const fetchExaminationFindings = useCallback(
+    async (search: string = "") => {
+      if (!selectedClinic?.clinicId) {
+        console.warn(
+          "⚠ No clinic ID available for fetching examination findings",
+        );
+        return [];
       }
-    );
 
-    const data = response.data;
-    
-    const transformedHistory = (data.data || data.results || []).map((item: any) => ({
-      id: item._id || item.id || `history_${Date.now()}_${Math.random()}`,
-      name: item.historyName || item.name || item.title,
-      code: item.historyCode || item.code,
-      category: item.category,
-      isCustom: false
-    }));
+      setLoadingExaminations(true);
+      try {
+        const token = localStorage.getItem("authToken");
+        const params = new URLSearchParams({
+          clinicId: selectedClinic.clinicId,
+          ...(search && { search }),
+          limit: "50",
+        });
 
-    return transformedHistory;
-  } catch (err) {
-    console.error("❌ Error fetching dental history:", err);
-    return [];
-  } finally {
-    setLoadingDentalHistory(false);
-  }
-}, [selectedClinic?.clinicId]);
+        const response = await axios.get(
+          `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/examination-findings?${params}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        const data = response.data;
+
+        const transformedFindings = (data.data || data.results || []).map(
+          (item: any) => ({
+            id: item._id || item.id || `finding_${Date.now()}_${Math.random()}`,
+            name: item.findingName || item.name || item.title,
+            code: item.findingCode || item.code,
+            category: item.category,
+            isCustom: false,
+          }),
+        );
+
+        return transformedFindings;
+      } catch (err) {
+        console.error("❌ Error fetching examination findings:", err);
+        return [];
+      } finally {
+        setLoadingExaminations(false);
+      }
+    },
+    [selectedClinic?.clinicId],
+  );
+
+  // ==================== Fetch Dental History ====================
+  const fetchDentalHistory = useCallback(
+    async (search: string = "") => {
+      if (!selectedClinic?.clinicId) {
+        console.warn("⚠ No clinic ID available for fetching dental history");
+        return [];
+      }
+
+      setLoadingDentalHistory(true);
+      try {
+        const token = localStorage.getItem("authToken");
+        const params = new URLSearchParams({
+          clinicId: selectedClinic.clinicId,
+          ...(search && { search }),
+          limit: "50",
+        });
+
+        const response = await axios.get(
+          `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/dental-history?${params}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        const data = response.data;
+
+        const transformedHistory = (data.data || data.results || []).map(
+          (item: any) => ({
+            id: item._id || item.id || `history_${Date.now()}_${Math.random()}`,
+            name: item.historyName || item.name || item.title,
+            code: item.historyCode || item.code,
+            category: item.category,
+            isCustom: false,
+          }),
+        );
+
+        return transformedHistory;
+      } catch (err) {
+        console.error("❌ Error fetching dental history:", err);
+        return [];
+      } finally {
+        setLoadingDentalHistory(false);
+      }
+    },
+    [selectedClinic?.clinicId],
+  );
 
   const handleEditTreatmentPlan = (plan: TreatmentPlan) => {
     console.log("✏️ Editing treatment plan:", plan.planName);
@@ -6072,78 +6336,19 @@ const fetchDentalHistory = useCallback(async (search: string = '') => {
                       <CardTitle>Consultation Notes</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      {/* Chief Complaint */}
-        {/* Chief Complaint - Multi-select Dropdown */}
-<div className="space-y-4">
-  <MultiSelectDropdown
-    label="Chief Complaint"
-    value={chiefComplaints}
-    onChange={setChiefComplaints}
-    fetchOptions={fetchChiefComplaints}
-    placeholder="Search and select chief complaints..."
-    loading={loadingComplaints}
-    allowCustom={true}
-  />
-  
-  {/* Display count of selected complaints */}
-  {chiefComplaints.length > 0 && (
-    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-      <p className="text-sm font-medium text-blue-800">
-        Selected Complaints: {chiefComplaints.length}
-      </p>
-      <div className="flex flex-wrap gap-2 mt-2">
-        {chiefComplaints.map((complaint, idx) => (
-          <Badge key={complaint.id} variant="outline" className="bg-white">
-            {complaint.name}
-            {complaint.isCustom && (
-              <span className="ml-1 text-xs text-purple-600">(Custom)</span>
-            )}
-          </Badge>
-        ))}
-      </div>
-    </div>
-  )}
-</div>
-
-{/* Diagnosis (Keep as is or convert to multi-select if needed) */}
-<div>
-  <label className="text-sm font-medium mb-2 block">
-    Diagnosis
-  </label>
-  <Textarea
-    placeholder="Enter diagnosis..."
-    className="min-h-[100px]"
-    value={diagnosis}
-    onChange={(e) => setDiagnosis(e.target.value)}
-  />
-</div>
-
-{/* Examination Findings - Multi-select Dropdown */}
-<div className="mt-6">
-  <MultiSelectDropdown
-    label="Examination Findings"
-    value={examinationFindings}
-    onChange={setExaminationFindings}
-    fetchOptions={fetchExaminationFindings}
-    placeholder="Search and select examination findings..."
-    loading={loadingExaminations}
-    allowCustom={true}
-  />
-</div>
-
-{/* Dental History - Multi-select Dropdown */}
-<div className="mt-6">
-  <MultiSelectDropdown
-    label="Dental History"
-    value={dentalHistoryItems}
-    onChange={setDentalHistoryItems}
-    fetchOptions={fetchDentalHistory}
-    placeholder="Search and select dental history items..."
-    loading={loadingDentalHistory}
-    allowCustom={true}
-  />
-</div>
-                      {/* Diagnosis */}
+                      {/* Chief Complaint - Multi-select Dropdown */}
+                      <div className="space-y-4">
+                        <MultiSelectDropdown
+                          label="Chief Complaint"
+                          value={chiefComplaints}
+                          onChange={setChiefComplaints}
+                          fetchOptions={fetchChiefComplaints}
+                          placeholder="Search and select chief complaints..."
+                          loading={loadingComplaints}
+                          allowCustom={true}
+                        />
+                      </div>
+   {/* Diagnosis */}
                       <div>
                         <label className="text-sm font-medium mb-2 block">
                           Diagnosis
@@ -6155,6 +6360,32 @@ const fetchDentalHistory = useCallback(async (search: string = '') => {
                           onChange={(e) => setDiagnosis(e.target.value)}
                         />
                       </div>
+                      {/* Examination Findings - Multi-select Dropdown */}
+                      <div className="mt-6">
+                        <MultiSelectDropdown
+                          label="Examination Findings"
+                          value={examinationFindings}
+                          onChange={setExaminationFindings}
+                          fetchOptions={fetchExaminationFindings}
+                          placeholder="Search and select examination findings..."
+                          loading={loadingExaminations}
+                          allowCustom={true}
+                        />
+                      </div>
+
+                      {/* Dental History - Multi-select Dropdown */}
+                      <div className="mt-6">
+                        <MultiSelectDropdown
+                          label="Dental History"
+                          value={dentalHistoryItems}
+                          onChange={setDentalHistoryItems}
+                          fetchOptions={fetchDentalHistory}
+                          placeholder="Search and select dental history items..."
+                          loading={loadingDentalHistory}
+                          allowCustom={true}
+                        />
+                      </div>
+                   
 
                       {/* Prescription */}
                       {/* Prescription Section with Auto-suggestion */}
@@ -6923,89 +7154,6 @@ const fetchDentalHistory = useCallback(async (search: string = '') => {
               </ScrollArea>
             </div>
           </div>
-
-          {/* ===== Right Content Panel ===== */}
-
-          {/* <div className="flex-1 p-6 overflow-y-auto">
-            {selectedAppointmentId && appointmentDetail ? (
-              <div className="max-w-4xl mx-auto">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>
-                      Appointment Details – {appointmentDetail.patientId.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                  
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Chief Complaint
-                      </label>
-                      <Textarea
-                        placeholder="Enter patient's main complaint..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-
-                  
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Diagnosis
-                      </label>
-                      <Textarea
-                        placeholder="Enter diagnosis..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Prescription
-                      </label>
-                      <Textarea
-                        placeholder="Write prescription here..."
-                        value={prescription}
-                        onChange={(e) => setPrescription(e.target.value)}
-                        className="min-h-[200px]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Additional Notes
-                      </label>
-                      <Textarea
-                        placeholder="Any additional notes or observations..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-
-                  
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={handleBackToClinicList}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-white hover:bg-primary/90"
-                        onClick={() =>
-                          alert("Consultation saved successfully!")
-                        }
-                      >
-                        Save Consultation
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <div className="text-center space-y-2">
-                  <Building2 className="mx-auto h-12 w-12 opacity-50" />
-                  <p>Select an appointment to view details</p>
-                </div>
-              </div>
-            )}
-          </div> */}
         </div>
       </div>
     );

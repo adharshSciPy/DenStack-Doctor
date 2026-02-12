@@ -1,6 +1,6 @@
-// components/MedicineInput.jsx
+// components/MedicineInput.jsx (Enhanced version)
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Pill, Plus, Check, X } from 'lucide-react';
+import { Pill, Plus, Check, X, ChevronDown } from 'lucide-react';
 import { getMedicineSuggestions, createMedicine } from '../utils/medicineServices';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -81,6 +81,7 @@ const MedicineInput = ({
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineSuggestion | null>(null);
   const [creatingNew, setCreatingNew] = useState<boolean>(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [newMedicineData, setNewMedicineData] = useState<NewMedicineData>({
     name: '',
     dosageForms: [],
@@ -88,11 +89,11 @@ const MedicineInput = ({
     category: 'other',
     prescriptionRequired: true
   });
-  // const [isUserTyping, setIsUserTyping] = useState<boolean>(false);
   
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Handle click outside to close suggestions
@@ -100,6 +101,7 @@ const MedicineInput = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+        setHighlightedIndex(-1);
       }
     };
     
@@ -112,33 +114,41 @@ const MedicineInput = ({
     setInputValue(value);
   }, [value]);
 
-  // Debounced search - Optimized for pharmacy-style typing
+  // Reset highlighted index when suggestions change
   useEffect(() => {
-    // Clear existing timer
+    setHighlightedIndex(-1);
+    itemRefs.current = new Array(suggestions.length + 1).fill(null);
+  }, [suggestions]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && itemRefs.current[highlightedIndex]) {
+      itemRefs.current[highlightedIndex]?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth'
+      });
+    }
+  }, [highlightedIndex]);
+
+  // Debounced search
+  useEffect(() => {
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
 
-    // Don't search if typing is in progress or input is too short
-   if (inputValue.trim().length < 2) {
-  setSuggestions([]);
-  setShowSuggestions(false);
-  setLoading(false);
-  return;
-}
-
-
-    // Set loading state immediately when user types
-    if (inputValue.trim().length >= 2) {
-      setLoading(true);
-      setShowSuggestions(true);
+    if (inputValue.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setLoading(false);
+      return;
     }
 
-    // Debounce the API call
- debounceTimer.current = setTimeout(() => {
-  fetchSuggestions(inputValue.trim());
-}, 250);
+    setLoading(true);
+    setShowSuggestions(true);
 
+    debounceTimer.current = setTimeout(() => {
+      fetchSuggestions(inputValue.trim());
+    }, 250);
 
     return () => {
       if (debounceTimer.current) {
@@ -146,14 +156,15 @@ const MedicineInput = ({
       }
     };
   }, [inputValue]);
+
   const handleSelectSuggestion = useCallback((medicine: MedicineSuggestion) => {
     setInputValue(medicine.displayName || medicine.name);
     setSelectedMedicine(medicine);
     setSuggestions([]);
     setShowSuggestions(false);
     setCreatingNew(false);
+    setHighlightedIndex(-1);
     
-    // Pass the complete medicine object including medicineId
     onMedicineSelect?.({
       medicineId: medicine._id,
       medicineName: medicine.displayName || medicine.name,
@@ -167,8 +178,8 @@ const MedicineInput = ({
       prescriptionRequired: medicine.prescriptionRequired
     });
   }, [onMedicineSelect]);
-const fetchSuggestions = useCallback(
-  async (searchTerm: string) => {
+
+  const fetchSuggestions = useCallback(async (searchTerm: string) => {
     if (!searchTerm || searchTerm.trim().length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -179,9 +190,8 @@ const fetchSuggestions = useCallback(
     try {
       const results = await getMedicineSuggestions(searchTerm.trim());
 
-      // ✅ AUTO-SELECT when there is ONE exact match
+      // AUTO-SELECT when there is ONE exact match
       const normalized = searchTerm.trim().toLowerCase();
-
       if (
         results.length === 1 &&
         (
@@ -190,10 +200,9 @@ const fetchSuggestions = useCallback(
         )
       ) {
         handleSelectSuggestion(results[0]);
-        return; // 🔥 stop here — no dropdown, no extra Enter
+        return;
       }
 
-      // Normal suggestions flow
       setSuggestions(results);
       setShowSuggestions(true);
     } catch (error) {
@@ -203,10 +212,7 @@ const fetchSuggestions = useCallback(
     } finally {
       setLoading(false);
     }
-  },
-  [handleSelectSuggestion]
-);
-
+  }, [handleSelectSuggestion]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -214,133 +220,187 @@ const fetchSuggestions = useCallback(
     onChange?.(value);
     setSelectedMedicine(null);
     setCreatingNew(false);
+    setHighlightedIndex(-1);
   };
 
-const handleInputFocus = () => {
-  if (inputValue.length >= 2) {
-    setShowSuggestions(true);
-  }
-};
-
-
-
- const handleCreateNew = async () => {
-  if (!inputValue.trim()) {
-    alert('Please enter a medicine name');
-    return;
-  }
-
-  if (!doctorId) {
-    alert('Doctor ID is required to create a new medicine. Please make sure you are logged in as a doctor.');
-    return;
-  }
-
-  try {
-    setLoading(true);
-    
-    // ✅ CORRECTED: Use medicineName instead of name
-    const medicineData = {
-      medicineName: inputValue.trim(),  // Backend expects medicineName, not name
-      doctorId: doctorId,
-      clinicId: clinicId,
-      dosageForm: newMedicineData.dosageForms?.[0] || '',
-      strength: newMedicineData.strengths?.[0] || '',
-      category: newMedicineData.category,
-      prescriptionRequired: newMedicineData.prescriptionRequired
-    };
-
-    // Log for debugging
-    console.log('Creating medicine with data:', {
-      medicineName: inputValue.trim(),
-      doctorId,
-      clinicId,
-      hasDoctorId: !!doctorId
-    });
-
-    const result = await createMedicine(medicineData);
-    
-    if (result.success && result.medicine) {  // ✅ Note: backend returns 'medicine' not 'data'
-      const newMedicine: MedicineSuggestion = {
-        _id: result.medicine._id,
-        name: result.medicine.name,
-        displayName: result.medicine.name,
-        genericName: result.medicine.genericName,
-        brandNames: result.medicine.brandNames,
-        dosageForms: result.medicine.dosageForms,
-        strengths: result.medicine.strengths,
-        category: result.medicine.category,
-        prescriptionRequired: result.medicine.prescriptionRequired
-      };
-      handleSelectSuggestion(newMedicine);
-      alert('Medicine added successfully!');
-    } else {
-      throw new Error(result.message || 'Failed to create medicine');
+  const handleInputFocus = () => {
+    if (inputValue.length >= 2 && suggestions.length > 0) {
+      setShowSuggestions(true);
     }
-  } catch (error: any) {
-    console.error('Error creating medicine:', error);
-    
-    // More detailed error message
-    if (error.response?.data?.message) {
-      alert(`Error: ${error.response.data.message}`);
-    } else if (error.message) {
-      alert(`Error: ${error.message}`);
-    } else {
-      alert('Failed to create medicine. Please try again.');
-    }
-  } finally {
-    setLoading(false);
-    setCreatingNew(false);
-  }
-};
+  };
 
-const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-  // Arrow navigation: move into suggestions
-  if (
-    (e.key === 'ArrowDown' || e.key === 'ArrowUp') &&
-    showSuggestions &&
-    suggestions.length > 0
-  ) {
-    e.preventDefault();
-
-    const items = document.querySelectorAll('[data-suggestion-item]');
-    if (!items.length) return;
-
-    const targetIndex = e.key === 'ArrowDown' ? 0 : items.length - 1;
-    (items[targetIndex] as HTMLElement).focus();
-    return;
-  }
-
-  // ENTER = single clear behaviour
-  if (e.key === 'Enter') {
-    e.preventDefault();
-
-    // If suggestions exist → select first
-    if (showSuggestions && suggestions.length > 0) {
-      handleSelectSuggestion(suggestions[0]);
+  const handleCreateNew = async () => {
+    if (!inputValue.trim()) {
+      alert('Please enter a medicine name');
       return;
     }
 
-    // No suggestions but valid input → create new
-    if (inputValue.trim().length >= 2 && !selectedMedicine) {
-      setCreatingNew(true);
-      setShowSuggestions(false);
+    if (!doctorId) {
+      alert('Doctor ID is required to create a new medicine.');
+      return;
     }
 
-    return;
-  }
+    try {
+      setLoading(true);
+      
+      const medicineData = {
+        medicineName: inputValue.trim(),
+        doctorId: doctorId,
+        clinicId: clinicId,
+        dosageForm: newMedicineData.dosageForms?.[0] || '',
+        strength: newMedicineData.strengths?.[0] || '',
+        category: newMedicineData.category,
+        prescriptionRequired: newMedicineData.prescriptionRequired
+      };
 
-  // ESC = close dropdown only (keep focus)
-  if (e.key === 'Escape') {
-    setShowSuggestions(false);
-    return;
-  }
+      const result = await createMedicine(medicineData);
+      
+      if (result.success && result.medicine) {
+        const newMedicine: MedicineSuggestion = {
+          _id: result.medicine._id,
+          name: result.medicine.name,
+          displayName: result.medicine.name,
+          genericName: result.medicine.genericName,
+          brandNames: result.medicine.brandNames,
+          dosageForms: result.medicine.dosageForms,
+          strengths: result.medicine.strengths,
+          category: result.medicine.category,
+          prescriptionRequired: result.medicine.prescriptionRequired
+        };
+        handleSelectSuggestion(newMedicine);
+      } else {
+        throw new Error(result.message || 'Failed to create medicine');
+      }
+    } catch (error: any) {
+      console.error('Error creating medicine:', error);
+      alert(error.message || 'Failed to create medicine. Please try again.');
+    } finally {
+      setLoading(false);
+      setCreatingNew(false);
+    }
+  };
 
-  // TAB = natural form navigation
-  if (e.key === 'Tab') {
-    setShowSuggestions(false);
-  }
-};
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Arrow Down: Open suggestions and highlight first item
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      
+      if (!showSuggestions) {
+        if (inputValue.length >= 2) {
+          fetchSuggestions(inputValue);
+          setShowSuggestions(true);
+          setTimeout(() => setHighlightedIndex(0), 50);
+        }
+      } else {
+        setHighlightedIndex(prev => {
+          const maxIndex = suggestions.length > 0 
+            ? (suggestions.length + (inputValue.length >= 2 ? 1 : 0) - 1) 
+            : -1;
+          return prev < maxIndex ? prev + 1 : 0;
+        });
+      }
+      return;
+    }
 
+    // Arrow Up: Navigate up
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      
+      if (showSuggestions) {
+        setHighlightedIndex(prev => {
+          const maxIndex = suggestions.length > 0 
+            ? (suggestions.length + (inputValue.length >= 2 ? 1 : 0) - 1) 
+            : -1;
+          return prev > 0 ? prev - 1 : maxIndex;
+        });
+      }
+      return;
+    }
+
+    // Enter: Select highlighted item or first item
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      // If we have a highlighted item, select it
+      if (highlightedIndex >= 0) {
+        const totalItems = suggestions.length + (inputValue.length >= 2 ? 1 : 0);
+        
+        if (highlightedIndex < suggestions.length) {
+          handleSelectSuggestion(suggestions[highlightedIndex]);
+        } else if (highlightedIndex === suggestions.length && inputValue.length >= 2) {
+          setCreatingNew(true);
+          setShowSuggestions(false);
+          setNewMedicineData(prev => ({ ...prev, name: inputValue }));
+        }
+        return;
+      }
+
+      // If suggestions exist and no highlight, select first
+      if (showSuggestions && suggestions.length > 0) {
+        handleSelectSuggestion(suggestions[0]);
+        return;
+      }
+
+      // No suggestions but valid input → create new
+      if (inputValue.trim().length >= 2 && !selectedMedicine) {
+        setCreatingNew(true);
+        setShowSuggestions(false);
+      }
+      return;
+    }
+
+    // Escape: Close dropdown
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    // Tab: Natural navigation, close suggestions
+    if (e.key === 'Tab') {
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  const handleSuggestionKeyDown = (
+    e: React.KeyboardEvent<HTMLDivElement>, 
+    medicine: MedicineSuggestion, 
+    index: number
+  ) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSelectSuggestion(medicine);
+    }
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = index + 1;
+      if (nextIndex < suggestions.length + (inputValue.length >= 2 ? 1 : 0)) {
+        setHighlightedIndex(nextIndex);
+        itemRefs.current[nextIndex]?.focus();
+      }
+    }
+    
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = index - 1;
+      if (prevIndex >= 0) {
+        setHighlightedIndex(prevIndex);
+        itemRefs.current[prevIndex]?.focus();
+      } else {
+        inputRef.current?.focus();
+        setHighlightedIndex(-1);
+      }
+    }
+    
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+      inputRef.current?.focus();
+    }
+  };
 
   const getCategoryColor = (category?: string) => {
     if (!category) return 'bg-gray-100 text-gray-800';
@@ -363,70 +423,22 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     return colors[category] || colors.other;
   };
 
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setNewMedicineData(prev => ({
-      ...prev,
-      category: e.target.value
-    }));
-  };
-
-  const handlePrescriptionRequiredChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setNewMedicineData(prev => ({
-      ...prev,
-      prescriptionRequired: e.target.value === 'true'
-    }));
-  };
-
-  // Clear input
   const handleClearInput = () => {
-  setInputValue('');
-  setSelectedMedicine(null);
-  setSuggestions([]);
-  setShowSuggestions(false);
-  setCreatingNew(false);
+    setInputValue('');
+    setSelectedMedicine(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setCreatingNew(false);
+    setHighlightedIndex(-1);
 
-  onChange?.('');
-  onMedicineSelect?.(null);
+    onChange?.('');
+    onMedicineSelect?.(null);
 
-  // 🔥 keep focus
-  requestAnimationFrame(() => {
-    inputRef.current?.focus();
-  });
-};
-
-  // Handle suggestion keyboard navigation
-  const handleSuggestionKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, medicine: MedicineSuggestion) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleSelectSuggestion(medicine);
-    }
-    
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const next = e.currentTarget.nextElementSibling as HTMLElement;
-      if (next) {
-        next.focus();
-      }
-    }
-    
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prev = e.currentTarget.previousElementSibling as HTMLElement;
-      if (prev) {
-        prev.focus();
-      } else {
-        inputRef.current?.focus();
-      }
-    }
-    
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setShowSuggestions(false);
+    requestAnimationFrame(() => {
       inputRef.current?.focus();
-    }
+    });
   };
 
-  // Determine if we should show clear button
   const shouldShowClearButton = Boolean(selectedMedicine || inputValue);
 
   return (
@@ -444,11 +456,13 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={`pl-10 ${className} ${selectedMedicine ? 'border-green-500 bg-green-50' : ''}`}
-          // disabled={loading}
           autoFocus={autoFocus}
           aria-autocomplete="list"
           aria-controls="medicine-suggestions-list"
           aria-expanded={showSuggestions}
+          aria-activedescendant={
+            highlightedIndex >= 0 ? `suggestion-${highlightedIndex}` : undefined
+          }
           role="combobox"
         />
         
@@ -472,7 +486,7 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         )}
       </div>
 
-      {/* LIVE SUGGESTIONS DROPDOWN - Pharmacy-style flow */}
+      {/* SUGGESTIONS DROPDOWN */}
       {showSuggestions && (
         <div 
           id="medicine-suggestions-list"
@@ -490,11 +504,15 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
               {suggestions.map((medicine, index) => (
                 <div
                   key={medicine._id}
+                  id={`suggestion-${index}`}
+                  ref={el => { itemRefs.current[index] = el; }}
                   data-suggestion-item
                   tabIndex={0}
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors focus:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors focus:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary ${
+                    highlightedIndex === index ? 'bg-gray-100 ring-2 ring-primary' : ''
+                  }`}
                   onClick={() => handleSelectSuggestion(medicine)}
-                  onKeyDown={(e) => handleSuggestionKeyDown(e, medicine)}
+                  onKeyDown={(e) => handleSuggestionKeyDown(e, medicine, index)}
                   role="option"
                   aria-selected={selectedMedicine?._id === medicine._id}
                 >
@@ -539,30 +557,20 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
                         )}
                       </div>
                     </div>
-                    
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="ml-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectSuggestion(medicine);
-                      }}
-                      aria-label={`Select ${medicine.name}`}
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
               ))}
               
-              {/* Option to create new */}
-              {inputValue.length >= 3 && (
+              {/* Create New Option */}
+              {inputValue.length >= 2 && (
                 <div
+                  id={`suggestion-${suggestions.length}`}
+                  ref={el => { itemRefs.current[suggestions.length] = el; }}
                   data-suggestion-item
                   tabIndex={0}
-                  className="p-3 hover:bg-blue-50 cursor-pointer border-t border-blue-100 bg-blue-50/50 focus:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`p-3 hover:bg-blue-50 cursor-pointer border-t border-blue-100 bg-blue-50/50 focus:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    highlightedIndex === suggestions.length ? 'bg-blue-100 ring-2 ring-blue-500' : ''
+                  }`}
                   onClick={() => {
                     setCreatingNew(true);
                     setShowSuggestions(false);
@@ -577,12 +585,15 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
                     }
                     if (e.key === 'ArrowUp') {
                       e.preventDefault();
-                      const prev = e.currentTarget.previousElementSibling as HTMLElement;
-                      if (prev) {
-                        prev.focus();
+                      if (suggestions.length > 0) {
+                        setHighlightedIndex(suggestions.length - 1);
                       } else {
                         inputRef.current?.focus();
                       }
+                    }
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      // Stay at current index
                     }
                   }}
                   role="option"
@@ -601,9 +612,13 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
             </>
           ) : inputValue.length >= 2 ? (
             <div
+              id="suggestion-0"
+              ref={el => { itemRefs.current[0] = el; }}
               data-suggestion-item
               tabIndex={0}
-              className="p-4 hover:bg-blue-50 cursor-pointer focus:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`p-4 hover:bg-blue-50 cursor-pointer focus:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                highlightedIndex === 0 ? 'bg-blue-100 ring-2 ring-blue-500' : ''
+              }`}
               onClick={() => {
                 setCreatingNew(true);
                 setNewMedicineData(prev => ({ ...prev, name: inputValue }));
@@ -613,6 +628,10 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
                   e.preventDefault();
                   setCreatingNew(true);
                   setNewMedicineData(prev => ({ ...prev, name: inputValue }));
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  inputRef.current?.focus();
                 }
               }}
               role="option"
@@ -668,7 +687,10 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
                 <select
                   className="w-full border rounded p-2 text-sm"
                   value={newMedicineData.category}
-                  onChange={handleCategoryChange}
+                  onChange={(e) => setNewMedicineData(prev => ({
+                    ...prev,
+                    category: e.target.value
+                  }))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !loading && newMedicineData.name.trim()) {
                       handleCreateNew();
@@ -698,7 +720,10 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
                 <select
                   className="w-full border rounded p-2 text-sm"
                   value={newMedicineData.prescriptionRequired.toString()}
-                  onChange={handlePrescriptionRequiredChange}
+                  onChange={(e) => setNewMedicineData(prev => ({
+                    ...prev,
+                    prescriptionRequired: e.target.value === 'true'
+                  }))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !loading && newMedicineData.name.trim()) {
                       handleCreateNew();
