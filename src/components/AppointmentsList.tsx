@@ -1845,6 +1845,7 @@ const TreatmentPlanDetailsModal = ({
 interface TreatmentPlanFormProps {
   patientId: string;
   patientName: string;
+  clinicId: string; // Added clinicId prop
   existingConditions: ToothCondition[];
   onClose: () => void;
   onSave: (plan: TreatmentPlanData) => void;
@@ -1853,8 +1854,9 @@ interface TreatmentPlanFormProps {
 
 const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   patientId,
-  existingConditions,
   patientName,
+  clinicId, // Receive clinicId from parent
+  existingConditions,
   onClose,
   onSave,
   initialData,
@@ -1885,33 +1887,46 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
       },
     ],
   );
-  const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
-  const [selectedProcedure, setSelectedProcedure] = useState("");
-  const [selectedSurface, setSelectedSurface] = useState("");
-  const [estimatedCost, setEstimatedCost] = useState<number>(0);
+  
+  // REMOVED: selectedProcedure, selectedSurface, estimatedCost - not needed anymore
+  
+  // State for multi-select dropdowns
+  const [selectedOnExamination, setSelectedOnExamination] = useState<any[]>([]);
+  const [selectedDiagnosis, setSelectedDiagnosis] = useState<any[]>([]);
+  const [selectedTreatment, setSelectedTreatment] = useState<any[]>([]);
+  const [selectedSurface, setSelectedSurface] = useState<string>("entire");
   const [notes, setNotes] = useState("");
+  
+  // Loading states
+  const [loadingExaminations, setLoadingExaminations] = useState(false);
+  const [loadingDiagnoses, setLoadingDiagnoses] = useState(false);
+  const [loadingTreatments, setLoadingTreatments] = useState(false);
+  
   const [teethPlans, setTeethPlans] = useState<
     {
       toothNumber: number;
-      procedures: any[];
+      onExamination?: any[];
+      diagnosis?: any[];
+      treatment?: any[];
+      notes?: string;
       priority: "urgent" | "high" | "medium" | "low";
     }[]
   >(
     initialData?.teeth.map((t) => ({
       toothNumber: t.toothNumber,
       priority: t.priority || "medium",
-      procedures: t.procedures.map((p) => ({
-        name: p.name,
-        surface: p.surface || "occlusal",
-        stage: p.stage || 1,
-        estimatedCost: p.estimatedCost || 0,
-        notes: p.notes || "",
-      })),
+      // Remove procedures - we're only storing clinical findings now
+      onExamination: (t as any).onExamination || [],
+      diagnosis: (t as any).diagnosis || [],
+      treatment: (t as any).treatment || [],
+      notes: (t as any).notes || "",
     })) || [],
   );
+  
   const [selectedPriority, setSelectedPriority] = useState<
     "urgent" | "high" | "medium" | "low"
   >("medium");
+  
   const [selectedStage, setSelectedStage] = useState<number>(1);
   const [chartType, setChartType] = useState<"adult" | "pediatric">("adult");
   const [selectionMode, setSelectionMode] = useState<"single" | "multiple">(
@@ -1921,25 +1936,161 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   const [multipleSelectionType, setMultipleSelectionType] =
     useState<string>("full-mouth");
 
+  // ==================== FETCH FUNCTIONS USING CLINICID PROP ====================
+  const fetchExaminationFindings = useCallback(async (search: string = "") => {
+    if (!clinicId) {
+      console.warn("⚠ No clinic ID available for fetching examination findings");
+      return [];
+    }
+
+    setLoadingExaminations(true);
+    try {
+      const token = localStorage.getItem("authToken");
+      const params = new URLSearchParams({
+        clinicId: clinicId,
+        ...(search && { search }),
+        limit: "50",
+      });
+
+      const response = await axios.get(
+        `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/examination-findings?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = response.data;
+      const findings = (data.data || data.results || data || []);
+      
+      const transformedFindings = findings.map((item: any) => ({
+        id: item._id || item.id || `finding_${Date.now()}_${Math.random()}`,
+        name: item.findingName || item.name || item.title,
+        code: item.findingCode || item.code,
+        category: item.category || 'Examination Finding',
+        isCustom: false,
+      }));
+
+      return transformedFindings;
+    } catch (err: any) {
+      console.error("❌ Error fetching examination findings:", err);
+      return [];
+    } finally {
+      setLoadingExaminations(false);
+    }
+  }, [clinicId]);
+
+  const fetchDiagnoses = useCallback(async (search: string = "") => {
+    if (!clinicId) {
+      console.warn("⚠ No clinic ID available for fetching diagnoses");
+      return [];
+    }
+
+    setLoadingDiagnoses(true);
+    try {
+      const token = localStorage.getItem("authToken");
+      const params = new URLSearchParams({
+        clinicId: clinicId,
+        ...(search && { search }),
+        limit: "50",
+        type: "diagnosis",
+      });
+
+      const response = await axios.get(
+        `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/patient-diagnosis?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = response.data;
+      const diagnoses = (data.data || data.results || data || []);
+      
+      const transformedDiagnoses = diagnoses.map((item: any) => ({
+        id: item._id || item.id || `diagnosis_${Date.now()}_${Math.random()}`,
+        name: item.procedureName || item.name || item.title,
+        code: item.procedureCode || item.code,
+        category: item.category || 'Diagnosis',
+        isCustom: false,
+      }));
+
+      return transformedDiagnoses;
+    } catch (err: any) {
+      console.error("❌ Error fetching diagnoses:", err);
+      return [];
+    } finally {
+      setLoadingDiagnoses(false);
+    }
+  }, [clinicId]);
+
+  const fetchTreatments = useCallback(async (search: string = "") => {
+    if (!clinicId) {
+      console.warn("⚠ No clinic ID available for fetching treatments");
+      return [];
+    }
+
+    setLoadingTreatments(true);
+    try {
+      const token = localStorage.getItem("authToken");
+      const params = new URLSearchParams({
+        clinicId: clinicId,
+        ...(search && { search }),
+        limit: "50",
+      });
+
+      const response = await axios.get(
+        `${clinicServiceBaseUrl}/api/v1/patient_treatment/details/treatment-procedures?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = response.data;
+      const treatments = (data.data || data.results || data || []);
+      
+      const transformedTreatments = treatments.map((item: any) => ({
+        id: item._id || item.id || `treatment_${Date.now()}_${Math.random()}`,
+        name: item.procedureName || item.name || item.title,
+        code: item.procedureCode || item.code,
+        category: item.category || 'Treatment',
+        isCustom: false,
+      }));
+
+      return transformedTreatments;
+    } catch (err: any) {
+      console.error("❌ Error fetching treatments:", err);
+      return [];
+    } finally {
+      setLoadingTreatments(false);
+    }
+  }, [clinicId]);
+
+  // Pre-fetch data when clinicId is available
+  useEffect(() => {
+    if (clinicId) {
+      console.log("🏥 Clinic ID available, pre-fetching dropdown options...");
+      fetchExaminationFindings("");
+      fetchDiagnoses("");
+      fetchTreatments("");
+    }
+  }, [clinicId, fetchExaminationFindings, fetchDiagnoses, fetchTreatments]);
+
   useEffect(() => {
     if (initialData) {
       console.log("📋 TreatmentPlanForm received initial data:", initialData);
-      console.log("- Teeth:", initialData.teeth?.length || 0);
-      console.log("- Stages:", initialData.stages?.length || 0);
-      console.log(
-        "- Procedures count:",
-        initialData.teeth?.reduce((sum, t) => sum + t.procedures.length, 0) ||
-          0,
-      );
     }
   }, [initialData]);
 
-  const handleAddProcedure = () => {
-    if (!selectedProcedure || !selectedSurface) {
-      alert("Please select procedure and surface");
-      return;
-    }
-
+  // UPDATED: Handle adding clinical findings without procedures
+  const handleAddFindings = () => {
     if (selectionMode === "single") {
       // Single tooth mode
       if (!selectedTooth) {
@@ -1947,34 +2098,61 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         return;
       }
 
-      if (estimatedCost < 0) {
-        alert("Please enter a valid estimated cost (must be 0 or greater)");
-        return;
-      }
-
       const toothIndex = teethPlans.findIndex(
         (tp) => tp.toothNumber === selectedTooth,
       );
-      const newProcedure = {
-        name: selectedProcedure,
-        surface: selectedSurface,
-        stage: selectedStage,
-        estimatedCost: estimatedCost || 0,
-        notes,
-      };
 
       if (toothIndex === -1) {
+        // New tooth
         setTeethPlans([
           ...teethPlans,
           {
             toothNumber: selectedTooth,
-            procedures: [newProcedure],
+            onExamination: selectedOnExamination,
+            diagnosis: selectedDiagnosis,
+            treatment: selectedTreatment,
+            notes: notes,
             priority: selectedPriority,
           },
         ]);
       } else {
+        // Update existing tooth - merge findings
         const updated = [...teethPlans];
-        updated[toothIndex].procedures.push(newProcedure);
+        
+        // Merge onExamination
+        updated[toothIndex].onExamination = [
+          ...(updated[toothIndex].onExamination || []),
+          ...selectedOnExamination.filter(
+            item => !updated[toothIndex].onExamination?.some(
+              existing => existing.id === item.id
+            )
+          )
+        ];
+        
+        // Merge diagnosis
+        updated[toothIndex].diagnosis = [
+          ...(updated[toothIndex].diagnosis || []),
+          ...selectedDiagnosis.filter(
+            item => !updated[toothIndex].diagnosis?.some(
+              existing => existing.id === item.id
+            )
+          )
+        ];
+        
+        // Merge treatment
+        updated[toothIndex].treatment = [
+          ...(updated[toothIndex].treatment || []),
+          ...selectedTreatment.filter(
+            item => !updated[toothIndex].treatment?.some(
+              existing => existing.id === item.id
+            )
+          )
+        ];
+        
+        // Update notes and priority
+        updated[toothIndex].notes = notes || updated[toothIndex].notes;
+        updated[toothIndex].priority = selectedPriority;
+        
         setTeethPlans(updated);
       }
 
@@ -1987,33 +2165,58 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
         return;
       }
 
-      if (estimatedCost < 0) {
-        alert("Please enter a valid estimated cost (must be 0 or greater)");
-        return;
-      }
-
       const newTeethPlans = [...teethPlans];
 
       selectedTeeth.forEach((toothNumber) => {
         const toothIndex = newTeethPlans.findIndex(
           (tp) => tp.toothNumber === toothNumber,
         );
-        const newProcedure = {
-          name: selectedProcedure,
-          surface: selectedSurface,
-          stage: selectedStage,
-          estimatedCost: estimatedCost || 0,
-          notes,
-        };
 
         if (toothIndex === -1) {
+          // New tooth
           newTeethPlans.push({
             toothNumber,
-            procedures: [newProcedure],
+            onExamination: selectedOnExamination,
+            diagnosis: selectedDiagnosis,
+            treatment: selectedTreatment,
+            notes: notes,
             priority: selectedPriority,
           });
         } else {
-          newTeethPlans[toothIndex].procedures.push(newProcedure);
+          // Update existing tooth - merge findings
+          // Merge onExamination
+          newTeethPlans[toothIndex].onExamination = [
+            ...(newTeethPlans[toothIndex].onExamination || []),
+            ...selectedOnExamination.filter(
+              item => !newTeethPlans[toothIndex].onExamination?.some(
+                existing => existing.id === item.id
+              )
+            )
+          ];
+          
+          // Merge diagnosis
+          newTeethPlans[toothIndex].diagnosis = [
+            ...(newTeethPlans[toothIndex].diagnosis || []),
+            ...selectedDiagnosis.filter(
+              item => !newTeethPlans[toothIndex].diagnosis?.some(
+                existing => existing.id === item.id
+              )
+            )
+          ];
+          
+          // Merge treatment
+          newTeethPlans[toothIndex].treatment = [
+            ...(newTeethPlans[toothIndex].treatment || []),
+            ...selectedTreatment.filter(
+              item => !newTeethPlans[toothIndex].treatment?.some(
+                existing => existing.id === item.id
+              )
+            )
+          ];
+          
+          // Update notes and priority
+          newTeethPlans[toothIndex].notes = notes || newTeethPlans[toothIndex].notes;
+          newTeethPlans[toothIndex].priority = selectedPriority;
         }
       });
 
@@ -2024,86 +2227,118 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     }
 
     // Reset form fields
-    setSelectedProcedure("");
-    setSelectedSurface("");
-    setEstimatedCost(0);
     setNotes("");
+    setSelectedOnExamination([]);
+    setSelectedDiagnosis([]);
+    setSelectedTreatment([]);
   };
 
-  const handleSavePlan = () => {
-    if (teethPlans.length === 0) {
-      alert(
-        "Please add at least one tooth procedure before saving the treatment plan",
-      );
-      return;
-    }
+const handleSavePlan = () => {
+  if (teethPlans.length === 0) {
+    alert("Please add at least one tooth with clinical findings before saving the treatment plan");
+    return;
+  }
 
-    // Format teeth data properly
-    const formattedTeeth = teethPlans.map((toothPlan) => ({
+  // Build procedures by stage from the treatments added to teeth
+  const proceduresByStage: Record<number, any[]> = {};
+  
+  teethPlans.forEach((toothPlan) => {
+    // Only include treatment findings as procedures (not onExamination or diagnosis)
+    (toothPlan.treatment || []).forEach((treatment: any) => {
+      const stageNum = selectedStage || 1; // Use current selected stage or default to 1
+      
+      if (!proceduresByStage[stageNum]) {
+        proceduresByStage[stageNum] = [];
+      }
+      
+      proceduresByStage[stageNum].push({
+        toothNumber: toothPlan.toothNumber,
+        name: treatment.name,
+        surface: "entire", // Default surface - you might want to make this selectable
+        estimatedCost: 0, // You might want to add cost field
+        notes: toothPlan.notes || "",
+        status: "planned",
+        stage: stageNum
+      });
+    });
+  });
+
+  // Format teeth data with procedures (NOT empty array)
+  const formattedTeeth = teethPlans.map((toothPlan) => {
+    // Get all procedures for this tooth across all stages
+    const toothProcedures: any[] = [];
+    
+    Object.entries(proceduresByStage).forEach(([stageNum, procs]) => {
+      const toothProcs = procs.filter(p => p.toothNumber === toothPlan.toothNumber);
+      toothProcedures.push(...toothProcs);
+    });
+    
+    return {
       toothNumber: toothPlan.toothNumber,
       priority: toothPlan.priority || "medium",
-      procedures: toothPlan.procedures.map((proc) => ({
-        name: proc.name,
-        surface: proc.surface || "occlusal",
-        stage: proc.stage || 1,
-        estimatedCost: proc.estimatedCost || 0,
-        notes: proc.notes || "",
-      })),
-    }));
-
-    // Format stages - CRITICAL: Include status from form
-    const formattedStages = stages.map((stage, index) => {
-      const stageNumber = index + 1;
-
-      const proceduresInStage = teethPlans.flatMap((toothPlan) =>
-        toothPlan.procedures
-          .filter((proc) => proc.stage === stageNumber)
-          .map((proc) => ({
-            toothNumber: toothPlan.toothNumber,
-            procedureName: proc.name,
-          })),
-      );
-
-      const stageStatus = stage.status || "pending";
-
-      return {
-        stageName: stage.stageName || `Stage ${stageNumber}`,
-        stageNumber: stageNumber,
-        description: stage.description || "",
-        procedureRefs: proceduresInStage,
-        status: stageStatus,
-        scheduledDate:
-          stage.scheduledDate ||
-          new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
-        notes: stage.notes || "",
-      };
-    });
-
-    console.log("📊 Stage Statuses being sent to backend:");
-    formattedStages.forEach((stage, idx) => {
-      console.log(
-        `  Stage ${idx + 1}: ${stage.stageName} - Status: ${stage.status}`,
-      );
-    });
-
-    const plan: TreatmentPlanData = {
-      planName,
-      description,
-      teeth: formattedTeeth,
-      stages: formattedStages,
+      procedures: toothProcedures, // Now has procedures, not empty!
+      onExamination: toothPlan.onExamination || [],
+      diagnosis: toothPlan.diagnosis || [],
+      treatment: toothPlan.treatment || [],
+      notes: toothPlan.notes || "",
     };
+  });
 
-    console.log("✅ Saving treatment plan:");
-    console.log("- Stages count:", formattedStages.length);
-    console.log(
-      "- Full stages data:",
-      JSON.stringify(formattedStages, null, 2),
+  // Format stages with procedureRefs
+  const formattedStages = stages.map((stage, index) => {
+    const stageNumber = index + 1;
+    const stageProcedures = proceduresByStage[stageNumber] || [];
+    
+    // Build toothSurfaceProcedures for this stage
+    const toothSurfaceMap: Record<number, Record<string, string[]>> = {};
+    
+    stageProcedures.forEach((proc) => {
+      if (!toothSurfaceMap[proc.toothNumber]) {
+        toothSurfaceMap[proc.toothNumber] = {};
+      }
+      if (!toothSurfaceMap[proc.toothNumber][proc.surface]) {
+        toothSurfaceMap[proc.toothNumber][proc.surface] = [];
+      }
+      if (!toothSurfaceMap[proc.toothNumber][proc.surface].includes(proc.name)) {
+        toothSurfaceMap[proc.toothNumber][proc.surface].push(proc.name);
+      }
+    });
+    
+    const toothSurfaceProcedures = Object.entries(toothSurfaceMap).map(
+      ([toothNumStr, surfaces]) => ({
+        toothNumber: parseInt(toothNumStr),
+        surfaceProcedures: Object.entries(surfaces).map(([surface, procedureNames]) => ({
+          surface,
+          procedureNames
+        }))
+      })
     );
+    
+    return {
+      stageName: stage.stageName || `Stage ${stageNumber}`,
+      stageNumber,
+      description: stage.description || "",
+      procedureRefs: stageProcedures.map(p => ({
+        toothNumber: p.toothNumber,
+        procedureName: p.name
+      })),
+      toothSurfaceProcedures,
+      status: stage.status || "pending",
+      scheduledDate: stage.scheduledDate || 
+        new Date(Date.now() + (stageNumber - 1) * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      notes: stage.notes || "",
+    };
+  });
 
-    onSave(plan);
+  const plan: TreatmentPlanData = {
+    planName,
+    description,
+    teeth: formattedTeeth,
+    stages: formattedStages,
   };
+
+  onSave(plan);
+};
 
   const handleAddStage = () => {
     const newStageNumber = stages.length + 1;
@@ -2129,39 +2364,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
       return;
     }
 
-    // Check if any procedures are assigned to this stage
-    const proceduresInStage = teethPlans.reduce((count, tooth) => {
-      return (
-        count + tooth.procedures.filter((p) => p.stage === index + 1).length
-      );
-    }, 0);
-
-    if (proceduresInStage > 0) {
-      if (
-        !confirm(
-          `Stage ${index + 1} has ${proceduresInStage} procedure(s). Removing the stage will also remove these procedures. Continue?`,
-        )
-      ) {
-        return;
-      }
-
-      // Remove procedures assigned to this stage completely
-      const updatedTeethPlans = teethPlans
-        .map((tooth) => ({
-          ...tooth,
-          procedures: tooth.procedures.filter(
-            (proc) => proc.stage !== index + 1,
-          ),
-        }))
-        .filter((tooth) => tooth.procedures.length > 0); // Remove teeth with no procedures
-
-      setTeethPlans(updatedTeethPlans);
-    }
-
-    // Remove the stage
     const updatedStages = stages.filter((_, i) => i !== index);
-
-    // Renumber remaining stages to maintain order
     const renumberedStages = updatedStages.map((stage, idx) => ({
       ...stage,
       stageName: stage.stageName.replace(/\d+$/, String(idx + 1)),
@@ -2169,7 +2372,6 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
 
     setStages(renumberedStages);
 
-    // Adjust selected stage if needed
     if (selectedStage > renumberedStages.length) {
       setSelectedStage(renumberedStages.length);
     } else if (selectedStage === index + 1) {
@@ -2186,23 +2388,10 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     setStages(updatedStages);
   };
 
-  const getProceduresByStage = (stageNumber: number) => {
-    return teethPlans.flatMap((tooth) =>
-      tooth.procedures
-        .filter((proc) => proc.stage === stageNumber)
-        .map((proc) => ({
-          toothNumber: tooth.toothNumber,
-          ...proc,
-        })),
-    );
-  };
-
-  // Get filtered teeth based on chart type
   const getFilteredTeeth = () => {
     return chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
   };
 
-  // Handle multiple selection patterns
   const handleMultipleSelection = (selectionType: string) => {
     setMultipleSelectionType(selectionType);
     const filteredTeeth = getFilteredTeeth();
@@ -2244,7 +2433,6 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
           .map((t) => t.number);
         break;
       case "custom":
-        // Keep current selection for custom editing
         teethToSelect = [...selectedTeeth];
         break;
       default:
@@ -2254,67 +2442,85 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     setSelectedTeeth(teethToSelect);
   };
 
-  // Clear selection
   const handleClearSelection = () => {
     setSelectedTeeth([]);
     setSelectedTooth(null);
   };
 
-  // Get tooth name by number
   const getToothName = (toothNumber: number) => {
     const allTeeth = getFilteredTeeth();
     const tooth = allTeeth.find((t) => t.number === toothNumber);
     return tooth ? tooth.name : `Tooth ${toothNumber}`;
   };
 
+  // Handle clearing all selections for a tooth
+  const handleClearToothFindings = (toothIndex: number, field: 'onExamination' | 'diagnosis' | 'treatment') => {
+    const updated = [...teethPlans];
+    if (updated[toothIndex]) {
+      updated[toothIndex][field] = [];
+      setTeethPlans(updated);
+    }
+  };
+
+  const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
+
   return (
     <div className="bg-white h-full flex flex-col">
-      <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b px-6 py-5 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Create Treatment Plan</h3>
-          <p className="text-sm text-muted-foreground">
-            Patient: {patientName}
+          <h3 className="text-xl font-semibold text-gray-800">Create Clinical Findings Plan</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Patient: <span className="font-medium">{patientName}</span>
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button variant="ghost" size="sm" onClick={onClose} className="hover:bg-primary/10">
           <X className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-4xl mx-auto">
           {/* Plan Basic Info */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Plan Name</label>
-            <input
-              type="text"
-              className="w-full border rounded-lg p-2"
-              value={planName}
-              onChange={(e) => setPlanName(e.target.value)}
-              placeholder="Enter plan name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Description
-            </label>
-            <textarea
-              className="w-full border rounded-lg p-2"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter description"
-              rows={3}
-            />
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Plan Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                  value={planName}
+                  onChange={(e) => setPlanName(e.target.value)}
+                  placeholder="e.g., Comprehensive Oral Examination"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Brief description of the plan"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Stages Management */}
-          <div className="border rounded-lg p-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="font-medium">Stages Management</h4>
-              <Button variant="outline" size="sm" onClick={handleAddStage}>
-                <Plus className="h-4 w-4 mr-2" />
+              <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                <span className="w-1.5 h-5 bg-primary rounded-full"></span>
+                Treatment Stages
+              </h4>
+              <Button variant="outline" size="sm" onClick={handleAddStage} className="border-primary/30 text-primary hover:bg-primary/5">
+                <Plus className="h-4 w-4 mr-1" />
                 Add Stage
               </Button>
             </div>
@@ -2322,48 +2528,47 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             <div className="space-y-3">
               {stages.map((stage, index) => {
                 const stageNumber = index + 1;
-                const proceduresInStage = getProceduresByStage(stageNumber);
 
                 return (
-                  <div key={index} className="border rounded p-4 bg-white">
-                    <div className="flex justify-between items-center mb-3">
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+                          <span className="text-sm font-bold text-primary">{stageNumber}</span>
+                        </div>
+                        <span className="font-medium text-gray-800">{stage.stageName}</span>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Badge
-                          variant="outline"
-                          className="bg-blue-50 text-blue-700"
+                          className={`text-xs px-3 py-1 ${
+                            stage.status === "completed"
+                              ? "bg-green-100 text-green-700 border-green-200"
+                              : stage.status === "in-progress"
+                                ? "bg-blue-100 text-blue-700 border-blue-200"
+                                : "bg-gray-100 text-gray-700 border-gray-200"
+                          }`}
                         >
-                          Stage {stageNumber}
+                          {stage.status || "pending"}
                         </Badge>
-                        <span className="font-medium">{stage.stageName}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {proceduresInStage.length} procedure(s)
-                        </Badge>
+                        {stages.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveStage(index)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
-                    </div>
-
-                    {/* Stage Status Badge */}
-                    <div className="mb-3">
-                      <Badge
-                        className={`text-xs ${
-                          stage.status === "completed"
-                            ? "bg-green-100 text-green-700"
-                            : stage.status === "in-progress"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        Status: {stage.status}
-                      </Badge>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Stage Name
-                        </label>
+                        <label className="block text-xs text-gray-500 mb-1">Stage Name</label>
                         <input
                           type="text"
-                          className="w-full border rounded p-2 text-sm"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-primary/30 focus:border-primary bg-white"
                           value={stage.stageName}
                           onChange={(e) => {
                             const updated = [...stages];
@@ -2372,14 +2577,11 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                           }}
                         />
                       </div>
-
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Scheduled Date
-                        </label>
+                        <label className="block text-xs text-gray-500 mb-1">Scheduled Date</label>
                         <input
                           type="date"
-                          className="w-full border rounded p-2 text-sm"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-primary/30 focus:border-primary bg-white"
                           value={stage.scheduledDate || ""}
                           onChange={(e) => {
                             const updated = [...stages];
@@ -2388,22 +2590,46 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                           }}
                         />
                       </div>
-
                       <div className="md:col-span-2">
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Description
-                        </label>
+                        <label className="block text-xs text-gray-500 mb-1">Description</label>
                         <textarea
-                          className="w-full border rounded p-2 text-sm"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-primary/30 focus:border-primary bg-white"
                           value={stage.description || ""}
                           onChange={(e) => {
                             const updated = [...stages];
                             updated[index].description = e.target.value;
                             setStages(updated);
                           }}
-                          rows={2}
-                          placeholder="Describe what will be done in this stage"
+                          rows={1}
+                          placeholder="Stage description"
                         />
+                      </div>
+                    </div>
+                    
+                    {/* Stage Status Toggle */}
+                    <div className="mt-3 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500">Update Status:</span>
+                        <div className="flex gap-1">
+                          {["pending", "in-progress", "completed"].map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => handleUpdateStageStatus(index, status as any)}
+                              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                                stage.status === status
+                                  ? status === "completed"
+                                    ? "bg-green-100 text-green-700 border-green-300"
+                                    : status === "in-progress"
+                                      ? "bg-blue-100 text-blue-700 border-blue-300"
+                                      : "bg-gray-100 text-gray-700 border-gray-300"
+                                  : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
+                              }`}
+                            >
+                              {status === "in-progress" ? "In Progress" : status.charAt(0).toUpperCase() + status.slice(1)}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2412,33 +2638,35 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             </div>
           </div>
 
-          {/* Add Procedures */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium mb-4">Add Procedures</h4>
+          {/* Add Clinical Findings Section */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-5 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-primary rounded-full"></span>
+              Add Clinical Findings
+            </h4>
 
             {/* Selection Mode Toggle */}
-            <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
-              <div className="flex flex-wrap items-center gap-4 mb-3">
+            <div className="mb-6 bg-gray-50/80 p-4 rounded-lg border border-gray-200">
+              <div className="flex flex-wrap items-center gap-6">
                 {/* Chart Type */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Chart:</span>
-                  <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+                  <span className="text-xs font-medium text-gray-600">Chart:</span>
+                  <div className="flex border border-gray-300 rounded-lg overflow-hidden bg-white">
                     {["adult", "pediatric"].map((type) => (
                       <button
                         key={type}
                         type="button"
                         onClick={() => {
                           setChartType(type as "adult" | "pediatric");
-                          // Clear selections when chart type changes
                           if (selectionMode === "single") {
                             setSelectedTooth(null);
                           } else {
                             setSelectedTeeth([]);
                           }
                         }}
-                        className={`px-3 py-1 text-sm transition-all ${
+                        className={`px-3 py-1.5 text-xs font-medium transition-all ${
                           chartType === type
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-primary text-white"
                             : "bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                       >
@@ -2448,12 +2676,12 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                   </div>
                 </div>
 
-                {/* Multi Select Toggle */}
+                {/* Selection Mode */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Selection Mode:</span>
-                  <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-1 bg-white">
-                    <span className="text-sm text-gray-700">
-                      {selectionMode === "multiple" ? "Multiple" : "Single"}
+                  <span className="text-xs font-medium text-gray-600">Selection Mode:</span>
+                  <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-1.5 bg-white">
+                    <span className="text-xs text-gray-700 font-medium">
+                      {selectionMode === "multiple" ? "Multiple Teeth" : "Single Tooth"}
                     </span>
                     <button
                       type="button"
@@ -2466,17 +2694,13 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                           handleMultipleSelection("full-mouth");
                         }
                       }}
-                      className={`relative w-9 h-5 rounded-full transition-colors ${
-                        selectionMode === "multiple"
-                          ? "bg-primary"
-                          : "bg-gray-300"
+                      className={`relative w-8 h-4 rounded-full transition-colors ${
+                        selectionMode === "multiple" ? "bg-primary" : "bg-gray-300"
                       }`}
                     >
                       <div
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                          selectionMode === "multiple"
-                            ? "translate-x-4"
-                            : "translate-x-0"
+                        className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${
+                          selectionMode === "multiple" ? "translate-x-4" : "translate-x-0"
                         }`}
                       />
                     </button>
@@ -2484,27 +2708,25 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                 </div>
               </div>
 
-              {/* Selection Options (only shown when multi-select is enabled) */}
+              {/* Quick Selection for Multiple Mode */}
               {selectionMode === "multiple" && (
-                <div className="mt-3">
-                  <span className="text-sm text-gray-600 mb-2 block">
-                    Quick Selection:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
+                <div className="mt-4">
+                  <span className="text-xs text-gray-600 mb-2 block">Quick Selection:</span>
+                  <div className="flex flex-wrap gap-1.5">
                     {[
                       { type: "full-mouth", label: "Full Mouth" },
-                      { type: "upper", label: "Upper Arch" },
-                      { type: "lower", label: "Lower Arch" },
-                      { type: "upper-right", label: "Upper Right" },
-                      { type: "upper-left", label: "Upper Left" },
-                      { type: "lower-right", label: "Lower Right" },
-                      { type: "lower-left", label: "Lower Left" },
+                      { type: "upper", label: "Upper" },
+                      { type: "lower", label: "Lower" },
+                      { type: "upper-right", label: "UR" },
+                      { type: "upper-left", label: "UL" },
+                      { type: "lower-right", label: "LR" },
+                      { type: "lower-left", label: "LL" },
                     ].map((item) => (
                       <button
                         key={item.type}
                         type="button"
                         onClick={() => handleMultipleSelection(item.type)}
-                        className={`px-3 py-1.5 text-sm rounded-md border transition-all ${
+                        className={`px-2.5 py-1 text-xs rounded-md border transition-all ${
                           multipleSelectionType === item.type
                             ? "bg-primary/10 border-primary text-primary font-medium"
                             : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -2519,41 +2741,37 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
             </div>
 
             {/* Stage Selection */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-gray-700 mb-2">
                 Assign to Stage
               </label>
               <div className="flex flex-wrap gap-2">
                 {stages.map((stage, index) => {
                   const stageNumber = index + 1;
-                  const proceduresInStage =
-                    getProceduresByStage(stageNumber).length;
-
                   return (
                     <button
                       key={index}
                       type="button"
                       onClick={() => setSelectedStage(stageNumber)}
-                      className={`px-3 py-2 border rounded-lg flex items-center gap-2 ${
+                      className={`px-3 py-1.5 border rounded-lg flex items-center gap-1.5 text-sm transition-all ${
                         selectedStage === stageNumber
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-white border-gray-300 hover:bg-gray-50"
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
                       <span>Stage {stageNumber}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {proceduresInStage}
-                      </Badge>
                       <Badge
-                        className={`text-[10px] ${
-                          stage.status === "completed"
-                            ? "bg-green-100 text-green-700"
-                            : stage.status === "in-progress"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700"
+                        className={`text-[10px] px-1.5 py-0.5 ${
+                          selectedStage === stageNumber
+                            ? "bg-white/20 text-white"
+                            : stage.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : stage.status === "in-progress"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
                         }`}
                       >
-                        {stage.status}
+                        {stage.status === "in-progress" ? "IP" : stage.status?.charAt(0).toUpperCase() || "P"}
                       </Badge>
                     </button>
                   );
@@ -2561,384 +2779,270 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Tooth Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {selectionMode === "single"
-                    ? "Tooth Number"
-                    : "Selected Teeth"}
-                </label>
-                {selectionMode === "single" ? (
-                  <select
-                    className="w-full border rounded-lg p-2.5"
-                    value={selectedTooth || ""}
-                    onChange={(e) =>
-                      setSelectedTooth(
-                        e.target.value ? Number(e.target.value) : null,
-                      )
-                    }
-                  >
-                    <option value="">Select tooth...</option>
-                    {getFilteredTeeth()
-                      .sort((a, b) => a.number - b.number)
-                      .map((tooth) => (
-                        <option key={tooth.number} value={tooth.number}>
-                          Tooth #{tooth.number} ({tooth.name})
-                        </option>
-                      ))}
-                  </select>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="border rounded-lg p-3 bg-gray-50 min-h-[60px]">
-                      {selectedTeeth.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {selectedTeeth
-                            .sort((a, b) => a - b)
-                            .map((toothNum) => (
-                              <div key={toothNum} className="relative group">
-                                <span className="px-3 py-1.5 bg-white border border-primary/30 text-primary rounded-lg text-sm font-medium flex items-center gap-1 shadow-sm">
-                                  <span>#{toothNum}</span>
-                                  <span className="text-xs text-gray-600">
-                                    ({getToothName(toothNum)})
-                                  </span>
+            {/* Tooth Selection */}
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-gray-700 mb-2">
+                {selectionMode === "single" ? "Tooth Number" : "Selected Teeth"}
+              </label>
+              {selectionMode === "single" ? (
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white"
+                  value={selectedTooth || ""}
+                  onChange={(e) =>
+                    setSelectedTooth(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
+                  }
+                >
+                  <option value="">Select a tooth...</option>
+                  {getFilteredTeeth()
+                    .sort((a, b) => a.number - b.number)
+                    .map((tooth) => (
+                      <option key={tooth.number} value={tooth.number}>
+                        Tooth #{tooth.number} - {tooth.name}
+                      </option>
+                    ))}
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50 min-h-[70px]">
+                    {selectedTeeth.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTeeth
+                          .sort((a, b) => a - b)
+                          .map((toothNum) => (
+                            <div key={toothNum} className="relative group">
+                              <span className="px-2.5 py-1.5 bg-white border border-primary/30 text-primary rounded-lg text-xs font-medium flex items-center gap-1 shadow-sm">
+                                #{toothNum}
+                                <span className="text-[10px] text-gray-500">
+                                  ({getToothName(toothNum).split(' ')[0]})
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedTeeth(
-                                      selectedTeeth.filter(
-                                        (num) => num !== toothNum,
-                                      ),
-                                    );
-                                  }}
-                                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                                  title="Remove tooth"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-10">
-                          <span className="text-gray-400 italic">
-                            No teeth selected. Use quick selection buttons
-                            above.
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {selectedTeeth.length > 0 && (
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-gray-600">
-                          <span className="font-medium">
-                            {selectedTeeth.length}
-                          </span>{" "}
-                          teeth selected
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleClearSelection}
-                          className="px-3 py-1.5 text-sm border border-red-300 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 hover:border-red-400 transition-colors flex items-center gap-1"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Clear All
-                        </button>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTeeth(
+                                    selectedTeeth.filter(
+                                      (num) => num !== toothNum,
+                                    ),
+                                  );
+                                }}
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-10">
+                        <span className="text-xs text-gray-400 italic">
+                          No teeth selected. Use quick selection buttons above.
+                        </span>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
+                  {selectedTeeth.length > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">
+                        <span className="font-medium">{selectedTeeth.length}</span> teeth selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearSelection}
+                        className="px-2.5 py-1 text-xs border border-red-300 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1"
+                      >
+                        <X className="h-3 w-3" />
+                        Clear All
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* MULTI-SELECT DROPDOWNS */}
+            <div className="space-y-4 mb-5">
+              <div className="bg-gray-50/50 p-4 rounded-lg border border-gray-200">
+                <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
+                  Clinical Findings for Selected Tooth/Teeth
+                </h5>
+                
+                <div className="space-y-4">
+                  {/* On Examination Dropdown */}
+                  <MultiSelectDropdown
+                    label="On Examination"
+                    value={selectedOnExamination}
+                    onChange={setSelectedOnExamination}
+                    fetchOptions={fetchExaminationFindings}
+                    placeholder="Search and select examination findings..."
+                    loading={loadingExaminations}
+                    allowCustom={true}
+                  />
+
+                  {/* Diagnosis Dropdown */}
+                  <MultiSelectDropdown
+                    label="Diagnosis"
+                    value={selectedDiagnosis}
+                    onChange={setSelectedDiagnosis}
+                    fetchOptions={fetchDiagnoses}
+                    placeholder="Search and select diagnoses..."
+                    loading={loadingDiagnoses}
+                    allowCustom={true}
+                  />
+
+                  {/* Treatment Dropdown */}
+                  <MultiSelectDropdown
+                    label="Treatment"
+                    value={selectedTreatment}
+                    onChange={setSelectedTreatment}
+                    fetchOptions={fetchTreatments}
+                    placeholder="Search and select treatments..."
+                    loading={loadingTreatments}
+                    allowCustom={true}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Priority & Notes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Procedure
+                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                  Priority
                 </label>
-                <select
-                  className="w-full border rounded-lg p-2.5"
-                  value={selectedProcedure}
-                  onChange={(e) => setSelectedProcedure(e.target.value)}
-                >
-                  <option value="">Select procedure...</option>
-                  {DENTAL_PROCEDURES.map((proc) => (
-                    <option key={proc} value={proc}>
-                      {proc}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-1.5">
+                  {(["urgent", "high", "medium", "low"] as const).map(
+                    (priority) => (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() => setSelectedPriority(priority)}
+                        className={`px-3 py-1.5 text-xs rounded-full border capitalize transition-all ${
+                          selectedPriority === priority
+                            ? priority === "urgent"
+                              ? "bg-red-500 text-white border-red-500"
+                              : priority === "high"
+                                ? "bg-orange-500 text-white border-orange-500"
+                                : priority === "medium"
+                                  ? "bg-blue-500 text-white border-blue-500"
+                                  : "bg-gray-500 text-white border-gray-500"
+                            : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {priority}
+                      </button>
+                    ),
+                  )}
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Surface
-                </label>
-                <select
-                  className="w-full border rounded-lg p-2.5"
-                  value={selectedSurface}
-                  onChange={(e) => setSelectedSurface(e.target.value)}
-                >
-                  <option value="">Select surface...</option>
-                  <option value="mesial">Mesial</option>
-                  <option value="distal">Distal</option>
-                  <option value="buccal">Buccal</option>
-                  <option value="lingual">Lingual</option>
-                  <option value="occlusal">Occlusal</option>
-                  <option value="entire">Entire Tooth</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Estimated Cost (₹)
+                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                  Notes
                 </label>
                 <input
-                  type="number"
-                  className="w-full border rounded-lg p-2.5"
-                  value={estimatedCost === 0 ? "" : estimatedCost}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === "") {
-                      setEstimatedCost(0);
-                    } else {
-                      const numValue = Number(value);
-                      if (numValue >= 0) {
-                        setEstimatedCost(numValue);
-                      }
-                    }
-                  }}
-                  min="0"
-                  step="100"
-                  placeholder="Enter amount"
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add clinical notes..."
                 />
               </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Priority</label>
-              <div className="flex gap-2">
-                {(["urgent", "high", "medium", "low"] as const).map(
-                  (priority) => (
-                    <button
-                      key={priority}
-                      type="button"
-                      onClick={() => setSelectedPriority(priority)}
-                      className={`px-4 py-2 border rounded-lg capitalize transition-all ${
-                        selectedPriority === priority
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                      }`}
-                    >
-                      {priority}
-                    </button>
-                  ),
-                )}
+            {/* Summary of selections */}
+            {(selectedOnExamination.length > 0 || selectedDiagnosis.length > 0 || selectedTreatment.length > 0) && (
+              <div className="mb-5 bg-blue-50/80 p-4 rounded-lg border border-blue-200">
+                <p className="text-xs font-semibold text-blue-800 mb-2 flex items-center gap-1">
+                  <span>📋</span> Findings to be added:
+                </p>
+                <div className="space-y-2">
+                  {selectedOnExamination.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-medium text-blue-700">On Examination:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedOnExamination.map(item => (
+                          <Badge key={item.id} className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5">
+                            {item.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedDiagnosis.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-medium text-purple-700">Diagnosis:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedDiagnosis.map(item => (
+                          <Badge key={item.id} className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5">
+                            {item.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedTreatment.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-medium text-green-700">Treatment:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedTreatment.map(item => (
+                          <Badge key={item.id} className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5">
+                            {item.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-1">Notes</label>
-              <textarea
-                className="w-full border rounded-lg p-2.5"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes about this procedure"
-                rows={2}
-              />
-            </div>
+            )}
 
             <Button
-              onClick={handleAddProcedure}
+              onClick={handleAddFindings}
               disabled={
-                !selectedProcedure ||
-                !selectedSurface ||
                 (selectionMode === "single" && !selectedTooth) ||
-                (selectionMode === "multiple" && selectedTeeth.length === 0)
+                (selectionMode === "multiple" && selectedTeeth.length === 0) ||
+                (selectedOnExamination.length === 0 && selectedDiagnosis.length === 0 && selectedTreatment.length === 0)
               }
-              className="w-full py-3 text-base"
+              className="w-full py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-white rounded-lg font-medium transition-all shadow-sm hover:shadow"
               size="lg"
             >
               <Plus className="h-5 w-5 mr-2" />
               {selectionMode === "multiple"
-                ? `Add Procedure to ${selectedTeeth.length} Selected Teeth`
-                : `Add Procedure to Tooth ${selectedTooth || ""}`}
+                ? `Add Findings to ${selectedTeeth.length} Selected ${selectedTeeth.length === 1 ? 'Tooth' : 'Teeth'}`
+                : `Add Findings to Tooth ${selectedTooth || ""}`}
             </Button>
           </div>
 
-          {/* Added Procedures */}
+          {/* Added Findings Summary */}
           {teethPlans.length > 0 && (
-            <div className="border rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <div className="flex justify-between items-center mb-4">
-                <h4 className="font-medium">Added Procedures</h4>
-                <div className="text-sm text-gray-500">
-                  Total:{" "}
-                  {teethPlans.reduce(
-                    (sum, tp) => sum + tp.procedures.length,
-                    0,
-                  )}{" "}
-                  procedures
-                </div>
+                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="w-1.5 h-5 bg-green-500 rounded-full"></span>
+                  Added Clinical Findings
+                </h4>
+                <Badge variant="outline" className="bg-gray-100 text-gray-700 px-3 py-1">
+                  {teethPlans.length} {teethPlans.length === 1 ? 'tooth' : 'teeth'}
+                </Badge>
               </div>
 
-              {/* Summary by Stage WITH STATUS TOGGLE BUTTONS AND REMOVE BUTTON */}
-              <div className="mb-6">
-                <h5 className="text-sm font-medium mb-3 text-gray-700">
-                  Stage Status Management
-                </h5>
-                <div className="space-y-3">
-                  {stages.map((stage, index) => {
-                    const stageNumber = index + 1;
-                    const proceduresInStage = getProceduresByStage(stageNumber);
-
-                    return (
-                      <div
-                        key={index}
-                        className="border rounded-lg p-4 bg-white"
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-50 text-blue-700"
-                            >
-                              Stage {stageNumber}
-                            </Badge>
-                            <span className="font-medium">
-                              {stage.stageName}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {proceduresInStage.length} procedure(s)
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {/* Current Status Badge */}
-                            <Badge
-                              className={`text-xs ${
-                                stage.status === "completed"
-                                  ? "bg-green-100 text-green-700"
-                                  : stage.status === "in-progress"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-gray-100 text-gray-700"
-                              }`}
-                            >
-                              {stage.status}
-                            </Badge>
-
-                            {/* Remove Stage Button - Only show if more than 1 stage */}
-                            {stages.length > 1 && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveStage(index)}
-                                className="text-red-500 hover:text-red-700"
-                                title="Remove this stage"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Stage Status Toggle Buttons */}
-                        <div className="mt-3 flex items-center gap-2">
-                          <span className="text-xs text-gray-500">
-                            Update Status:
-                          </span>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStageStatus(index, "pending")
-                              }
-                              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                                stage.status === "pending"
-                                  ? "bg-gray-100 text-gray-700 border-gray-300"
-                                  : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-                              }`}
-                              title="Mark as Pending"
-                            >
-                              Pending
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStageStatus(index, "in-progress")
-                              }
-                              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                                stage.status === "in-progress"
-                                  ? "bg-blue-100 text-blue-700 border-blue-300"
-                                  : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-                              }`}
-                              title="Mark as In Progress"
-                            >
-                              In Progress
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStageStatus(index, "completed")
-                              }
-                              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                                stage.status === "completed"
-                                  ? "bg-green-100 text-green-700 border-green-300"
-                                  : "bg-white text-gray-600 hover:bg-gray-50 border-gray-300"
-                              }`}
-                              title="Mark as Completed"
-                            >
-                              Completed
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Optional: Show procedures in this stage */}
-                        {proceduresInStage.length > 0 && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-xs text-gray-500 mb-1">
-                              Procedures in this stage:
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {proceduresInStage
-                                .slice(0, 3)
-                                .map((proc, procIdx) => (
-                                  <Badge
-                                    key={procIdx}
-                                    variant="outline"
-                                    className="text-[10px]"
-                                  >
-                                    T{proc.toothNumber}: {proc.name}
-                                  </Badge>
-                                ))}
-                              {proceduresInStage.length > 3 && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px]"
-                                >
-                                  +{proceduresInStage.length - 3} more
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                 {teethPlans.map((toothPlan, idx) => (
-                  <div key={idx} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-3">
+                  <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                    <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="bg-gray-100">
-                          Tooth #{toothPlan.toothNumber}
-                        </Badge>
-                        {toothPlan.priority &&
-                          toothPlan.priority !== "medium" && (
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="font-bold text-primary text-sm">#{toothPlan.toothNumber}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-800">Tooth #{toothPlan.toothNumber}</span>
+                          {toothPlan.priority && toothPlan.priority !== "medium" && (
                             <Badge
-                              className={`text-xs ${
+                              className={`ml-2 text-[10px] ${
                                 toothPlan.priority === "urgent"
                                   ? "bg-red-100 text-red-700"
                                   : toothPlan.priority === "high"
@@ -2949,83 +3053,92 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
                               {toothPlan.priority}
                             </Badge>
                           )}
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-500">
-                        {toothPlan.procedures.length} procedure(s)
-                      </span>
+                      <div className="flex gap-2">
+                        {(toothPlan.onExamination?.length ?? 0) > 0 && (
+                          <button
+                            onClick={() => handleClearToothFindings(idx, 'onExamination')}
+                            className="text-[10px] text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded"
+                          >
+                            Clear Exam
+                          </button>
+                        )}
+                        {(toothPlan.diagnosis?.length ?? 0) > 0 && (
+                          <button
+                            onClick={() => handleClearToothFindings(idx, 'diagnosis')}
+                            className="text-[10px] text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded"
+                          >
+                            Clear Dx
+                          </button>
+                        )}
+                        {(toothPlan.treatment?.length ?? 0) > 0 && (
+                          <button
+                            onClick={() => handleClearToothFindings(idx, 'treatment')}
+                            className="text-[10px] text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded"
+                          >
+                            Clear Tx
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Group procedures by stage */}
-                    {(() => {
-                      const proceduresByStage: Record<number, any[]> = {};
-                      toothPlan.procedures.forEach((proc) => {
-                        const stage = proc.stage || 1;
-                        if (!proceduresByStage[stage]) {
-                          proceduresByStage[stage] = [];
-                        }
-                        proceduresByStage[stage].push(proc);
-                      });
-
-                      return Object.entries(proceduresByStage).map(
-                        ([stageNum, procs]) => (
-                          <div key={stageNum} className="mb-3 last:mb-0">
-                            <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                              <span>Stage {stageNum}</span>
-                              <Badge variant="outline" className="text-[10px]">
-                                {procs.length} procedure(s)
+                    {/* Clinical Findings Display */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {toothPlan.onExamination && toothPlan.onExamination.length > 0 && (
+                        <div className="bg-blue-50/30 p-2 rounded-lg border border-blue-100">
+                          <span className="text-[10px] font-semibold text-blue-700 block mb-1 flex items-center gap-1">
+                            <span>🔍</span> On Examination
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {toothPlan.onExamination.map((item: any) => (
+                              <Badge key={item.id} className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5">
+                                {item.name}
+                                {item.isCustom && " ✏️"}
                               </Badge>
-                              {/* Show stage status */}
-                              <Badge
-                                className={`text-[10px] ${
-                                  stages[parseInt(stageNum) - 1]?.status ===
-                                  "completed"
-                                    ? "bg-green-100 text-green-700"
-                                    : stages[parseInt(stageNum) - 1]?.status ===
-                                        "in-progress"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-gray-100 text-gray-700"
-                                }`}
-                              >
-                                {stages[parseInt(stageNum) - 1]?.status ||
-                                  "pending"}
-                              </Badge>
-                            </div>
-                            <div className="space-y-2">
-                              {procs.map((proc, procIdx) => (
-                                <div
-                                  key={procIdx}
-                                  className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border"
-                                >
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">
-                                        {proc.name}
-                                      </span>
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        {proc.surface}
-                                      </Badge>
-                                    </div>
-                                    {proc.notes && (
-                                      <div className="text-sm text-gray-600 mt-1">
-                                        {proc.notes}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-sm font-medium">
-                                      ₹{proc.estimatedCost}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                            ))}
                           </div>
-                        ),
-                      );
-                    })()}
+                        </div>
+                      )}
+                      
+                      {toothPlan.diagnosis && toothPlan.diagnosis.length > 0 && (
+                        <div className="bg-purple-50/30 p-2 rounded-lg border border-purple-100">
+                          <span className="text-[10px] font-semibold text-purple-700 block mb-1 flex items-center gap-1">
+                            <span>📌</span> Diagnosis
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {toothPlan.diagnosis.map((item: any) => (
+                              <Badge key={item.id} className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5">
+                                {item.name}
+                                {item.isCustom && " ✏️"}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {toothPlan.treatment && toothPlan.treatment.length > 0 && (
+                        <div className="bg-green-50/30 p-2 rounded-lg border border-green-100">
+                          <span className="text-[10px] font-semibold text-green-700 block mb-1 flex items-center gap-1">
+                            <span>💊</span> Treatment
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {toothPlan.treatment.map((item: any) => (
+                              <Badge key={item.id} className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5">
+                                {item.name}
+                                {item.isCustom && " ✏️"}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {toothPlan.notes && (
+                      <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                        <span className="font-medium">Notes:</span> {toothPlan.notes}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3035,35 +3148,28 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="border-t px-6 py-4 flex justify-between items-center">
-        <div className="text-sm text-gray-500">
+      <div className="border-t border-gray-200 px-6 py-4 bg-gray-50/80 flex justify-between items-center">
+        <div className="text-sm text-gray-600">
           {teethPlans.length > 0 ? (
-            <>
-              {teethPlans.length} teeth,{" "}
-              {teethPlans.reduce((sum, tp) => sum + tp.procedures.length, 0)}{" "}
-              procedures
-              <div className="mt-1">
-                Stages: {stages.filter((s) => s.status === "completed").length}{" "}
-                completed,
-                {stages.filter((s) => s.status === "in-progress").length}{" "}
-                in-progress,
-                {stages.filter((s) => s.status === "pending").length} pending
-              </div>
-            </>
+            <span className="flex items-center gap-2">
+              <span className="font-medium">{teethPlans.length}</span> teeth with findings
+              <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+              <span className="font-medium">{stages.length}</span> stages
+            </span>
           ) : (
-            "No procedures added yet"
+            <span className="text-gray-400 italic">No findings added yet</span>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onClose} className="px-5">
             Cancel
           </Button>
           <Button
             onClick={handleSavePlan}
             disabled={teethPlans.length === 0}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 text-white px-6 shadow-sm hover:shadow"
           >
-            Save Treatment Plan
+            Save Clinical Findings Plan
           </Button>
         </div>
       </div>
@@ -5796,6 +5902,7 @@ export function AppointmentsList() {
                   patientId={appointmentDetail?.patientId?._id || ""}
                   patientName={appointmentDetail?.patientId?.name || ""}
                   existingConditions={dentalData.performedTeeth || []}
+                   clinicId={selectedClinic?.clinicId || appointmentDetail?.clinicId || ""} 
                   onClose={() => setShowTreatmentPlanForm(false)}
                   onSave={(plan) => {
                     console.log("Saving treatment plan:", plan);
