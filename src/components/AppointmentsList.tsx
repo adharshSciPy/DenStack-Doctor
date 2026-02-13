@@ -3885,15 +3885,15 @@ const MultiSelectDropdown = ({
                 tabIndex={0}
                 role="option"
               >
-                <div className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded">
+                {/* <div className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded">
                   <Plus className="h-4 w-4" />
                   Add "{searchTerm}" as custom
-                </div>
+                </div> */}
               </div>
             )}
 
             {/* Custom Input Mode */}
-            {allowCustom && customMode && (
+           {/* {allowCustom && customMode && (
               <div className="border-t p-2 flex-shrink-0">
                 <div className="space-y-2">
                   <input
@@ -3943,7 +3943,7 @@ const MultiSelectDropdown = ({
                   </div>
                 </div>
               </div>
-            )}
+            )}*/}
           </div>
         )}
       </div>
