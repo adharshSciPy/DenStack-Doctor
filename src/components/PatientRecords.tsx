@@ -31,6 +31,8 @@ import {
   CreditCard,
   Receipt,
   Users,
+   UserRound,
+  FlaskConical
 } from "lucide-react";
 import axios from "axios";
 import patientServiceBaseUrl from "../patientServiceBaseUrl";
@@ -112,6 +114,15 @@ interface DentalWork {
   _id: string;
 }
 
+// ✅ NEW: Interface for clinical dropdown entries
+interface ClinicalEntry {
+  value: string;
+  isCustom: boolean;
+  code?: string;
+  category?: string;
+  selectedAt?: string;
+}
+
 interface VisitHistory {
   _id: string;
   clinicId: string;
@@ -125,14 +136,21 @@ interface VisitHistory {
   visitDate: string;
   treatmentPlanId?: string;
   
-  // New fields from API
-  symptoms: string[];
-  diagnosis: string[];
+  // ✅ FIXED: Replace 'symptoms' with new schema fields
+  chiefComplaints: ClinicalEntry[];     // From backend - replaces symptoms
+  examinationFindings: ClinicalEntry[]; // New field
+  dentalHistory: ClinicalEntry[];       // New field
+  diagnosis: string[];                 // Still exists
   prescriptions: {
     medicineName: string;
     dosage?: string;
     frequency?: string;
     duration?: string;
+    brandNames?: string[];
+    dosageForms?: string[];
+    strengths?: string[];
+    medicineId?: string;
+    _id?: string;
   }[];
   notes: string;
   files: {
@@ -144,6 +162,15 @@ interface VisitHistory {
     name: string;
     description?: string;
     fee: number;
+  }[];
+  // ✅ NEW: Add plannedProcedures
+  plannedProcedures?: {
+    name: string;
+    estimatedCost: number;
+    notes?: string;
+    surface?: string;
+    toothNumber: number;
+    _id?: string;
   }[];
   labHistory: string[];
   referral: {
@@ -159,7 +186,14 @@ interface VisitHistory {
     addedBy?: string;
     updatedAt?: string;
   };
-  softTissueExamination: any[];
+  softTissueExamination: Array<{
+    id?: string;
+    name: string;
+    notes?: string;
+    onExamination?: Array<{ value: string; isCustom?: boolean }>;
+    diagnosis?: Array<{ value: string; isCustom?: boolean }>;
+    treatment?: any[];
+  }>;
   tmjExamination: any[];
   createdAt: string;
   updatedAt: string;
@@ -224,7 +258,8 @@ export function PatientRecords({ doctorId }: PatientRecordsProps) {
     nextCursor: null as { visitDate: string; _id: string } | null,
     totalCount: 0,
   });
-const [showDentalChart, setShowDentalChart] = useState(false);
+  const [showDentalChart, setShowDentalChart] = useState(false);
+  
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -1300,8 +1335,8 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
         </div>
       )}
 
-      {/* Visit Details Drawer */}
-   {showVisitDrawer && selectedVisit && (
+   {/* ✅ FIXED: Visit Details Drawer with New Schema Fields */}
+{showVisitDrawer && selectedVisit && (
   <div className="fixed inset-0 z-50 overflow-hidden">
     <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={handleCloseVisitDrawer} />
     
@@ -1346,28 +1381,6 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {/* <div>
-                      <Label className="text-xs text-gray-500">Status</Label>
-                      <Badge 
-                        className="mt-1"
-                        variant={selectedVisit.status === "completed" ? "default" : "secondary"}
-                      >
-                        {selectedVisit.status}
-                      </Badge>
-                    </div> */}
-                    {/* <div>
-                      <Label className="text-xs text-gray-500">Payment</Label>
-                      <Badge 
-                        className="mt-1"
-                        variant={selectedVisit.isPaid ? "default" : "destructive"}
-                      >
-                        {selectedVisit.isPaid ? "Paid" : "Unpaid"}
-                      </Badge>
-                    </div> */}
-                    {/* <div>
-                      <Label className="text-xs text-gray-500">Appointment ID</Label>
-                      <p className="text-sm font-mono mt-1 truncate">{selectedVisit.appointmentId}</p>
-                    </div> */}
                     <div>
                       <Label className="text-xs text-gray-500">Visit Date</Label>
                       <p className="text-sm mt-1">{formatSimpleDate(selectedVisit.visitDate)}</p>
@@ -1376,8 +1389,11 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                 </CardContent>
               </Card>
 
-              {/* Symptoms & Diagnosis */}
-              {(selectedVisit.symptoms.length > 0 || selectedVisit.diagnosis.length > 0) && (
+              {/* ✅ FIXED: Chief Complaints, Examination Findings, Dental History */}
+              {(selectedVisit.chiefComplaints?.length > 0 || 
+                selectedVisit.examinationFindings?.length > 0 || 
+                selectedVisit.dentalHistory?.length > 0 || 
+                selectedVisit.diagnosis?.length > 0) && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -1386,25 +1402,58 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {selectedVisit.symptoms.length > 0 && (
+                    {/* Chief Complaints - NEW */}
+                    {selectedVisit.chiefComplaints && selectedVisit.chiefComplaints.length > 0 && (
                       <div>
-                        <Label className="text-sm font-medium text-gray-700">Symptoms</Label>
+                        <Label className="text-sm font-medium text-gray-700">Chief Complaints</Label>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.symptoms.map((symptom, idx) => (
+                          {selectedVisit.chiefComplaints.map((complaint, idx) => (
                             <Badge key={idx} variant="outline" className="text-sm">
-                              {symptom}
+                              {complaint.value}
+                              {complaint.isCustom && (
+                                <span className="ml-1 text-xs bg-purple-100 px-1 rounded">custom</span>
+                              )}
                             </Badge>
                           ))}
                         </div>
                       </div>
                     )}
-                    
-                    {selectedVisit.diagnosis.length > 0 && (
+
+                    {/* Examination Findings - NEW */}
+                    {selectedVisit.examinationFindings && selectedVisit.examinationFindings.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Examination Findings</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {selectedVisit.examinationFindings.map((finding, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-sm">
+                              {finding.value}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Dental History - NEW */}
+                    {selectedVisit.dentalHistory && selectedVisit.dentalHistory.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Dental History</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {selectedVisit.dentalHistory.map((history, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-sm">
+                              {history.value}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Diagnosis - UPDATED: Now an array of strings */}
+                    {selectedVisit.diagnosis && selectedVisit.diagnosis.length > 0 && (
                       <div>
                         <Label className="text-sm font-medium text-gray-700">Diagnosis</Label>
                         <div className="flex flex-wrap gap-2 mt-2">
                           {selectedVisit.diagnosis.map((diag, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-sm">
+                            <Badge key={idx} variant="destructive" className="text-sm">
                               {diag}
                             </Badge>
                           ))}
@@ -1412,6 +1461,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                       </div>
                     )}
                     
+                    {/* Notes - Existing */}
                     {selectedVisit.notes && (
                       <div>
                         <Label className="text-sm font-medium text-gray-700">Doctor's Notes</Label>
@@ -1425,7 +1475,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
               )}
 
               {/* Prescriptions */}
-              {selectedVisit.prescriptions.length > 0 && (
+              {selectedVisit.prescriptions && selectedVisit.prescriptions.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -1444,7 +1494,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                                 {prescription.dosage && (
                                   <div>
                                     <span className="text-gray-500">Dosage:</span>
-                                    <span className="ml-2 font-medium">{prescription.dosage}</span>
+                                    <span className="ml-2 font-medium">{prescription.dosage} mg</span>
                                   </div>
                                 )}
                                 {prescription.frequency && (
@@ -1456,7 +1506,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                                 {prescription.duration && (
                                   <div>
                                     <span className="text-gray-500">Duration:</span>
-                                    <span className="ml-2 font-medium">{prescription.duration}</span>
+                                    <span className="ml-2 font-medium">{prescription.duration} days</span>
                                   </div>
                                 )}
                               </div>
@@ -1469,7 +1519,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                 </Card>
               )}
 
-              {/* Dental Work */}
+              {/* Dental Work - UPDATED: Shows procedures and conditions */}
               {selectedVisit.dentalWork && selectedVisit.dentalWork.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
@@ -1479,17 +1529,27 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {selectedVisit.dentalWork.map((work, idx) => (
                         <div key={idx} className="p-4 border rounded-lg">
                           <div className="flex justify-between items-start mb-3">
                             <h4 className="font-bold text-lg">Tooth #{work.toothNumber}</h4>
-                            <Badge variant="outline">
-                              {work.conditions.length} condition{work.conditions.length !== 1 ? 's' : ''}
-                            </Badge>
+                            <div className="flex gap-2">
+                              {work.conditions?.length > 0 && (
+                                <Badge variant="outline">
+                                  {work.conditions.length} condition{work.conditions.length !== 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                              {work.procedures?.length > 0 && (
+                                <Badge variant="outline">
+                                  {work.procedures.length} procedure{work.procedures.length !== 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           
-                          {work.conditions.length > 0 && (
+                          {/* Conditions */}
+                          {work.conditions && work.conditions.length > 0 && (
                             <div className="mb-3">
                               <Label className="text-sm font-medium text-gray-700">Conditions:</Label>
                               <div className="flex flex-wrap gap-2 mt-2">
@@ -1501,6 +1561,26 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                               </div>
                             </div>
                           )}
+
+                          {/* Procedures */}
+                          {work.procedures && work.procedures.length > 0 && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Procedures:</Label>
+                              <div className="space-y-2 mt-2">
+                                {work.procedures.map((procedure, procIdx) => (
+                                  <div key={procIdx} className="p-2 bg-gray-50 rounded">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-medium">{procedure.name}</span>
+                                      {/* <span className="text-sm">₹{procedure.cost || 0}</span> */}
+                                    </div>
+                                    {procedure.notes && (
+                                      <p className="text-xs text-gray-600 mt-1">{procedure.notes}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1508,11 +1588,73 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                 </Card>
               )}
 
-              {/* Billing Information */}
-              
+              {/* Soft Tissue Examination - NEW */}
+              {selectedVisit.softTissueExamination && selectedVisit.softTissueExamination.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Activity className="w-5 h-5" />
+                      Soft Tissue Examination
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedVisit.softTissueExamination.map((tissue, idx) => (
+                      <div key={idx} className="space-y-4">
+                        <div>
+                          <h4 className="font-medium text-gray-800">{tissue.name}</h4>
+                          {tissue.notes && (
+                            <p className="text-sm text-gray-600 mt-1">{tissue.notes}</p>
+                          )}
+                        </div>
+                        
+                        {tissue.onExamination && tissue.onExamination.length > 0 && (
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700">Findings:</Label>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {tissue.onExamination.map((finding, findIdx) => (
+                                <Badge key={findIdx} variant="secondary" className="text-sm">
+                                  {finding.value}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {tissue.diagnosis && tissue.diagnosis.length > 0 && (
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700">Diagnosis:</Label>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {tissue.diagnosis.map((diag, diagIdx) => (
+                                <Badge key={diagIdx} variant="destructive" className="text-sm">
+                                  {diag.value}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Lab History - NEW */}
+              {selectedVisit.labHistory && selectedVisit.labHistory.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FlaskConical className="w-5 h-5" />
+                      Lab History ({selectedVisit.labHistory.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-500">Lab work details will be displayed here</p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Files Attached */}
-              {selectedVisit.files.length > 0 && (
+              {selectedVisit.files && selectedVisit.files.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -1529,8 +1671,8 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
                               <FileText className="w-5 h-5 text-blue-600" />
                             </div>
                             <div className="flex-1">
-                              <p className="text-sm truncate">{file.url.split('/').pop()}</p>
-                              <p className="text-xs text-gray-500">{file.type}</p>
+                              <p className="text-sm truncate">{file.url?.split('/').pop() || 'File'}</p>
+                              <p className="text-xs text-gray-500">{file.type || 'Unknown'}</p>
                             </div>
                           </div>
                         </div>
@@ -1551,10 +1693,6 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
               <Button variant="outline" onClick={handleCloseVisitDrawer}>
                 Close
               </Button>
-              {/* <Button>
-                <Download className="w-4 h-4 mr-2" />
-                Download Report
-              </Button> */}
             </div>
           </div>
         </div>
