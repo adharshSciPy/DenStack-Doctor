@@ -6769,6 +6769,8 @@ const fetchDentalHistory = useCallback(async (search: string = '') => {
             onClose={() => setShowLabOrderModal(false)}
             appointmentId={appointmentDetail?._id}
             patientId={appointmentDetail?.patientId?._id}
+            clinicId={selectedClinic?.clinicId}
+            doctorId={getDoctorId()}
             onSuccess={() => {
               alert("Lab order created successfully!");
             }}
