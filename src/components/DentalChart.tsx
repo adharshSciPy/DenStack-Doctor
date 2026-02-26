@@ -1,4 +1,3 @@
-// DentalChart.tsx - COMPLETE CODE WITH SOFT TISSUE AND TMJ SUPPORT
 import React, { useState, useEffect, useRef,useCallback } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
