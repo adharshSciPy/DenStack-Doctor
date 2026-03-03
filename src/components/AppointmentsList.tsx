@@ -4335,16 +4335,16 @@ export function AppointmentsList() {
       if (result.nextCursor && page === newCursors.length + 1) {
         newCursors.push(result.nextCursor);
       }
-
+  const hasMore = result.hasMore && result.data.length === pagination.itemsPerPage;
       setPagination((prev) => ({
-        ...prev,
-        currentPage: page,
-        hasMore: result.hasMore || false,
-        cursors: newCursors,
-        totalFetched: resetSearch
-          ? result.count
-          : prev.totalFetched + result.count,
-      }));
+      ...prev,
+      currentPage: page,
+      hasMore: hasMore,
+      cursors: newCursors,
+      totalFetched: resetSearch
+        ? result.count
+        : prev.totalFetched + result.count,
+    }));
     } catch (err) {
       console.error("Fetch error:", err);
       setError(err instanceof Error ? err.message : "Fetch failed");
@@ -7178,229 +7178,192 @@ const convertToDentalChartFormat = (
   }
 
   // Clinic Cards List View
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle>Appointments by Clinic</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {selectedDate
-                  ? format(selectedDate, "EEEE, MMMM d, yyyy")
-                  : "Select a date"}
-              </p>
-            </div>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  {selectedDate
-                    ? format(selectedDate, "MMM d, yyyy")
-                    : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate || undefined}
-                  onSelect={(date: Date | undefined) => {
-                    const normalizedDate = date ?? null;
-                    setSelectedDate(normalizedDate);
-                    fetchAppointments(1, searchQuery, true, normalizedDate);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+ return (
+  <>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <CardTitle>Appointments by Clinic</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {selectedDate
+                ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                : "Select a date"}
+            </p>
           </div>
 
-          {/* <div className="relative mt-4">
-            <Search
-              className="absolute top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-              style={{ right: "10px" }}
-            />
-            <Input
-              placeholder="Search by clinic name, patient name, or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-9"
-            />
-          </div> */}
-        </CardHeader>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                {selectedDate
+                  ? format(selectedDate, "MMM d, yyyy")
+                  : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate || undefined}
+                onSelect={(date: Date | undefined) => {
+                  const normalizedDate = date ?? null;
+                  setSelectedDate(normalizedDate);
+                  fetchAppointments(1, searchQuery, true, normalizedDate);
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </CardHeader>
 
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center space-y-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Loading appointments...</p>
-              </div>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center h-[400px]">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading appointments...</p>
             </div>
-          ) : error ? (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center space-y-4">
-                <p className="text-red-500">{error}</p>
-                <Button
-                  onClick={() =>
-                    fetchAppointments(pagination.currentPage, searchQuery)
-                  }
-                >
-                  Retry
-                </Button>
-              </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-[400px]">
+            <div className="text-center space-y-4">
+              <p className="text-red-500">{error}</p>
+              <Button
+                onClick={() =>
+                  fetchAppointments(pagination.currentPage, searchQuery)
+                }
+              >
+                Retry
+              </Button>
             </div>
-          ) : (
-            <>
-              {clinicAppointments.length === 0 ? (
-                <div className="flex items-center justify-center h-[400px]">
-                  <div className="text-center space-y-2">
-                    <p className="text-muted-foreground text-lg">
-                      No appointments found
-                    </p>
-                    {searchQuery && (
-                      <p className="text-sm text-muted-foreground">
-                        Try adjusting your search criteria
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <ScrollArea className="max-h-[80vh] overflow-y-auto pr-2 sm:pr-4">
-                  <div
-                    className="
-        flex flex-wrap
-        gap-4 sm:gap-6
-        justify-start
-        items-stretch
-      "
-                  >
-                    {clinicAppointments.map((clinic) => (
-                      <Card
-                        key={clinic.clinicId}
-                        onClick={() => handleClinicClick(clinic)}
-                        className="
-            cursor-pointer
-            flex flex-col
-            justify-between
-            border border-border
-            hover:border-primary/50
-            hover:shadow-lg
-            hover:shadow-primary/10
-            transition-transform
-            transform hover:scale-[1.02]
-            duration-300
-            rounded-2xl
-            bg-card
-            w-full sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1rem)] lg:w-[calc(25%-1rem)]
-          "
-                      >
-                        <CardContent className="p-4 sm:p-6 flex flex-col justify-between h-full">
-                          <div className="space-y-4">
-                            {/* Header */}
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="bg-primary/10 p-2.5 sm:p-3 rounded-xl">
-                                  <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                                </div>
-                                <div>
-                                  <h3 className="font-semibold text-base sm:text-lg truncate max-w-[140px] sm:max-w-[160px]">
-                                    {clinic.clinicName}
-                                  </h3>
-                                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
-                                    <Phone className="h-3 w-3 flex-shrink-0" />
-                                    <span>{clinic.clinicPhone}</span>
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Appointment Count */}
-                            <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                                <span className="text-sm sm:text-base">
-                                  Appointments
-                                </span>
-                              </div>
-                              <Badge className="bg-primary text-primary-foreground text-sm sm:text-base px-3 py-1 rounded-md">
-                                {clinic.appointments.length}
-                              </Badge>
-                            </div>
-
-                            {/* Appointment List Preview */}
-                            {/* <div className="pt-1 sm:pt-2">
-                              <div className="text-xs text-muted-foreground space-y-1">
-                                {clinic.appointments
-                                  .slice(0, 2)
-                                  .map((apt, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="flex items-center justify-between"
-                                    >
-                                      <span className="truncate max-w-[100px] sm:max-w-[120px]">
-                                        {apt.patient.name}
-                                      </span>
-                                      <span className="ml-2 flex-shrink-0">
-                                        {formatTime(apt.appointmentTime)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                {clinic.appointments.length > 2 && (
-                                  <div className="text-center pt-1 font-medium text-primary">
-                                    +{clinic.appointments.length - 2} more
-                                  </div>
-                                )}
-                              </div>
-                            </div> */}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <div className="text-sm text-muted-foreground">
-                  <p>
-                    Page {pagination.currentPage} • Showing{" "}
-                    {clinicAppointments.length} clinic
-                    {clinicAppointments.length !== 1 ? "s" : ""}
+          </div>
+        ) : (
+          <>
+            {clinicAppointments.length === 0 ? (
+              <div className="flex items-center justify-center h-[400px]">
+                <div className="text-center space-y-2">
+                  <p className="text-muted-foreground text-lg">
+                    No appointments found
                   </p>
                   {searchQuery && (
-                    <p className="text-xs mt-1">Filtered by: "{searchQuery}"</p>
+                    <p className="text-sm text-muted-foreground">
+                      Try adjusting your search criteria
+                    </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+              </div>
+            ) : (
+              <ScrollArea className="max-h-[80vh] overflow-y-auto pr-2 sm:pr-4">
+                <div className="flex flex-wrap gap-4 sm:gap-6 justify-start items-stretch">
+                  {clinicAppointments.map((clinic) => (
+                    <Card
+                      key={clinic.clinicId}
+                      onClick={() => handleClinicClick(clinic)}
+                      className="
+                        cursor-pointer
+                        flex flex-col
+                        justify-between
+                        border border-border
+                        hover:border-primary/50
+                        hover:shadow-lg
+                        transition-all
+                        duration-200
+                        rounded-2xl
+                        bg-card
+                        w-full sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1rem)] lg:w-[calc(25%-1rem)]
+                      "
+                    >
+                      <CardContent className="p-4 sm:p-6 flex flex-col justify-between h-full">
+                        <div className="space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/10 p-2.5 sm:p-3 rounded-xl">
+                                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-base sm:text-lg truncate max-w-[140px] sm:max-w-[160px]">
+                                  {clinic.clinicName}
+                                </h3>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                                  <Phone className="h-3 w-3 flex-shrink-0" />
+                                  <span>{clinic.clinicPhone}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Appointment Count - with circular background */}
+                          <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                              <span className="text-sm sm:text-base">
+                                Appointments
+                              </span>
+                            </div>
+  <div className="flex items-center justify-center bg-primary rounded-full w-10 h-10 sm:w-12 sm:h-12 shadow-md">
+  <span className="text-sm sm:text-base font-bold text-white">
+    {clinic.appointments.length}
+  </span>
+</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            {/* Pagination */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+              <div className="text-sm text-muted-foreground text-center sm:text-left w-full sm:w-auto">
+                <p>
+                  Page {pagination.currentPage} • Showing{" "}
+                  {clinicAppointments.length} clinic
+                  {clinicAppointments.length !== 1 ? "s" : ""}
+                </p>
+                {searchQuery && (
+                  <p className="text-xs mt-1">Filtered by: "{searchQuery}"</p>
+                )}
+              </div>
+              <div className="flex items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+                {pagination.currentPage > 1 && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange("prev")}
-                    disabled={pagination.currentPage === 1 || loading}
+                    disabled={loading}
+                    className="flex-1 sm:flex-none min-w-[70px] max-w-[100px] sm:min-w-[80px] sm:max-w-[110px] px-2 sm:px-3"
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
+                    <span className="hidden xs:inline sm:hidden md:inline">Prev</span>
+                    <span className="xs:hidden sm:inline">Previous</span>
                   </Button>
-                  <div className="px-3 py-1 text-sm border rounded-md bg-muted">
-                    {pagination.currentPage}
-                  </div>
+                )}
+                <div className="px-3 py-1 text-sm border rounded-md bg-muted min-w-[40px] max-w-[60px] text-center">
+                  {pagination.currentPage}
+                </div>
+                {pagination.hasMore && clinicAppointments.length > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange("next")}
-                    disabled={!pagination.hasMore || loading}
+                    disabled={loading}
+                    className="flex-1 sm:flex-none min-w-[70px] max-w-[100px] sm:min-w-[80px] sm:max-w-[110px] px-2 sm:px-3"
                   >
-                    Next
+                    <span className="hidden xs:inline sm:hidden md:inline">Next</span>
+                    <span className="xs:hidden sm:inline">Next</span>
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
-                </div>
+                )}
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </>
-  );
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  </>
+);
 }
