@@ -377,7 +377,7 @@ const handleToggleMode = useCallback(() => {
       { path: "/dashboard", title: "Overview", icon: LayoutDashboard, showInClinicMode: false },
       { path: "/appointments", title: "Appointments", icon: Calendar, showInClinicMode: true },
       { path: "/patients", title: "Patient Records", icon: FileText, showInClinicMode: true },
-      { path: "/prescriptions", title: "E-Prescription", icon: ClipboardList, showInClinicMode: true },
+      // { path: "/prescriptions", title: "E-Prescription", icon: ClipboardList, showInClinicMode: true },
       {
         path: "/alerts",
         title: "Alerts",
