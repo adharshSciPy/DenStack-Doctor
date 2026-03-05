@@ -32,7 +32,9 @@ import {
   Receipt,
   Users,
    UserRound,
-  FlaskConical
+  FlaskConical,
+  Scissors,
+  HeartPulse
 } from "lucide-react";
 import axios from "axios";
 import patientServiceBaseUrl from "../patientServiceBaseUrl";
@@ -1338,364 +1340,426 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
    {/* ✅ FIXED: Visit Details Drawer with New Schema Fields */}
 {showVisitDrawer && selectedVisit && (
   <div className="fixed inset-0 z-50 overflow-hidden">
-    <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={handleCloseVisitDrawer} />
-    
+    {/* Backdrop */}
+    <div
+      className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+      onClick={handleCloseVisitDrawer}
+    />
+
+    {/* Drawer */}
     <div className="absolute inset-y-0 right-0 flex max-w-full">
-      <div className="relative w-screen max-w-3xl">
-        <div className="flex h-full flex-col bg-white shadow-xl">
-          {/* Header */}
-          <div className="bg-primary px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/20"
-                  onClick={handleCloseVisitDrawer}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Visit Details</h2>
-                  <p className="text-white/80 text-sm">{formatDate(selectedVisit.visitDate)}</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/20"
+      <div className="relative w-screen max-w-2xl flex flex-col h-full bg-slate-50 shadow-2xl">
+
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="relative bg-white border-b border-slate-200 px-5 py-4 flex-shrink-0">
+          {/* Top accent line */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400 rounded-t" />
+
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-3">
+              <button
                 onClick={handleCloseVisitDrawer}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <h2 className="text-base font-semibold text-slate-800 tracking-tight">
+                  Visit Details
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                  {formatDate(selectedVisit.visitDate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Status pill */}
+              {/* <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide
+                ${selectedVisit.status === "completed"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : selectedVisit.status === "ongoing"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}> */}
+                {/* <span className={`w-1.5 h-1.5 rounded-full
+                  ${selectedVisit.status === "completed" ? "bg-emerald-500"
+                    : selectedVisit.status === "ongoing" ? "bg-blue-500"
+                    : "bg-amber-500"}`}
+                />
+                {selectedVisit.status ?? "Unknown"}
+              </span> */}
+
+              <button
+                onClick={handleCloseVisitDrawer}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="space-y-6">
-              {/* Visit Overview Card */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Visit Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label className="text-xs text-gray-500">Visit Date</Label>
-                      <p className="text-sm mt-1">{formatSimpleDate(selectedVisit.visitDate)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* ✅ FIXED: Chief Complaints, Examination Findings, Dental History */}
-              {(selectedVisit.chiefComplaints?.length > 0 || 
-                selectedVisit.examinationFindings?.length > 0 || 
-                selectedVisit.dentalHistory?.length > 0 || 
-                selectedVisit.diagnosis?.length > 0) && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Stethoscope className="w-5 h-5" />
-                      Clinical Assessment
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Chief Complaints - NEW */}
-                    {selectedVisit.chiefComplaints && selectedVisit.chiefComplaints.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Chief Complaints</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.chiefComplaints.map((complaint, idx) => (
-                            <Badge key={idx} variant="outline" className="text-sm">
-                              {complaint.value}
-                              {complaint.isCustom && (
-                                <span className="ml-1 text-xs bg-purple-100 px-1 rounded">custom</span>
-                              )}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Examination Findings - NEW */}
-                    {selectedVisit.examinationFindings && selectedVisit.examinationFindings.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Examination Findings</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.examinationFindings.map((finding, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-sm">
-                              {finding.value}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Dental History - NEW */}
-                    {selectedVisit.dentalHistory && selectedVisit.dentalHistory.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Dental History</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.dentalHistory.map((history, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-sm">
-                              {history.value}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Diagnosis - UPDATED: Now an array of strings */}
-                    {selectedVisit.diagnosis && selectedVisit.diagnosis.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Diagnosis</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedVisit.diagnosis.map((diag, idx) => (
-                            <Badge key={idx} variant="destructive" className="text-sm">
-                              {diag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Notes - Existing */}
-                    {selectedVisit.notes && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Doctor's Notes</Label>
-                        <p className="text-sm text-gray-600 mt-2 p-3 bg-gray-50 rounded">
-                          {selectedVisit.notes}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Prescriptions */}
-              {selectedVisit.prescriptions && selectedVisit.prescriptions.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Pill className="w-5 h-5" />
-                      Prescriptions ({selectedVisit.prescriptions.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedVisit.prescriptions.map((prescription, idx) => (
-                        <div key={idx} className="p-3 border rounded-lg bg-blue-50/50">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-medium text-gray-800">{prescription.medicineName}</h4>
-                              <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
-                                {prescription.dosage && (
-                                  <div>
-                                    <span className="text-gray-500">Dosage:</span>
-                                    <span className="ml-2 font-medium">{prescription.dosage} mg</span>
-                                  </div>
-                                )}
-                                {prescription.frequency && (
-                                  <div>
-                                    <span className="text-gray-500">Frequency:</span>
-                                    <span className="ml-2 font-medium">{prescription.frequency}</span>
-                                  </div>
-                                )}
-                                {prescription.duration && (
-                                  <div>
-                                    <span className="text-gray-500">Duration:</span>
-                                    <span className="ml-2 font-medium">{prescription.duration} days</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Dental Work - UPDATED: Shows procedures and conditions */}
-              {selectedVisit.dentalWork && selectedVisit.dentalWork.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Activity className="w-5 h-5" />
-                      Dental Work ({selectedVisit.dentalWork.length} teeth)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {selectedVisit.dentalWork.map((work, idx) => (
-                        <div key={idx} className="p-4 border rounded-lg">
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-bold text-lg">Tooth #{work.toothNumber}</h4>
-                            <div className="flex gap-2">
-                              {work.conditions?.length > 0 && (
-                                <Badge variant="outline">
-                                  {work.conditions.length} condition{work.conditions.length !== 1 ? 's' : ''}
-                                </Badge>
-                              )}
-                              {work.procedures?.length > 0 && (
-                                <Badge variant="outline">
-                                  {work.procedures.length} procedure{work.procedures.length !== 1 ? 's' : ''}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Conditions */}
-                          {work.conditions && work.conditions.length > 0 && (
-                            <div className="mb-3">
-                              <Label className="text-sm font-medium text-gray-700">Conditions:</Label>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {work.conditions.map((cond, condIdx) => (
-                                  <Badge key={condIdx} variant="secondary" className="text-sm">
-                                    {cond}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Procedures */}
-                          {work.procedures && work.procedures.length > 0 && (
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Procedures:</Label>
-                              <div className="space-y-2 mt-2">
-                                {work.procedures.map((procedure, procIdx) => (
-                                  <div key={procIdx} className="p-2 bg-gray-50 rounded">
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-medium">{procedure.name}</span>
-                                      {/* <span className="text-sm">₹{procedure.cost || 0}</span> */}
-                                    </div>
-                                    {procedure.notes && (
-                                      <p className="text-xs text-gray-600 mt-1">{procedure.notes}</p>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Soft Tissue Examination - NEW */}
-              {selectedVisit.softTissueExamination && selectedVisit.softTissueExamination.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Activity className="w-5 h-5" />
-                      Soft Tissue Examination
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {selectedVisit.softTissueExamination.map((tissue, idx) => (
-                      <div key={idx} className="space-y-4">
-                        <div>
-                          <h4 className="font-medium text-gray-800">{tissue.name}</h4>
-                          {tissue.notes && (
-                            <p className="text-sm text-gray-600 mt-1">{tissue.notes}</p>
-                          )}
-                        </div>
-                        
-                        {tissue.onExamination && tissue.onExamination.length > 0 && (
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700">Findings:</Label>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {tissue.onExamination.map((finding, findIdx) => (
-                                <Badge key={findIdx} variant="secondary" className="text-sm">
-                                  {finding.value}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {tissue.diagnosis && tissue.diagnosis.length > 0 && (
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700">Diagnosis:</Label>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {tissue.diagnosis.map((diag, diagIdx) => (
-                                <Badge key={diagIdx} variant="destructive" className="text-sm">
-                                  {diag.value}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Lab History - NEW */}
-              {selectedVisit.labHistory && selectedVisit.labHistory.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FlaskConical className="w-5 h-5" />
-                      Lab History ({selectedVisit.labHistory.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-500">Lab work details will be displayed here</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Files Attached */}
-              {selectedVisit.files && selectedVisit.files.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Attached Files ({selectedVisit.files.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedVisit.files.map((file, idx) => (
-                        <div key={idx} className="p-3 border rounded-lg hover:bg-gray-50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm truncate">{file.url?.split('/').pop() || 'File'}</p>
-                              <p className="text-xs text-gray-500">{file.type || 'Unknown'}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="border-t px-6 py-4 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Created on {formatSimpleDate(selectedVisit.createdAt)}
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleCloseVisitDrawer}>
-                Close
-              </Button>
+              </button>
             </div>
           </div>
         </div>
+
+        {/* ── Scrollable Body ─────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* Visit meta strip */}
+          <div className="bg-white border-b border-slate-100 px-5 py-3 grid grid-cols-3 divide-x divide-slate-100">
+            {[
+              { icon: CalendarDays, label: "Date",    value: formatSimpleDate(selectedVisit.visitDate) },
+              // { icon: User,         label: "Doctor",  value: selectedVisit.doctorId?.name ?? "—" },
+              // { icon: Stethoscope,  label: "Spec.",   value: selectedVisit.doctor?.specialization ?? "—" },
+            ].map(({ icon: Icon, label, value }) => (
+              <div key={label} className="px-4 first:pl-0 last:pr-0">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Icon className="w-3 h-3 text-slate-400" />
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{label}</span>
+                </div>
+                <p className="text-sm font-medium text-slate-700 truncate">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-4 py-4 space-y-3">
+
+            {/* ── Clinical Assessment ──────────────────────────────────────── */}
+            {(selectedVisit.chiefComplaints?.length > 0 ||
+              selectedVisit.examinationFindings?.length > 0 ||
+              selectedVisit.dentalHistory?.length > 0 ||
+              selectedVisit.diagnosis?.length > 0 ||
+              selectedVisit.notes) && (
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
+                    <Stethoscope className="w-3.5 h-3.5 text-blue-600" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-700">Clinical Assessment</h3>
+                </div>
+
+                <div className="divide-y divide-slate-50">
+
+                  {selectedVisit.chiefComplaints?.length > 0 && (
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        Chief Complaints
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedVisit.chiefComplaints.map((c, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100">
+                            {c.value}
+                            {c.isCustom && (
+                              <span className="text-[9px] bg-red-100 text-red-500 px-1 py-0.5 rounded font-semibold">
+                                custom
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVisit.examinationFindings?.length > 0 && (
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        Examination Findings
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedVisit.examinationFindings.map((f, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-100">
+                            {f.value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVisit.dentalHistory?.length > 0 && (
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        Dental History
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedVisit.dentalHistory.map((h, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                            {h.value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVisit.diagnosis?.length > 0 && (
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        Diagnosis
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedVisit.diagnosis.map((d, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-white">
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVisit.notes && (
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        Doctor's Notes
+                      </p>
+                      <div className="flex gap-2">
+                        <div className="w-0.5 bg-blue-200 rounded-full flex-shrink-0 my-0.5" />
+                        <p className="text-sm text-slate-600 leading-relaxed">{selectedVisit.notes}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* ── Prescriptions ─────────────────────────────────────────────── */}
+            {selectedVisit.prescriptions?.length > 0 && (
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center">
+                      <Pill className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-700">Prescriptions</h3>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {selectedVisit.prescriptions.length}
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-50">
+                  {selectedVisit.prescriptions.map((rx, i) => (
+                    <div key={i} className="px-4 py-3 flex items-start gap-3">
+                      {/* Index number */}
+                      <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-[10px] font-bold text-emerald-600">{i + 1}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800">{rx.medicineName}</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
+                          {rx.dosage && (
+                            <span className="text-xs text-slate-500">
+                              <span className="font-medium text-slate-600">{rx.dosage} mg</span>
+                              <span className="text-slate-400 ml-1">dose</span>
+                            </span>
+                          )}
+                          {rx.frequency && (
+                            <span className="text-xs text-slate-500">
+                              <span className="font-medium text-slate-600">{rx.frequency}</span>
+                              <span className="text-slate-400 ml-1">freq</span>
+                            </span>
+                          )}
+                          {rx.duration && (
+                            <span className="text-xs text-slate-500">
+                              <span className="font-medium text-slate-600">{rx.duration} days</span>
+                              <span className="text-slate-400 ml-1">duration</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Dental Work ───────────────────────────────────────────────── */}
+            {selectedVisit.dentalWork?.length > 0 && (
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-sky-50 flex items-center justify-center">
+                      <Activity className="w-3.5 h-3.5 text-sky-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-700">Dental Work</h3>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {selectedVisit.dentalWork.length} {selectedVisit.dentalWork.length === 1 ? "tooth" : "teeth"}
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-50">
+                  {selectedVisit.dentalWork.map((work, i) => (
+                    <div key={i} className="px-4 py-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-7 h-7 rounded-lg bg-sky-600 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[11px] font-bold text-white">{work.toothNumber}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-700">Tooth #{work.toothNumber}</span>
+                        <div className="flex gap-1 ml-auto">
+                          {work.conditions?.length > 0 && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-100">
+                              {work.conditions.length}C
+                            </span>
+                          )}
+                          {work.procedures?.length > 0 && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 border border-sky-100">
+                              {work.procedures.length}P
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {work.conditions?.length > 0 && (
+                        <div className="mb-2 pl-9">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Conditions</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {work.conditions.map((c: string, ci: number) => (
+                              <span key={ci} className="px-2 py-0.5 text-xs rounded bg-amber-50 text-amber-700 border border-amber-100 font-medium">
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {work.procedures?.length > 0 && (
+                        <div className="pl-9 space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Procedures</p>
+                          {work.procedures.map((p: any, pi: number) => (
+                            <div key={pi} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                              <Scissors className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-xs font-semibold text-slate-700">{p.name}</p>
+                                {p.notes && <p className="text-xs text-slate-500 mt-0.5">{p.notes}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Soft Tissue Examination ───────────────────────────────────── */}
+            {selectedVisit.softTissueExamination?.length > 0 && (
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-rose-50 flex items-center justify-center">
+                    <HeartPulse className="w-3.5 h-3.5 text-rose-500" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-700">Soft Tissue Examination</h3>
+                </div>
+
+                <div className="divide-y divide-slate-50">
+                  {selectedVisit.softTissueExamination.map((tissue: any, i: number) => (
+                    <div key={i} className="px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-700 mb-1">{tissue.name}</p>
+                      {tissue.notes && (
+                        <p className="text-xs text-slate-500 mb-2 leading-relaxed">{tissue.notes}</p>
+                      )}
+                      {tissue.onExamination?.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Findings</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tissue.onExamination.map((f: any, fi: number) => (
+                              <span key={fi} className="px-2.5 py-1 text-xs rounded-full bg-violet-50 text-violet-700 border border-violet-100 font-medium">
+                                {f.value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {tissue.diagnosis?.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Diagnosis</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tissue.diagnosis.map((d: any, di: number) => (
+                              <span key={di} className="px-2.5 py-1 text-xs rounded-full bg-slate-800 text-white font-semibold">
+                                {d.value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Lab History ───────────────────────────────────────────────── */}
+            {selectedVisit.labHistory?.length > 0 && (
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-teal-50 flex items-center justify-center">
+                      <FileText className="w-3.5 h-3.5 text-teal-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-700">Lab History</h3>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {selectedVisit.labHistory.length}
+                  </span>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-sm text-slate-400 italic">Lab work details will be displayed here.</p>
+                </div>
+              </section>
+            )}
+
+            {/* ── Attached Files ────────────────────────────────────────────── */}
+            {selectedVisit.files?.length > 0 && (
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center">
+                      <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-700">Attached Files</h3>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {selectedVisit.files.length}
+                  </span>
+                </div>
+                <div className="p-4 grid grid-cols-2 gap-2">
+                  {selectedVisit.files.map((file: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-700 truncate">
+                          {file.url?.split("/").pop() ?? "File"}
+                        </p>
+                        <p className="text-[10px] text-slate-400">{file.type ?? "Unknown"}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Bottom padding */}
+            <div className="h-2" />
+          </div>
+        </div>
+
+        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 bg-white border-t border-slate-200 px-5 py-3 flex items-center justify-between">
+          <p className="text-xs text-slate-400">
+            Created <span className="text-slate-500 font-medium">{formatSimpleDate(selectedVisit.createdAt)}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-8 border-slate-200 text-slate-600 hover:bg-slate-50"
+              onClick={handleCloseVisitDrawer}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
