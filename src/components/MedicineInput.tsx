@@ -179,40 +179,43 @@ const MedicineInput = ({
     });
   }, [onMedicineSelect]);
 
-  const fetchSuggestions = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.trim().length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setLoading(false);
+// In MedicineInput.jsx, inside fetchSuggestions:
+const fetchSuggestions = useCallback(async (searchTerm: string) => {
+  if (!searchTerm || searchTerm.trim().length < 2) {
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setLoading(false);
+    return;
+  }
+
+  try {
+    console.log("Searching for:", searchTerm); // Add this
+    const results = await getMedicineSuggestions(searchTerm.trim());
+    console.log("Results received:", results); // Add this
+
+    // AUTO-SELECT when there is ONE exact match
+    const normalized = searchTerm.trim().toLowerCase();
+    if (
+      results.length === 1 &&
+      (
+        results[0].name.toLowerCase() === normalized ||
+        results[0].displayName?.toLowerCase() === normalized
+      )
+    ) {
+      handleSelectSuggestion(results[0]);
       return;
     }
 
-    try {
-      const results = await getMedicineSuggestions(searchTerm.trim());
-
-      // AUTO-SELECT when there is ONE exact match
-      const normalized = searchTerm.trim().toLowerCase();
-      if (
-        results.length === 1 &&
-        (
-          results[0].name.toLowerCase() === normalized ||
-          results[0].displayName?.toLowerCase() === normalized
-        )
-      ) {
-        handleSelectSuggestion(results[0]);
-        return;
-      }
-
-      setSuggestions(results);
-      setShowSuggestions(true);
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      setSuggestions([]);
-      setShowSuggestions(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [handleSelectSuggestion]);
+    setSuggestions(results);
+    setShowSuggestions(true);
+  } catch (error) {
+    console.error('Error fetching suggestions:', error);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  } finally {
+    setLoading(false);
+  }
+}, [handleSelectSuggestion]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;

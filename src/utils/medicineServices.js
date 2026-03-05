@@ -1,6 +1,9 @@
 // services/medicineService.js
 import axios from 'axios';
 import patientServiceBaseUrl from '../patientServiceBaseUrl.js';
+const getToken = () => {
+  return sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
+};
 
 /**
  * Get medicine suggestions from API
@@ -11,7 +14,7 @@ export const getMedicineSuggestions = async (searchTerm, limit = 15) => {
   }
 
   try {
-    const token = localStorage.getItem('authToken');
+    const token =getToken();
     const response = await axios.get(
       `${patientServiceBaseUrl}/api/v1/patient-service/medicine/suggestions`,
       {
@@ -37,7 +40,7 @@ export const getMedicineSuggestions = async (searchTerm, limit = 15) => {
  */
 export const getPopularMedicines = async (limit = 20) => {
   try {
-    const token = localStorage.getItem('authToken');
+    const token = getToken();
     const response = await axios.get(
       `${patientServiceBaseUrl}/api/v1/patient-service/medicine/popular`,
       {
@@ -58,16 +61,15 @@ export const getPopularMedicines = async (limit = 20) => {
  */
 export const createMedicine = async (medicineData) => {
   try {
-    // const token = localStorage.getItem('authToken');
+    const token = getToken();
     const response = await axios.post(
       `${patientServiceBaseUrl}/api/v1/patient-service/medicine/create`,
       medicineData,
-      // {
-      //   headers: {
-      //     Authorization: `Bearer ${token}`,
-      //     'Content-Type': 'application/json'
-      //   }
-      // }
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
     );
     
     return response.data;
@@ -82,7 +84,7 @@ export const createMedicine = async (medicineData) => {
  */
 export const searchMedicines = async (searchTerm, page = 1, limit = 20) => {
   try {
-    const token = localStorage.getItem('authToken');
+    const token = getToken();
     const response = await axios.get(
       `${patientServiceBaseUrl}/api/v1/patient-service/medicine/search`,
       {

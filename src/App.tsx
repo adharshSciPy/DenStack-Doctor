@@ -115,7 +115,14 @@ const clearAllAuthData = () => {
   removeStorageKey(STORAGE_KEYS.ACTIVE_MODE);
   removeStorageKey(STORAGE_KEYS.IS_HYBRID);
 };
-
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true; // treat malformed token as expired
+  }
+};
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>({
     token: null,
@@ -231,6 +238,12 @@ useEffect(() => {
   
   if (storedToken) {
     console.log("🔍 Found stored token");
+     if (isTokenExpired(storedToken)) {
+    console.log("⏰ Stored token is expired, clearing auth data...");
+    clearAllAuthData();
+    setIsInitialized(true);
+    return () => window.removeEventListener("message", handleMessage);
+  }
     const storedRole = getStorageValue(STORAGE_KEYS.USER_ROLE);
     const storedDoctorId = getStorageValue(STORAGE_KEYS.DOCTOR_ID);
     const storedClinicId = getStorageValue(STORAGE_KEYS.CLINIC_ID);

@@ -3252,3 +3252,22 @@ html {
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+/* Add this to your global CSS or in a style tag */
+.drawer-test {
+  position: fixed !important;
+  left: 0 !important;
+  top: 60px !important;
+  bottom: 0 !important;
+  width: 85% !important;
+  background: white !important;
+  z-index: 9999 !important;
+  transition: transform 0.3s ease !important;
+}
+
+.drawer-test.open {
+  transform: translateX(0) !important;
+}
+
+.drawer-test.closed {
+  transform: translateX(-100%) !important;
+}
