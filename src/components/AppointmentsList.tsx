@@ -23,6 +23,7 @@ import {
   Trash2,
   Check,
   ChevronDown,
+  Menu
 } from "lucide-react";
 
 import DentalLabOrderModal from "./DentalLabOrderModal";
@@ -49,6 +50,7 @@ import MedicineInput from "./MedicineInput";
 import labBaseUrl from "../labBaseUrl";
 import ThreeDCBCTViewer from "./nifti/Niftiviewer";
 import { preloadAllDentalSvgs } from "../utils/dentalSvgCache";
+import { log } from "console";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -89,51 +91,6 @@ interface TreatmentPlanStage {
   notes?: string;
 }
 
-// Update the TreatmentPlanData interface to match backend schema
-// interface TreatmentPlanData {
-//   planName: string;
-//   description?: string;
-//   teeth: {
-//     toothNumber: number;
-//     priority?: "urgent" | "high" | "medium" | "low";
-//     // Add clinical findings fields to match backend
-//     onExamination?: Array<{
-//       id: string;
-//       name: string;
-//       code?: string;
-//       category?: string;
-//       isCustom: boolean;
-//       selectedAt?: string;
-//     }>;
-//     diagnosis?: Array<{
-//       id: string;
-//       name: string;
-//       code?: string;
-//       category?: string;
-//       isCustom: boolean;
-//       selectedAt?: string;
-//     }>;
-//     treatment?: Array<{
-//       id: string;
-//       name: string;
-//       code?: string;
-//       category?: string;
-//       isCustom: boolean;
-//       selectedAt?: string;
-//     }>;
-//     notes?: string;
-//     procedures: Array<{
-//       name: string;
-//       surface: string;
-//       stage?: number;
-//       estimatedCost: number;
-//       notes?: string;
-//       status?: "planned" | "in-progress" | "completed";
-//     }>;
-//   }[];
-//   stages: TreatmentPlanStage[];
-//   startToday?: boolean;
-// }
 interface ToothData {
   number: number; // FDI number
   name: string;
@@ -3441,14 +3398,6 @@ interface Stage {
     procedureName: string;
   }[];
 }
-// interface Procedure {
-//   name: string;
-//   doctorId: string;
-//   referredByDoctorId: string;
-//   referredToDoctorId: string;
-//   referralNotes: string;
-//   completed: boolean;
-// }
 interface ResultFile {
   _id: string;
   fileName: string;
@@ -4249,7 +4198,8 @@ export function AppointmentsList() {
   const [loadingComplaints, setLoadingComplaints] = useState(false);
   const [loadingExaminations, setLoadingExaminations] = useState(false);
   const [loadingDentalHistory, setLoadingDentalHistory] = useState(false);
-
+const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const [isMobile, setIsMobile] = useState(false);
   // console.log("ded", selectedHistory);
 
   const formatTime = (time: string) => {
@@ -4277,6 +4227,14 @@ export function AppointmentsList() {
 
     return () => clearTimeout(timer);
   }, []);
+  useEffect(() => {
+  const checkScreenSize = () => {
+    setIsMobile(window.innerWidth < 768);
+  };
+  checkScreenSize();
+  window.addEventListener('resize', checkScreenSize);
+  return () => window.removeEventListener('resize', checkScreenSize);
+}, []);
   const [showLabOrderModal, setShowLabOrderModal] = useState(false);
   //  useEffect(()=>(
   // console.log("clnicId",selectedClinic?.clinicId)
@@ -4328,7 +4286,7 @@ export function AppointmentsList() {
       const result: AppointmentResponse = response.data;
 
       if (!result.success) throw new Error(result.message || "Fetch failed");
-
+     console.log("test",result);
       setClinicAppointments(result.data);
 
       const newCursors = resetSearch ? [] : [...pagination.cursors];
@@ -5834,33 +5792,351 @@ const convertToDentalChartFormat = (
         )}
 
         <div className="min-h-screen bg-gray-50">
-          <div className="bg-white border-b px-6 py-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBackToAppointments}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Appointments
-              </Button>
-              <div className="flex-1">
-                <h1 className="text-2xl font-semibold">Appointment Details</h1>
-                <p className="text-sm text-muted-foreground">
-                  OP# {appointmentDetail.opNumber} -{" "}
+   <div className="bg-white px-4 py-3 md:px-6 md:py-4">
+  <div className="flex flex-wrap items-center gap-3 md:gap-4">
+    {/* Mobile Menu Button */}
+    {isMobile && (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsMobileMenuOpen(true)}
+        className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 md:py-2"
+      >
+        <Menu className="h-4 w-4" />
+        <span className="sr-only md:not-sr-only md:ml-2">Menu</span>
+      </Button>
+    )}
+    
+    {/* Back Button - Full on desktop, icon only on mobile */}
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleBackToAppointments}
+      className="h-9 px-2 md:px-3 gap-1 md:gap-2"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      <span className="hidden md:inline">Back to Appointments</span>
+      <span className="md:hidden">Back</span>
+    </Button>
+    
+    {/* Title Section - Takes remaining space */}
+    <div className="flex-1 min-w-0">
+      <h1 className="text-base md:text-2xl font-semibold truncate">
+        Appointment Details
+      </h1>
+      <p className="text-xs md:text-sm text-muted-foreground truncate">
+        OP# {appointmentDetail.opNumber} - {appointmentDetail.patientId.name}
+      </p>
+    </div>
+    
+    {/* Dental History Button - Responsive sizing */}
+    <Button
+      onClick={() => setViewDentalHistory(!viewDentalHistory)}
+      size={isMobile ? "sm" : "default"}
+      className="whitespace-nowrap"
+    >
+      <span className="hidden md:inline">Dental History</span>
+      <span className="md:hidden">History</span>
+    </Button>
+  </div>
+</div>
+{isMobile && (
+  <>
+    {/* Backdrop */}
+    {isMobileMenuOpen && (
+      <div
+        className="fixed inset-0 bg-black/50 z-[200]"
+        onClick={() => setIsMobileMenuOpen(false)}
+      />
+    )}
+    
+    {/* Drawer */}
+    <div
+      className={`fixed top-0 right-0 h-full w-[85%] max-w-[400px] bg-white shadow-2xl z-[300] transform transition-transform duration-300 ease-in-out ${
+        isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+    >
+      {/* Drawer Header */}
+      <div className="bg-primary/5 px-4 py-3 border-b flex items-center justify-between">
+        <h2 className="font-semibold text-lg">Patient Information</h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="h-8 w-8 p-0"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      
+      {/* Drawer Content - Scrollable */}
+      <div className="h-[calc(100%-57px)] overflow-y-auto p-4">
+        <div className="space-y-4">
+          {/* Patient Info Card */}
+          <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+            <div className="flex items-center gap-3 mb-4">
+              <Avatar className="h-16 w-16">
+                <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                  {appointmentDetail.patientId.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-semibold text-lg">
                   {appointmentDetail.patientId.name}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {appointmentDetail.patientId.patientUniqueId}
                 </p>
               </div>
-              <Button
-                //      variant="outline"
-                // className="gap-2"
-                onClick={() => setViewDentalHistory(!viewDentalHistory)}
-              >
-                Dental History
-              </Button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <span>
+                  {appointmentDetail.patientId.age}Y,{" "}
+                  {appointmentDetail.patientId.gender}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
+                <span>{appointmentDetail.patientId.phone}</span>
+              </div>
+              {appointmentDetail.patientId.email && (
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-primary" />
+                  <span className="truncate">
+                    {appointmentDetail.patientId.email}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Appointment Info */}
+          <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+            <h4 className="font-semibold mb-3 text-primary">
+              Appointment Info
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-primary" />
+                <span>
+                  {formatDate(appointmentDetail.appointmentDate)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" />
+                <span>
+                  {formatTime(appointmentDetail.appointmentTime)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="font-normal">
+                  {appointmentDetail.department}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Patient Treatment Plans */}
+          <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+            <h4 className="font-semibold mb-3 text-primary">
+              Patient Treatment Plans
+            </h4>
+
+            {treatmentPlansLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading treatment plans...
+              </p>
+            ) : patientTreatmentPlans.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No treatment plans found
+              </p>
+            ) : (
+              <ScrollArea className="h-[200px] pr-2">
+                <div className="space-y-2">
+                  {patientTreatmentPlans.map((plan) => (
+                    <div
+                      key={plan._id}
+                      className="flex items-center justify-between p-3 border border-primary/20 rounded-lg bg-white/60 hover:bg-white transition-all cursor-pointer"
+                      onClick={() => {
+                        setSelectedTreatmentPlan(plan);
+                        setIsMobileMenuOpen(false); // Close drawer when selecting a plan
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CalendarIcon className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {formatDate(plan.startedAt || plan.createdAt)}
+                        </span>
+                        <span className="text-sm text-gray-600 truncate max-w-[100px]">
+                          {plan.planName}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-blue-50 text-blue-700"
+                        >
+                          {plan.stages?.length || 0} stages
+                        </Badge>
+                      </div>
+                      <Badge
+                        className={`${
+                          plan.status === "completed"
+                            ? "bg-green-100 text-green-700"
+                            : plan.status === "in-progress"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-yellow-100 text-yellow-700"
+                        } text-[10px]`}
+                      >
+                        {plan.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          {/* Patient History */}
+          <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+            <h4 className="font-semibold mb-3 text-primary">
+              Patient History
+            </h4>
+
+            {detailLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading history...
+              </p>
+            ) : patientHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No previous visits
+              </p>
+            ) : (
+              <ScrollArea className="h-[200px] pr-2">
+                <div className="space-y-3">
+                  {patientHistory.map((item) => {
+                    const hasTreatmentPlan = !!item.treatmentPlan;
+
+                    return (
+                      <div
+                        key={item._id}
+                        className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="text-xs font-medium text-primary">
+                            {formatDate(
+                              item.visitDate ||
+                                item.appointmentDate ||
+                                "",
+                            )}
+                          </p>
+
+                          {hasTreatmentPlan && (
+                            <span className="bg-green-100 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                              Treatment Plan
+                            </span>
+                          )}
+                        </div>
+
+                        {item.doctor && (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Dr. {item.doctor.name}
+                          </p>
+                        )}
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-2"
+                          onClick={() => {
+                            handleViewHistory(item);
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          View Full Details
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          {/* Previous Prescriptions */}
+          <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+            <h4 className="font-semibold mb-3 text-primary">
+              Previous Prescriptions
+            </h4>
+            {detailLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading Orders...
+              </p>
+            ) : labHistory?.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No previous visits
+              </p>
+            ) : (
+              <ScrollArea className="h-[200px] pr-2">
+                <div className="space-y-3">
+                  {labHistory?.map((labItem, index) => {
+                    const order = labItem.order || labItem;
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-white/50 rounded-lg p-3 border border-primary/10 hover:bg-white/80 transition-colors"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          {order.note}
+                        </div>
+                        <div className="flex justify-between items-center mb-1">
+                          {formatDate(order.createdAt)}
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-2"
+                          onClick={() => {
+                            if (!order.niftiFile) return;
+
+                            const url = order.niftiFile.fileUrl;
+                            const name =
+                              order.niftiFile.fileName || "CBCT Scan";
+
+                            const viewerUrl = `/dashboard/cbct-viewer?fileUrl=${encodeURIComponent(
+                              url,
+                            )}&fileName=${encodeURIComponent(name)}`;
+
+                            window.open(
+                              viewerUrl,
+                              "_blank",
+                              "noopener,noreferrer",
+                            );
+                            setIsMobileMenuOpen(false);
+                          }}
+                          disabled={!order.niftiFile}
+                        >
+                          View 3D
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  </>
+)}
+
           {viewDentalHistory && (
             <div className="fixed inset-0 z-[100] bg-white">
               {/* Dental History Header - Similar styling */}
@@ -6005,6 +6281,7 @@ const convertToDentalChartFormat = (
           ) : (
             // Original consultation view when dental chart is not open
             <div className="flex h-[calc(100vh-80px)]">
+                {!isMobile && (
               <div className="w-[30%] bg-primary/5 border-r p-6 overflow-y-auto">
                 <div className="space-y-4">
                   <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
@@ -6344,7 +6621,7 @@ const convertToDentalChartFormat = (
                   </div>
                 </div>
               </div>
-
+ )}
               <div className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-4xl mx-auto">
                   <Card>
@@ -7079,17 +7356,11 @@ const convertToDentalChartFormat = (
             <ArrowLeft className="h-4 w-4" />
             Back to Clinics
           </Button>
-          <div className="flex-1">
-            {/* <h1 className="text-2xl font-semibold">{selectedClinic.clinicName}</h1>
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <Phone className="h-4 w-4" />
-              {selectedClinic.clinicPhone}
-            </p> */}
-          </div>
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            {selectedClinic.appointments.length} Appointment
-            {selectedClinic.appointments.length !== 1 ? "s" : ""}
-          </Badge>
+         <Badge variant="outline" className="ml-auto sm:ml-0 p-0.5 sm:p-1 border-2 sm:border-border rounded-full bg-primary/10 sm:bg-transparent w-auto h-auto">
+  <span className="flex items-center justify-center bg-primary text-primary-foreground rounded-full w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base font-medium shadow-sm">
+    {selectedClinic.appointments.length}
+  </span>
+</Badge>
         </div>
 
         {/* Content Split Layout */}
@@ -7178,190 +7449,132 @@ const convertToDentalChartFormat = (
   }
 
   // Clinic Cards List View
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle>Appointments by Clinic</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {selectedDate
-                  ? format(selectedDate, "EEEE, MMMM d, yyyy")
-                  : "Select a date"}
-              </p>
-            </div>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  {selectedDate
-                    ? format(selectedDate, "MMM d, yyyy")
-                    : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate || undefined}
-                  onSelect={(date: Date | undefined) => {
-                    const normalizedDate = date ?? null;
-                    setSelectedDate(normalizedDate);
-                    fetchAppointments(1, searchQuery, true, normalizedDate);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+return (
+  <>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <CardTitle>Appointments by Clinic</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {selectedDate
+                ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                : "Select a date"}
+            </p>
           </div>
 
-          {/* <div className="relative mt-4">
-            <Search
-              className="absolute top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-              style={{ right: "10px" }}
-            />
-            <Input
-              placeholder="Search by clinic name, patient name, or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-9"
-            />
-          </div> */}
-        </CardHeader>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                {selectedDate
+                  ? format(selectedDate, "MMM d, yyyy")
+                  : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate || undefined}
+                onSelect={(date: Date | undefined) => {
+                  const normalizedDate = date ?? null;
+                  setSelectedDate(normalizedDate);
+                  fetchAppointments(1, searchQuery, true, normalizedDate);
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </CardHeader>
 
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center space-y-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Loading appointments...</p>
-              </div>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center h-[400px]">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading appointments...</p>
             </div>
-          ) : error ? (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center space-y-4">
-                <p className="text-red-500">{error}</p>
-                <Button
-                  onClick={() =>
-                    fetchAppointments(pagination.currentPage, searchQuery)
-                  }
-                >
-                  Retry
-                </Button>
-              </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-[400px]">
+            <div className="text-center space-y-4">
+              <p className="text-red-500">{error}</p>
+              <Button
+                onClick={() =>
+                  fetchAppointments(pagination.currentPage, searchQuery)
+                }
+              >
+                Retry
+              </Button>
             </div>
-          ) : (
-            <>
-              {clinicAppointments.length === 0 ? (
-                <div className="flex items-center justify-center h-[400px]">
-                  <div className="text-center space-y-2">
-                    <p className="text-muted-foreground text-lg">
-                      No appointments found
+          </div>
+        ) : (
+          <>
+            {clinicAppointments.length === 0 ? (
+              <div className="flex items-center justify-center h-[400px]">
+                <div className="text-center space-y-2">
+                  <p className="text-muted-foreground text-lg">
+                    No appointments found
+                  </p>
+                  {searchQuery && (
+                    <p className="text-sm text-muted-foreground">
+                      Try adjusting your search criteria
                     </p>
-                    {searchQuery && (
-                      <p className="text-sm text-muted-foreground">
-                        Try adjusting your search criteria
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <ScrollArea className="max-h-[80vh] overflow-y-auto pr-2 sm:pr-4">
-                  <div
-                    className="
-        flex flex-wrap
-        gap-4 sm:gap-6
-        justify-start
-        items-stretch
-      "
-                  >
-                    {clinicAppointments.map((clinic) => (
-                      <Card
-                        key={clinic.clinicId}
-                        onClick={() => handleClinicClick(clinic)}
-                        className="
-            cursor-pointer
-            flex flex-col
-            justify-between
-            border border-border
-            hover:border-primary/50
-            hover:shadow-lg
-            hover:shadow-primary/10
-            transition-transform
-            transform hover:scale-[1.02]
-            duration-300
-            rounded-2xl
-            bg-card
-            w-full sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1rem)] lg:w-[calc(25%-1rem)]
-          "
-                      >
-                        <CardContent className="p-4 sm:p-6 flex flex-col justify-between h-full">
-                          <div className="space-y-4">
-                            {/* Header */}
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="bg-primary/10 p-2.5 sm:p-3 rounded-xl">
-                                  <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                                </div>
-                                <div>
-                                  <h3 className="font-semibold text-base sm:text-lg truncate max-w-[140px] sm:max-w-[160px]">
-                                    {clinic.clinicName}
-                                  </h3>
-                                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
-                                    <Phone className="h-3 w-3 flex-shrink-0" />
-                                    <span>{clinic.clinicPhone}</span>
-                                  </p>
-                                </div>
+              </div>
+            ) : (
+              <ScrollArea className="max-h-[80vh] overflow-y-auto pr-2 sm:pr-4">
+                <div className="flex flex-wrap gap-4 sm:gap-6 justify-start items-stretch">
+                  {clinicAppointments.map((clinic) => (
+                    <Card
+                      key={clinic.clinicId}
+                      onClick={() => handleClinicClick(clinic)}
+                      className="cursor-pointer flex flex-col justify-between border border-border hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-transform transform hover:scale-[1.02] duration-300 rounded-2xl bg-card w-full sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1rem)] lg:w-[calc(25%-1rem)]"
+                    >
+                      <CardContent className="p-4 sm:p-6 flex flex-col justify-between h-full">
+                        <div className="space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/10 p-2.5 sm:p-3 rounded-xl">
+                                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-base sm:text-lg truncate max-w-[140px] sm:max-w-[160px]">
+                                  {clinic.clinicName}
+                                </h3>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                                  <Phone className="h-3 w-3 flex-shrink-0" />
+                                  <span>{clinic.clinicPhone}</span>
+                                </p>
                               </div>
                             </div>
-
-                            {/* Appointment Count */}
-                            <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                                <span className="text-sm sm:text-base">
-                                  Appointments
-                                </span>
-                              </div>
-                              <Badge className="bg-primary text-primary-foreground text-sm sm:text-base px-3 py-1 rounded-md">
-                                {clinic.appointments.length}
-                              </Badge>
-                            </div>
-
-                            {/* Appointment List Preview */}
-                            {/* <div className="pt-1 sm:pt-2">
-                              <div className="text-xs text-muted-foreground space-y-1">
-                                {clinic.appointments
-                                  .slice(0, 2)
-                                  .map((apt, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="flex items-center justify-between"
-                                    >
-                                      <span className="truncate max-w-[100px] sm:max-w-[120px]">
-                                        {apt.patient.name}
-                                      </span>
-                                      <span className="ml-2 flex-shrink-0">
-                                        {formatTime(apt.appointmentTime)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                {clinic.appointments.length > 2 && (
-                                  <div className="text-center pt-1 font-medium text-primary">
-                                    +{clinic.appointments.length - 2} more
-                                  </div>
-                                )}
-                              </div>
-                            </div> */}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
 
+                          {/* Appointment Count */}
+                          <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                              <span className="text-sm sm:text-base">
+                                Appointments
+                              </span>
+                            </div>
+                            <Badge className="bg-primary text-primary-foreground text-sm sm:text-base px-3 py-1 rounded-md">
+                              {clinic.appointments.length}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            {/* Pagination - Only show if there's more than one page */}
+            {(pagination.currentPage > 1 || pagination.hasMore) && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
                   <p>
@@ -7397,10 +7610,11 @@ const convertToDentalChartFormat = (
                   </Button>
                 </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </>
-  );
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  </>
+);
 }
