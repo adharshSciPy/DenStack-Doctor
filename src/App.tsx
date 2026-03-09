@@ -44,6 +44,9 @@ import BlogDetail from "./components/BlogDetail";
 import CBCTViewerPage from "./components/CBCTViewerPage";
 import DentalChartGlobalPreloader from "./components/DentalChartGlobalPreloader";
 import DoctorLogin from "./components/DoctorLogin";
+import { useToast } from "./hooks/useToast";
+import ToastProvider  from "./components/ToastProvider";
+
 
 const MAIN_APP_ORIGIN = "http://localhost:3000";
 const NOTIFICATION_SERVICE_URL = "http://localhost:8011";
@@ -149,7 +152,7 @@ export default function App() {
 
   const navigate = useNavigate();
   const location = useLocation();
-
+const toast = useToast();
   // Check screen size
   useEffect(() => {
     const checkScreenSize = () => {
@@ -201,11 +204,11 @@ export default function App() {
         isHybrid,
         activeMode: 'doctor',
       });
-
+   toast.showSuccess(`Welcome back! Logged in as ${role === "760" ? "Hybrid" : role === "600" ? "Doctor" : "User"}`);
       setIsInitialized(true);
       navigate("/dashboard", { replace: true });
     },
-    [navigate],
+    [navigate,toast],
   );
 
   /* -------------------- AUTH + ROUTING CORE -------------------- */
@@ -218,6 +221,7 @@ export default function App() {
       console.log("📨 Message received:", event.data);
       const { type, token, role, doctorId, clinicId, isHybrid } = event.data || {};
       if (type !== "LOGIN_DATA" || !token || !role) return;
+        toast.showInfo("Authenticating from main app...");
       handleAuthUpdate(token, role, doctorId, clinicId, false, isHybrid === true);
     };
 
@@ -235,6 +239,7 @@ export default function App() {
 
     if (token && role) {
       console.log("✅ Found URL params, authenticating...");
+      toast.showInfo("Authenticating with provided credentials...");
       // Clear any existing data first
       clearAllAuthData();
       
@@ -295,6 +300,7 @@ export default function App() {
         if (storedDoctorId && !isValidDoctorId(storedDoctorId)) {
           removeStorageKey(STORAGE_KEYS.DOCTOR_ID);
         }
+        //  toast.showSuccess("Welcome back!");
       }
     } else {
       console.log("🔍 No stored token found");
@@ -304,7 +310,7 @@ export default function App() {
     setIsInitialized(true);
 
     return () => window.removeEventListener("message", handleMessage);
-  }, [handleAuthUpdate]);
+  }, [handleAuthUpdate,toast]);
 
   /* -------------------- HANDLE REPEATED URL TOKENS -------------------- */
 
@@ -337,7 +343,7 @@ export default function App() {
 
   const handleLogout = useCallback(() => {
     console.log("🚪 Logging out...");
-    
+    toast.showInfo("Logging out...");
     // Clear all storage
     clearAllAuthData();
     
@@ -357,7 +363,7 @@ export default function App() {
     
     // Navigate to login
     navigate("/login", { replace: true });
-  }, [navigate]);
+  }, [navigate,toast]);
 
   /* -------------------- TOGGLE MODE (for hybrid users) -------------------- */
 
@@ -366,7 +372,7 @@ export default function App() {
     
     const newMode = authState.activeMode === 'doctor' ? 'clinic' : 'doctor';
     console.log("🔄 Toggling mode:", { current: authState.activeMode, new: newMode });
-    
+     toast.showInfo(`Switching to ${newMode} mode...`);
     setStorageValue(STORAGE_KEYS.ACTIVE_MODE, newMode, true);
     
     if (newMode === 'clinic') {
@@ -375,6 +381,7 @@ export default function App() {
         const clinicDashboardUrl = `http://localhost:3000/dashboard/${authState.clinicId}`;
         const redirectURL = `${clinicDashboardUrl}?token=${encodeURIComponent(authState.token)}&role=${authState.role}&doctorId=${authState.doctorId}&clinicId=${authState.clinicId}&isHybrid=true&mode=clinic`;
         console.log("➡️ Redirecting to clinic dashboard:", redirectURL);
+         toast.showSuccess("Redirecting to clinic dashboard...");
         window.location.href = redirectURL;
       } else {
         console.error("❌ Missing clinicId or doctorId for clinic mode", {
@@ -387,7 +394,7 @@ export default function App() {
       // Already in doctor mode, nothing to do
       console.log("Already in doctor mode");
     }
-  }, [authState]);
+  }, [authState,toast]);
 
   /* -------------------- MENU -------------------- */
 
@@ -791,6 +798,7 @@ export default function App() {
   return (
     <SidebarProvider>
       <DentalChartGlobalPreloader />
+      <ToastProvider /> 
       <div className="flex min-h-screen w-full">
         {/* Only show Sidebar if not on login page */}
         {!isLoginPage && !isMobile && <DesktopSidebar />}

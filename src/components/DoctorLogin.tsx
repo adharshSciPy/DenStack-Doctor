@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useToast } from "../hooks/useToast";
+
 
 interface DoctorRegistrationData {
   name: string;
@@ -57,7 +59,7 @@ export default function DoctorLogin() {
   
   const navigate = useNavigate();
   const location = useLocation();
-
+  const toast = useToast();
   // Login state
   const [loginData, setLoginData] = useState<LoginData>({
     email: "",
@@ -97,7 +99,7 @@ export default function DoctorLogin() {
 
     if (token && role && doctorId) {
       console.log("🔄 Auto-login detected from URL params");
-      
+      toast.showInfo("Auto-logging you in...");
       // Clear any existing data first
       clearAllAuthData();
 
@@ -112,7 +114,7 @@ export default function DoctorLogin() {
       if (clinicId) {
         setStorageValueInBoth(STORAGE_KEYS.CLINIC_ID, clinicId);
       }
-
+ toast.showSuccess("Auto-login successful! Welcome back.");
       // Dispatch login event for any listeners
       window.postMessage({
         type: 'LOGIN_DATA',
@@ -126,7 +128,7 @@ export default function DoctorLogin() {
       // Navigate to dashboard
       navigate("/dashboard", { replace: true });
     }
-  }, [location, navigate]);
+  }, [location, navigate,toast]);
 
   // Update password strength when password changes
   useEffect(() => {
@@ -165,46 +167,62 @@ export default function DoctorLogin() {
 
   const validateRegistration = (): boolean => {
     if (!regData.name || regData.name.length < 2) {
-      setError("Name must be at least 2 characters long");
+       const errorMsg = "Name must be at least 2 characters long";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(regData.email)) {
-      setError("Please enter a valid email address");
+        const errorMsg = "Please enter a valid email address";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(regData.phoneNumber.replace(/\D/g, ''))) {
-      setError("Please enter a valid 10-digit phone number");
+    const errorMsg = "Please enter a valid 10-digit phone number";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
     if (regData.password.length < 8) {
-      setError("Password must be at least 8 characters long for security");
+    const errorMsg = "Password must be at least 8 characters long for security";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
     // Check password strength
     const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
     if (strengthCount < 3) {
-      setError("Please use a stronger password (mix of uppercase, lowercase, numbers, and special characters)");
+      const errorMsg = "Please use a stronger password (mix of uppercase, lowercase, numbers, and special characters)";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
     if (regData.password !== regData.confirmPassword) {
-      setError("Passwords do not match");
+       const errorMsg = "Passwords do not match";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
     if (!regData.specialization) {
-      setError("Please enter your specialization");
+      const errorMsg = "Please enter your specialization";
+      setError(errorMsg);
+      toast.showError(errorMsg)
       return false;
     }
 
     if (!regData.licenseNumber) {
-      setError("License number is required");
+       const errorMsg = "License number is required";
+      setError(errorMsg);
+      toast.showError(errorMsg);
       return false;
     }
 
@@ -232,7 +250,7 @@ export default function DoctorLogin() {
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
-
+const loadingToastId = toast.showLoading("Logging in...");
     try {
       console.log("🔐 Attempting login with:", loginData.email);
       
@@ -272,7 +290,8 @@ export default function DoctorLogin() {
           sessionDoctorId: sessionStorage.getItem(STORAGE_KEYS.DOCTOR_ID),
           localDoctorId: localStorage.getItem(STORAGE_KEYS.DOCTOR_ID),
         });
-
+ toast.dismiss(loadingToastId);
+        toast.showSuccess(`Welcome back, Dr. ${doctor.name || 'Doctor'}!`);
         // Dispatch login event for any listeners
         window.postMessage({
           type: 'LOGIN_DATA',
@@ -290,11 +309,16 @@ export default function DoctorLogin() {
         }, 100);
       }
     } catch (error) {
-      console.error("Login failed:", error);
+        console.error("Login failed:", error);
+      toast.dismiss(loadingToastId);
       if (axios.isAxiosError(error)) {
-        setError(error.response?.data?.message || "Login failed. Please check your credentials.");
+        const errorMessage = error.response?.data?.message || "Login failed. Please check your credentials.";
+        setError(errorMessage);
+        toast.showError(errorMessage);
       } else {
-        setError("Login failed. Please try again.");
+         const errorMessage = "Login failed. Please try again.";
+        setError(errorMessage);
+        toast.showError(errorMessage);
       }
     } finally {
       setLoading(false);
@@ -311,7 +335,7 @@ export default function DoctorLogin() {
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
-
+ const loadingToastId = toast.showLoading("Creating your account...");
     // Remove confirmPassword before sending
     const { confirmPassword, ...registrationData } = regData;
 
@@ -323,7 +347,8 @@ export default function DoctorLogin() {
 
       if (response.status === 201) {
         console.log("✅ Registration successful:", response.data);
-        
+          toast.dismiss(loadingToastId);
+        toast.showSuccess("Registration successful! Please login with your credentials.");
         setSuccessMessage("Registration successful! Please login with your credentials.");
         
         // Auto-fill login form
@@ -331,7 +356,7 @@ export default function DoctorLogin() {
           email: regData.email,
           password: regData.password
         });
-        
+         toast.showInfo("Login form has been auto-filled for you.");
         // Switch to login after 2 seconds
         setTimeout(() => {
           setIsLogin(true);
@@ -351,10 +376,18 @@ export default function DoctorLogin() {
       }
     } catch (error) {
       console.error("Registration failed:", error);
+
+       toast.dismiss(loadingToastId);
+      
       if (axios.isAxiosError(error)) {
-        setError(error.response?.data?.message || "Registration failed. Please try again.");
+        const errorMessage = error.response?.data?.message || "Registration failed. Please try again.";
+        setError(errorMessage);
+        toast.showError(errorMessage);
       } else {
-        setError("Registration failed. Please try again.");
+               const errorMessage = "Registration failed. Please try again.";
+        setError(errorMessage);
+        toast.showError(errorMessage);
+
       }
     } finally {
       setLoading(false);
