@@ -19,9 +19,6 @@ import {
   Building2,
   Menu,
   X,
-  Home,
-  User,
-  Settings,
 } from "lucide-react";
 
 import {
@@ -47,7 +44,6 @@ import DoctorLogin from "./components/DoctorLogin";
 import { useToast } from "./hooks/useToast";
 import ToastProvider  from "./components/ToastProvider";
 
-
 const MAIN_APP_ORIGIN = "http://localhost:3000";
 const NOTIFICATION_SERVICE_URL = "http://localhost:8011";
 const STORAGE_KEYS = {
@@ -58,7 +54,6 @@ const STORAGE_KEYS = {
   ACTIVE_MODE: "activeMode",
   IS_HYBRID: "isHybrid",
 } as const;
-
 
 interface Notification {
   _id: string;
@@ -86,7 +81,6 @@ interface AuthState {
   isHybrid: boolean;
   activeMode: 'doctor' | 'clinic';
 }
-
 
 const isValidDoctorId = (id: any): id is string => {
   if (typeof id !== "string") return false;
@@ -129,7 +123,7 @@ const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split('.')[1]));
     return payload.exp * 1000 < Date.now();
   } catch {
-    return true; // treat malformed token as expired
+    return true;
   }
 };
 
@@ -152,7 +146,8 @@ export default function App() {
 
   const navigate = useNavigate();
   const location = useLocation();
-const toast = useToast();
+  const toast = useToast();
+
   // Check screen size
   useEffect(() => {
     const checkScreenSize = () => {
@@ -166,8 +161,10 @@ const toast = useToast();
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
-    setSidebarCollapsed(true);
-  }, [location.pathname]);
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [location.pathname, isMobile]);
 
   const handleAuthUpdate = useCallback(
     (
@@ -180,7 +177,7 @@ const toast = useToast();
     ) => {
       console.log("🔐 Auth update:", { token, role, doctorId, clinicId, persistent, isHybrid });
 
-      clearStorage();
+      clearAllAuthData;
 
       setStorageValue(STORAGE_KEYS.AUTH_TOKEN, token, persistent);
       setStorageValue(STORAGE_KEYS.USER_ROLE, role, persistent);
@@ -204,15 +201,19 @@ const toast = useToast();
         isHybrid,
         activeMode: 'doctor',
       });
-   toast.showSuccess(`Welcome back! Logged in as ${role === "760" ? "Hybrid" : role === "600" ? "Doctor" : "User"}`);
+      
+      toast.showSuccess(`Welcome back! Logged in as ${role === "760" ? "Hybrid" : role === "600" ? "Doctor" : "User"}`);
       setIsInitialized(true);
-      navigate("/dashboard", { replace: true });
+      
+      // Use setTimeout to ensure state is updated before navigation
+      setTimeout(() => {
+        navigate("/dashboard", { replace: true });
+      }, 0);
     },
-    [navigate,toast],
+    [navigate],
   );
 
-  /* -------------------- AUTH + ROUTING CORE -------------------- */
-
+  // Initialize auth state
   useEffect(() => {
     console.log("🩺 Doctor Portal initializing...");
 
@@ -221,13 +222,13 @@ const toast = useToast();
       console.log("📨 Message received:", event.data);
       const { type, token, role, doctorId, clinicId, isHybrid } = event.data || {};
       if (type !== "LOGIN_DATA" || !token || !role) return;
-        toast.showInfo("Authenticating from main app...");
+      toast.showInfo("Authenticating from main app...");
       handleAuthUpdate(token, role, doctorId, clinicId, false, isHybrid === true);
     };
 
     window.addEventListener("message", handleMessage);
 
-    // Check URL params first (highest priority)
+    // Check URL params first
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     const role = params.get("role");
@@ -240,10 +241,9 @@ const toast = useToast();
     if (token && role) {
       console.log("✅ Found URL params, authenticating...");
       toast.showInfo("Authenticating with provided credentials...");
-      // Clear any existing data first
+      
       clearAllAuthData();
       
-      // Set the authentication data
       handleAuthUpdate(
         token,
         role,
@@ -253,23 +253,24 @@ const toast = useToast();
         isHybrid,
       );
       
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
       setIsInitialized(true);
-      return; // Important: return early to prevent checking storage
+      return;
     }
 
-    // Check for stored token (only if no URL params)
+    // Check for stored token
     const storedToken = getStorageValue(STORAGE_KEYS.AUTH_TOKEN);
     
     if (storedToken) {
       console.log("🔍 Found stored token");
+      
       if (isTokenExpired(storedToken)) {
         console.log("⏰ Stored token is expired, clearing auth data...");
         clearAllAuthData();
         setIsInitialized(true);
-        return () => window.removeEventListener("message", handleMessage);
+        return;
       }
+      
       const storedRole = getStorageValue(STORAGE_KEYS.USER_ROLE);
       const storedDoctorId = getStorageValue(STORAGE_KEYS.DOCTOR_ID);
       const storedClinicId = getStorageValue(STORAGE_KEYS.CLINIC_ID);
@@ -300,7 +301,6 @@ const toast = useToast();
         if (storedDoctorId && !isValidDoctorId(storedDoctorId)) {
           removeStorageKey(STORAGE_KEYS.DOCTOR_ID);
         }
-        //  toast.showSuccess("Welcome back!");
       }
     } else {
       console.log("🔍 No stored token found");
@@ -310,44 +310,42 @@ const toast = useToast();
     setIsInitialized(true);
 
     return () => window.removeEventListener("message", handleMessage);
-  }, [handleAuthUpdate,toast]);
+  }, [handleAuthUpdate]);
 
-  /* -------------------- HANDLE REPEATED URL TOKENS -------------------- */
-
+  // Handle URL params on location change (but prevent infinite loops)
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const token = params.get("token");
-    const role = params.get("role");
-    const urlDoctorId = params.get("doctorId");
-    const clinicId = params.get("clinicId");
-    const isHybrid = params.get("isHybrid") === "true" || role === "760";
+    // Only run if we're not already initialized with a token from URL params
+    if (!authState.token) {
+      const params = new URLSearchParams(location.search);
+      const token = params.get("token");
+      const role = params.get("role");
+      const urlDoctorId = params.get("doctorId");
+      const clinicId = params.get("clinicId");
+      const isHybrid = params.get("isHybrid") === "true" || role === "760";
 
-    if (token && role) {
-      handleAuthUpdate(
-        token,
-        role,
-        urlDoctorId || undefined,
-        clinicId || undefined,
-        true,
-        isHybrid,
-      );
+      if (token && role) {
+        handleAuthUpdate(
+          token,
+          role,
+          urlDoctorId || undefined,
+          clinicId || undefined,
+          true,
+          isHybrid,
+        );
+      }
     }
-  }, [location, handleAuthUpdate]);
+  }, [location.search, handleAuthUpdate, authState.token]);
 
-  /* -------------------- THEME -------------------- */
-
+  // Theme
   const clinicIdFromStorage = getStorageValue(STORAGE_KEYS.CLINIC_ID);
   useClinicTheme(clinicIdFromStorage || "");
-
-  /* -------------------- LOGOUT -------------------- */
 
   const handleLogout = useCallback(() => {
     console.log("🚪 Logging out...");
     toast.showInfo("Logging out...");
-    // Clear all storage
+    
     clearAllAuthData();
     
-    // Reset auth state to initial values
     setAuthState({
       token: null,
       role: null,
@@ -357,31 +355,32 @@ const toast = useToast();
       activeMode: 'doctor',
     });
     
-    // Clear notifications
     setNotifications([]);
     setUnreadCount(0);
     
-    // Navigate to login
     navigate("/login", { replace: true });
-  }, [navigate,toast]);
-
-  /* -------------------- TOGGLE MODE (for hybrid users) -------------------- */
+  }, [navigate]);
 
   const handleToggleMode = useCallback(() => {
     if (!authState.isHybrid) return;
     
     const newMode = authState.activeMode === 'doctor' ? 'clinic' : 'doctor';
     console.log("🔄 Toggling mode:", { current: authState.activeMode, new: newMode });
-     toast.showInfo(`Switching to ${newMode} mode...`);
+    
+    toast.showInfo(`Switching to ${newMode} mode...`);
     setStorageValue(STORAGE_KEYS.ACTIVE_MODE, newMode, true);
+    
+    setAuthState(prev => ({
+      ...prev,
+      activeMode: newMode
+    }));
     
     if (newMode === 'clinic') {
       if (authState.clinicId && authState.doctorId && authState.token) {
-        // Redirect to clinic dashboard on port 3000
         const clinicDashboardUrl = `http://localhost:3000/dashboard/${authState.clinicId}`;
         const redirectURL = `${clinicDashboardUrl}?token=${encodeURIComponent(authState.token)}&role=${authState.role}&doctorId=${authState.doctorId}&clinicId=${authState.clinicId}&isHybrid=true&mode=clinic`;
         console.log("➡️ Redirecting to clinic dashboard:", redirectURL);
-         toast.showSuccess("Redirecting to clinic dashboard...");
+        toast.showSuccess("Redirecting to clinic dashboard...");
         window.location.href = redirectURL;
       } else {
         console.error("❌ Missing clinicId or doctorId for clinic mode", {
@@ -390,13 +389,8 @@ const toast = useToast();
           token: authState.token
         });
       }
-    } else {
-      // Already in doctor mode, nothing to do
-      console.log("Already in doctor mode");
     }
-  }, [authState,toast]);
-
-  /* -------------------- MENU -------------------- */
+  }, [authState]);
 
   const menuItems = useMemo<MenuItem[]>(() => {
     const items: MenuItem[] = [
@@ -434,8 +428,6 @@ const toast = useToast();
     }
   }, [menuItems, authState.activeMode]);
 
-  /* -------------------- NOTIFICATIONS -------------------- */
-
   const handleNotificationsUpdate = useCallback(
     (data: Notification[], count: number) => {
       setNotifications(data);
@@ -456,25 +448,32 @@ const toast = useToast();
     setUnreadCount((c) => Math.max(0, c - 1));
   }, []);
 
-  /* -------------------- RENDER -------------------- */
+  const handleNavigation = useCallback((path: string) => {
+    navigate(path);
+  }, [navigate]);
 
-  // Only show logs and render content after initialization
   if (!isInitialized) {
-    return <div>Initializing...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Initializing Doctor Portal...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Debug log only shows if there's a valid token
   if (authState.token) {
     console.log("📊 Current auth state:", {
       role: authState.role,
       isHybrid: authState.isHybrid,
       activeMode: authState.activeMode,
       clinicId: authState.clinicId,
-      doctorId: authState.doctorId
+      doctorId: authState.doctorId,
+      path: location.pathname
     });
   }
 
-  // Check if current path is login page
   const isLoginPage = location.pathname === "/login";
 
   // Mobile Navigation Component
@@ -543,7 +542,7 @@ const toast = useToast();
                     if (item.onClick) {
                       item.onClick();
                     } else if (item.path) {
-                      navigate(item.path);
+                      handleNavigation(item.path);
                     }
                     setMobileMenuOpen(false);
                   }}
@@ -587,7 +586,7 @@ const toast = useToast();
           {filteredMenuItems.slice(0, 5).map((item) => (
             <button
               key={item.path}
-              onClick={() => item.path && navigate(item.path)}
+              onClick={() => item.path && handleNavigation(item.path)}
               className={`flex flex-col items-center p-2 rounded-lg relative ${
                 item.path && location.pathname === item.path
                   ? "text-primary"
@@ -656,7 +655,7 @@ const toast = useToast();
         )}
       </div>
 
-      {/* HYBRID TOGGLE BUTTON - Only for hybrid users */}
+      {/* HYBRID TOGGLE BUTTON */}
       {authState.isHybrid && (
         <>
           {!sidebarCollapsed ? (
@@ -715,7 +714,7 @@ const toast = useToast();
               if (item.onClick) {
                 item.onClick();
               } else if (item.path) {
-                navigate(item.path);
+                handleNavigation(item.path);
               }
             }}
             className={`w-full flex items-center ${
@@ -753,7 +752,7 @@ const toast = useToast();
           </button>
         ))}
 
-        {/* Logout Button in Desktop */}
+        {/* Logout Button */}
         <button
           onClick={handleLogout}
           className={`w-full flex items-center ${
@@ -767,7 +766,7 @@ const toast = useToast();
         </button>
       </nav>
 
-      {/* USER SECTION - Only show when expanded and authenticated */}
+      {/* USER SECTION */}
       {!sidebarCollapsed && authState.token && (
         <div className="p-4 border-t">
           <div className="flex items-center gap-3">
@@ -798,7 +797,7 @@ const toast = useToast();
   return (
     <SidebarProvider>
       <DentalChartGlobalPreloader />
-      <ToastProvider /> 
+      <ToastProvider />
       <div className="flex min-h-screen w-full">
         {/* Only show Sidebar if not on login page */}
         {!isLoginPage && !isMobile && <DesktopSidebar />}
@@ -829,6 +828,7 @@ const toast = useToast();
                       authState.token ? <Navigate to="/dashboard" replace /> : <DoctorLogin />
                     } 
                   />
+                  
                   <Route
                     path="/dashboard"
                     element={
@@ -879,6 +879,7 @@ const toast = useToast();
                       authState.token ? <ProductivityCharts /> : <Navigate to="/login" replace />
                     }
                   />
+                  
                   <Route
                     path="/alerts"
                     element={
@@ -943,6 +944,7 @@ const toast = useToast();
                       authState.token ? <CBCTViewerPage /> : <Navigate to="/login" replace />
                     }
                   />
+                  
                   <Route path="/" element={<Navigate to="/login" replace />} />
                 </Routes>
               </main>
