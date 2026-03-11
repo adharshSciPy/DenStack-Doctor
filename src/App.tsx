@@ -33,7 +33,7 @@ import { AppointmentsList } from "./components/AppointmentsList";
 import { PatientRecords } from "./components/PatientRecords";
 import EPrescription from "./components/EPrescription";
 import { ProductivityCharts } from "./components/ProductivityCharts";
-import { Marketplace } from "./components/Marketplace";
+import { DoctorMarketplace } from "./components/Marketplace";
 import { AlertsPanel } from "./components/AlertsPanel";
 import BlogList from "./components/BlogList";
 import CreateBlog from "./components/CreateBlog";
@@ -931,12 +931,21 @@ export default function App() {
                     }
                   />
                   
-                  <Route
-                    path="/marketplace"
-                    element={
-                      authState.token ? <Marketplace /> : <Navigate to="/login" replace />
-                    }
-                  />
+                // In App.tsx - Update the marketplace route
+<Route
+  path="/marketplace"
+  element={
+    authState.token ? (
+      <DoctorMarketplace 
+        token={authState.token}
+        doctorId={authState.doctorId}
+        clinicId={authState.clinicId}
+      />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
                   
                   <Route
                     path="/dashboard/cbct-viewer"
