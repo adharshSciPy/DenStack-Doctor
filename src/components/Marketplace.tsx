@@ -624,21 +624,22 @@ export function DoctorMarketplace({ token, doctorId, clinicId }: DoctorMarketpla
   };
 
   // Navigate to external ecommerce with token
-  const navigateToEcommerce = () => {
-    if (!token) {
-      console.error("No token available");
-      return;
-    }
-    
-    // Encode token for safe URL passing
-    const encodedToken = encodeURIComponent(token);
-    
-    // Replace with your actual ecommerce URL
-    const ecommerceUrl = `http://localhost:4000/login?accessToken=${encodedToken}&doctorId=${doctorId}&clinicId=${clinicId}`;
-    
-    // Open in new tab
-    window.open(ecommerceUrl, '_blank');
-  };
+const navigateToEcommerce = () => {
+  if (!token) {
+    console.error("No token available");
+    toast.showError("Authentication token missing");
+    return;
+  }
+  
+  // Encode token for safe URL passing
+  const encodedToken = encodeURIComponent(token);
+  
+  // Create URL with doctor token only (no clinicId needed)
+  const ecommerceUrl = `http://localhost:4000/login?accessToken=${encodedToken}&doctorId=${doctorId}`;
+  
+  // Open in new tab
+  window.open(ecommerceUrl, '_blank');
+};
 
   // Fetch product categories
   const getCategories = async () => {
