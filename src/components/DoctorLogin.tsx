@@ -21,6 +21,7 @@ import {
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
+import baseUrl from "../baseUrl"
 
 
 interface DoctorRegistrationData {
@@ -85,6 +86,14 @@ export default function DoctorLogin() {
     hasNumber: false,
     hasSpecialChar: false
   });
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+const [resetStep, setResetStep] = useState(1);
+
+const [resetData, setResetData] = useState({
+  email: "",
+  otp: "",
+  newPassword: "",
+});
 
   // Check for auto-login parameters on mount
   useEffect(() => {
@@ -255,7 +264,7 @@ const loadingToastId = toast.showLoading("Logging in...");
       console.log("🔐 Attempting login with:", loginData.email);
       
       const response = await axios.post(
-        "http://localhost:8001/api/v1/auth/doctor/login",
+        `${baseUrl}api/v1/auth/doctor/login`,
         loginData
       );
 
@@ -341,7 +350,7 @@ const loadingToastId = toast.showLoading("Logging in...");
 
     try {
       const response = await axios.post(
-        "http://localhost:8001/api/v1/auth/doctor/register",
+        `${baseUrl}api/v1/auth/doctor/register`,
         registrationData
       );
 
@@ -411,6 +420,48 @@ const loadingToastId = toast.showLoading("Logging in...");
     if (strength <= 4) return "Strong";
     return "Very Strong";
   };
+const sendOTP = async () => {
+  try {
+    setLoading(true);
+
+    await axios.post(
+      `${baseUrl}api/v1/auth/doctor/forgot-password`,
+      { email: resetData.email }
+    );
+
+    toast.showSuccess("OTP sent to your email");
+    setResetStep(2);
+
+  } catch (err:any) {
+    toast.showError(err.response?.data?.message || "Failed to send OTP");
+  } finally {
+    setLoading(false);
+  }
+};
+const resetPassword = async () => {
+  try {
+    setLoading(true);
+
+    await axios.post(
+      `${baseUrl}api/v1/auth/doctor/reset-password`,
+      {
+        email: resetData.email,
+        otp: resetData.otp,
+        newPassword: resetData.newPassword,
+      }
+    );
+
+    toast.showSuccess("Password reset successful");
+
+    setShowForgotPassword(false);
+    setResetStep(1);
+
+  } catch (err:any) {
+    toast.showError(err.response?.data?.message || "Reset failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
@@ -568,12 +619,14 @@ const loadingToastId = toast.showLoading("Logging in...");
                     />
                     <span className="ml-2 text-sm text-gray-600">Remember me</span>
                   </label>
-                  <button 
-                    type="button" 
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                  >
-                    Forgot password?
-                  </button>
+                  <button
+  type="button"
+  onClick={() => setShowForgotPassword(true)}
+  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+>
+  Forgot password?
+</button>
+
                 </div>
 
                 <button
@@ -863,6 +916,72 @@ const loadingToastId = toast.showLoading("Logging in...");
           </div>
         </div>
       </div>
+{showForgotPassword && (
+<div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+<div className="bg-white p-6 rounded-xl w-full max-w-md">
+
+<h2 className="text-xl font-semibold mb-4">
+Reset Password
+</h2>
+
+{/* STEP 1 EMAIL */}
+{resetStep === 1 && (
+<>
+<input
+type="email"
+placeholder="Enter your email"
+className="w-full border p-3 rounded-lg mb-4"
+value={resetData.email}
+onChange={(e)=>setResetData({...resetData,email:e.target.value})}
+/>
+
+<button
+onClick={sendOTP}
+className="w-full bg-blue-600 text-white py-3 rounded-lg"
+>
+Send OTP
+</button>
+</>
+)}
+
+{/* STEP 2 OTP + PASSWORD */}
+{resetStep === 2 && (
+<>
+<input
+type="text"
+placeholder="Enter OTP"
+className="w-full border p-3 rounded-lg mb-3"
+value={resetData.otp}
+onChange={(e)=>setResetData({...resetData,otp:e.target.value})}
+/>
+
+<input
+type="password"
+placeholder="New Password"
+className="w-full border p-3 rounded-lg mb-4"
+value={resetData.newPassword}
+onChange={(e)=>setResetData({...resetData,newPassword:e.target.value})}
+/>
+
+<button
+onClick={resetPassword}
+className="w-full bg-green-600 text-white py-3 rounded-lg"
+>
+Reset Password
+</button>
+</>
+)}
+
+<button
+className="mt-4 text-sm text-gray-500"
+onClick={()=>setShowForgotPassword(false)}
+>
+Cancel
+</button>
+
+</div>
+</div>
+)}
 
       <style>{`
         @keyframes blob {
