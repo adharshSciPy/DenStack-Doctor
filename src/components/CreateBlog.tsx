@@ -222,8 +222,8 @@ const CreateBlog: React.FC = () => {
       });
       
       alert(response.data.message || (isEditing ? 'Blog updated!' : 'Blog created!'));
-      navigate('/blogs');
-      console.log(response);
+      navigate('/blog');
+      console.log(response);  
       
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
