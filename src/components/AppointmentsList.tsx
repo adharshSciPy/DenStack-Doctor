@@ -5825,7 +5825,7 @@ const convertToDentalChartFormat = (
         Appointment Details
       </h1>
       <p className="text-xs md:text-sm text-muted-foreground truncate">
-        OP# {appointmentDetail.opNumber} - {appointmentDetail.patientId.name}
+        OP# {appointmentDetail.opNumber||""} - {appointmentDetail.patientId.name||""}
       </p>
     </div>
     
@@ -5881,15 +5881,15 @@ const convertToDentalChartFormat = (
                     .split(" ")
                     .map((n) => n[0])
                     .join("")
-                    .toUpperCase()}
+                    .toUpperCase()||"Unknown"}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <h3 className="font-semibold text-lg">
-                  {appointmentDetail.patientId.name}
+                  {appointmentDetail.patientId.name||"Unknown"}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {appointmentDetail.patientId.patientUniqueId}
+                  {appointmentDetail.patientId.patientUniqueId||""}
                 </p>
               </div>
             </div>
@@ -5897,19 +5897,19 @@ const convertToDentalChartFormat = (
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-primary" />
                 <span>
-                  {appointmentDetail.patientId.age}Y,{" "}
-                  {appointmentDetail.patientId.gender}
+                  {appointmentDetail.patientId.age||""}Y,{" "} 
+                  {appointmentDetail.patientId.gender||""}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-primary" />
-                <span>{appointmentDetail.patientId.phone}</span>
+                <span>{appointmentDetail.patientId.phone||""}</span>
               </div>
               {appointmentDetail.patientId.email && (
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-primary" />
                   <span className="truncate">
-                    {appointmentDetail.patientId.email}
+                    {appointmentDetail.patientId.email||""}
                   </span>
                 </div>
               )}
@@ -5925,18 +5925,18 @@ const convertToDentalChartFormat = (
               <div className="flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4 text-primary" />
                 <span>
-                  {formatDate(appointmentDetail.appointmentDate)}
+                  {formatDate(appointmentDetail.appointmentDate||"")}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
                 <span>
-                  {formatTime(appointmentDetail.appointmentTime)}
+                  {formatTime(appointmentDetail.appointmentTime||"")}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="font-normal">
-                  {appointmentDetail.department}
+                  {appointmentDetail.department||""}
                 </Badge>
               </div>
             </div>
@@ -6154,8 +6154,8 @@ const convertToDentalChartFormat = (
                   <div className="flex-1">
                     <h1 className="text-2xl font-semibold">Dental History</h1>
                     <p className="text-sm text-muted-foreground">
-                      Patient: {appointmentDetail.patientId.name} • ID:{" "}
-                      {appointmentDetail.patientId.patientUniqueId}
+                      Patient: {appointmentDetail.patientId.name||""} • ID:{" "}
+                      {appointmentDetail.patientId.patientUniqueId||""}
                     </p>
                   </div>
                 </div>
@@ -6196,8 +6196,8 @@ const convertToDentalChartFormat = (
                   <div className="flex-1">
                     <h1 className="text-2xl font-semibold">Dental Chart</h1>
                     <p className="text-sm text-muted-foreground">
-                      Patient: {appointmentDetail.patientId.name} • ID:{" "}
-                      {appointmentDetail.patientId.patientUniqueId}
+                      Patient: {appointmentDetail.patientId.name||""} • ID:{" "}
+                      {appointmentDetail.patientId.patientUniqueId||""}
                     </p>
                   </div>
                 </div>
@@ -6213,12 +6213,12 @@ const convertToDentalChartFormat = (
               {/* Full-screen Dental Chart Container */}
               <div className="h-[calc(100vh-60px)] w-full">
                 <DentalChart
-                  patientId={appointmentDetail.patientId._id}
-                  visitId={appointmentDetail._id}
+                  patientId={appointmentDetail.patientId._id||""}
+                  visitId={appointmentDetail._id||""}
                   mode="edit"
-                  patientName={appointmentDetail.patientId.name}
-                  clinicId={appointmentDetail.clinicId}
-                  patientUniqueId={appointmentDetail.patientId.patientUniqueId}
+                  patientName={appointmentDetail.patientId.name||""}
+                  clinicId={appointmentDetail.clinicId||""}
+                  patientUniqueId={appointmentDetail.patientId.patientUniqueId||""}
                   onClose={() => {
                     setShowDentalChart(false);
                   }}
@@ -6292,15 +6292,15 @@ const convertToDentalChartFormat = (
                             .split(" ")
                             .map((n) => n[0])
                             .join("")
-                            .toUpperCase()}
+                            .toUpperCase()||""}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h3 className="font-semibold text-lg">
-                          {appointmentDetail.patientId.name}
+                          {appointmentDetail.patientId.name||""}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                          {appointmentDetail.patientId.patientUniqueId}
+                          {appointmentDetail.patientId.patientUniqueId||""}
                         </p>
                       </div>
                     </div>
@@ -6308,19 +6308,19 @@ const convertToDentalChartFormat = (
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-primary" />
                         <span>
-                          {appointmentDetail.patientId.age}Y,{" "}
-                          {appointmentDetail.patientId.gender}
+                          {appointmentDetail.patientId.age||""}Y,{" "}
+                          {appointmentDetail.patientId.gender||""}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-primary" />
-                        <span>{appointmentDetail.patientId.phone}</span>
+                        <span>{appointmentDetail.patientId.phone||""}</span>
                       </div>
                       {appointmentDetail.patientId.email && (
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-primary" />
                           <span className="truncate">
-                            {appointmentDetail.patientId.email}
+                            {appointmentDetail.patientId.email||""}
                           </span>
                         </div>
                       )}
@@ -6335,18 +6335,18 @@ const convertToDentalChartFormat = (
                       <div className="flex items-center gap-2">
                         <CalendarIcon className="h-4 w-4 text-primary" />
                         <span>
-                          {formatDate(appointmentDetail.appointmentDate)}
+                          {formatDate(appointmentDetail.appointmentDate||"")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-primary" />
                         <span>
-                          {formatTime(appointmentDetail.appointmentTime)}
+                          {formatTime(appointmentDetail.appointmentTime||"")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="font-normal">
-                          {appointmentDetail.department}
+                          {appointmentDetail.department||""}
                         </Badge>
                       </div>
                       {/* <div className="mt-2">
@@ -7415,16 +7415,16 @@ const convertToDentalChartFormat = (
                               .split(" ")
                               .map((n) => n[0])
                               .join("")
-                              .toUpperCase()}
+                              .toUpperCase()||""}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <p className="font-medium truncate">
-                            {appointment.patient.name}
+                            {appointment.patient.name||""}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
                             {formatTime(appointment.appointmentTime)} •{" "}
-                            {formatDate(appointment.appointmentDate)}
+                            {formatDate(appointment.appointmentDate||"")}
                           </p>
                         </div>
                         <Badge
