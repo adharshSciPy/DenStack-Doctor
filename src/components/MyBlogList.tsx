@@ -16,6 +16,8 @@ import { format } from "date-fns";
 import BlogCard from "./BlogCard";
 import styles from "../styles/BlogList.module.css";
 import blogServiceUrl from "../blogServiceUrl";
+import { useToast } from "../hooks/useToast";
+
 
 interface Doctor {
   _id: string;
@@ -104,6 +106,7 @@ export function MyBlogList() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalBlogs, setTotalBlogs] = useState(0);
   const [stats, setStats] = useState<BlogStats | null>(null);
+const toast = useToast();
 
   // Calculate local stats from blogs
   const calculateStats = (blogList: Blog[]) => {
@@ -235,7 +238,7 @@ export function MyBlogList() {
       }
     } catch (error) {
       console.error("Error fetching blogs:", error);
-      alert("Failed to fetch blogs");
+      toast.showError("Failed to fetch blogs");
     } finally {
       setLoading(false);
     }
@@ -273,7 +276,7 @@ export function MyBlogList() {
       fetchBlogs(); // Refresh the list
     } catch (error) {
       console.error("Error liking blog:", error);
-      alert("Failed to like blog");
+      toast.showError("Failed to like blog");
     }
   };
 

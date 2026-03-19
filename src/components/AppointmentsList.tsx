@@ -51,6 +51,7 @@ import labBaseUrl from "../labBaseUrl";
 import ThreeDCBCTViewer from "./nifti/Niftiviewer";
 import { preloadAllDentalSvgs } from "../utils/dentalSvgCache";
 import { log } from "console";
+import { useToast } from "../hooks/useToast";
 interface ToothCondition {
   toothNumber: number;
   conditions: string[];
@@ -107,7 +108,6 @@ interface DentalChartData {
   tmjExaminations?: any[];
   treatmentPlan?: any;
 }
-// Add these interfaces near your other interface definitions
 interface TreatmentPlanProcedureChange {
   type: string;
   toothNumber: number;
@@ -137,7 +137,6 @@ interface TreatmentPlanChangeData {
   addedStages: any[];
   removedStages: any[];
 }
-// Add these interfaces near your other interface definitions
 interface ComplaintItem {
   id: string;
   name: string;
@@ -654,25 +653,6 @@ const PEDIATRIC_TOOTH_DATA: ToothData[] = [
   },
 ];
 
-const DENTAL_PROCEDURES = [
-  "Cleaning/Prophylaxis",
-  "Scaling & Root Planing",
-  "Filling (Composite)",
-  "Filling (Amalgam)",
-  "Root Canal Treatment",
-  "Crown Placement",
-  "Bridge",
-  "Denture",
-  "Extraction",
-  "Implant",
-  "Orthodontic Treatment",
-  "Whitening",
-  "Veneer",
-  "Gum Surgery",
-  "Frenectomy",
-  "Apicoectomy",
-];
-
 const TreatmentPlanDetailsModal = ({
   plan,
   onClose,
@@ -686,32 +666,13 @@ const TreatmentPlanDetailsModal = ({
   const [localPlan, setLocalPlan] = useState<TreatmentPlan | null>(plan);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"teeth" | "stages">("teeth");
-  const [toast, setToast] = useState<{
-    show: boolean;
-    message: string;
-    type: "success" | "error";
-  }>({
-    show: false,
-    message: "",
-    type: "success",
-  });
   useEffect(() => {
     console.log("TreatmentPlanDetailsModal viewOnly:", viewOnly);
   }, [viewOnly]);
-  // Get auth token
   const getAuthToken = () => {
     return localStorage.getItem("authToken");
   };
-
-  // Show toast notification
-
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3000);
-  };
-  // API BASE URL
+const toast=useToast();
   const API_BASE = "/api/v1/patient-service/consultation";
 
   // Fetch updated plan data
@@ -749,14 +710,13 @@ const TreatmentPlanDetailsModal = ({
 
       if (response.data.success) {
         setLocalPlan(response.data.data);
-        showToast("Treatment plan started successfully!", "success");
+        toast.showSuccess("Treatment plan started successfully!");
         refetchTreatmentPlans?.();
       }
     } catch (error: any) {
       console.error("Error starting plan:", error);
-      showToast(
-        error.response?.data?.message || "Failed to start plan",
-        "error",
+      toast.showError(
+        error.response?.data?.message || "Failed to start plan"
       );
     } finally {
       setLoading(false);
@@ -782,21 +742,20 @@ const TreatmentPlanDetailsModal = ({
 
       if (response.data.success) {
         setLocalPlan(response.data.data);
-        showToast("Treatment plan completed successfully!", "success");
+        toast.showSuccess("Treatment plan completed successfully!");
         refetchTreatmentPlans?.();
       }
     } catch (error: any) {
       console.error("Error completing plan:", error);
-      showToast(
-        error.response?.data?.message || "Failed to complete plan",
-        "error",
+      toast.showError(
+        error.response?.data?.message || "Failed to complete plan"
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // 3️⃣ Complete Stage(passing array index as stageNumber from the button)
+  //Complete Stage(passing array index as stageNumber from the button)
 
   const handleCompleteStage = async (stageNumber: number) => {
     if (viewOnly) return;
@@ -812,7 +771,7 @@ const TreatmentPlanDetailsModal = ({
       );
 
       if (stageIndex === -1 || stageIndex === undefined) {
-        showToast("Stage not found", "error");
+        toast.showError("Stage not found");
         setLoading(false);
         return;
       }
@@ -824,75 +783,23 @@ const TreatmentPlanDetailsModal = ({
       );
 
       if (response.data.success) {
-        // Update the local plan with the response data
         setLocalPlan(response.data.treatmentPlan);
-
-        // Get the completed stage number from the response
         const completedStageNumber =
           response.data.stage?.stageNumber || stageNumber;
-        showToast(
-          `Stage ${completedStageNumber} completed successfully!`,
-          "success",
-        );
+        toast.showSuccess(
+          `Stage ${completedStageNumber} completed successfully!`);
         refetchTreatmentPlans?.();
-
-        // Force a refresh of the plan details
         await fetchPlanDetails();
       }
     } catch (error: any) {
       console.error("Error completing stage:", error);
-      showToast(
-        error.response?.data?.message || "Failed to complete stage",
-        "error",
-      );
+      toast.showError(
+        error.response?.data?.message || "Failed to complete stage");
     } finally {
       setLoading(false);
     }
   };
-  // 4️⃣ Add New Stage
-  const handleAddStage = async () => {
-    if (viewOnly) return;
-    if (!localPlan?._id) return;
-
-    const stageName = prompt("Enter stage name:");
-    if (!stageName) return;
-
-    const description = prompt("Enter stage description (optional):") || "";
-    const scheduledDate =
-      prompt("Enter scheduled date (YYYY-MM-DD, optional):") ||
-      new Date().toISOString().split("T")[0];
-
-    setLoading(true);
-    try {
-      const token = getAuthToken();
-      const response = await axios.patch(
-        `${patientServiceBaseUrl}${API_BASE}/add-stage/${localPlan._id}`,
-        {
-          stageName,
-          description,
-          scheduledDate,
-          toothSurfaceProcedures: [], // Can be populated from UI
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (response.data.success) {
-        setLocalPlan(response.data.data);
-        showToast("Stage added successfully!", "success");
-        refetchTreatmentPlans?.();
-      }
-    } catch (error: any) {
-      console.error("Error adding stage:", error);
-      showToast(
-        error.response?.data?.message || "Failed to add stage",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 5️⃣ Remove Stage
+  //Remove Stage
   const handleRemoveStage = async (stageNumber: number) => {
     if (viewOnly) return;
 
@@ -911,24 +818,21 @@ const TreatmentPlanDetailsModal = ({
 
       if (response.data.success) {
         setLocalPlan(response.data.treatmentPlan);
-        showToast(`Stage ${stageNumber} removed successfully!`, "success");
+        toast.showSuccess(`Stage ${stageNumber} removed successfully!`);
         refetchTreatmentPlans?.();
-
-        // Force a refresh of the plan details to get updated status
-        await fetchPlanDetails();
+      await fetchPlanDetails();
       }
     } catch (error: any) {
       console.error("Error removing stage:", error);
-      showToast(
-        error.response?.data?.message || "Failed to remove stage",
-        "error",
+      toast.showError(
+        error.response?.data?.message || "Failed to remove stage"
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // 6️⃣ Remove Procedure
+  // Remove Procedure
   const handleRemoveProcedure = async (
     toothNumber: number,
     procedureName: string,
@@ -957,24 +861,21 @@ const TreatmentPlanDetailsModal = ({
       );
 
       if (response.data.success) {
-        // Update local plan with response data
         setLocalPlan(response.data.treatmentPlan);
-        showToast("Procedure removed successfully!", "success");
+        toast.showSuccess("Procedure removed successfully!");
         refetchTreatmentPlans?.();
-        await fetchPlanDetails(); // Refresh data
+        await fetchPlanDetails();
       }
     } catch (error: any) {
       console.error("Error removing procedure:", error);
-      showToast(
-        error.response?.data?.message || "Failed to remove procedure",
-        "error",
-      );
+      toast.showError(
+        error.response?.data?.message || "Failed to remove procedure");
     } finally {
       setLoading(false);
     }
   };
 
-  // 7️⃣ Remove/Cancel Treatment Plan
+  //Remove/Cancel Treatment Plan
   const handleRemovePlan = async () => {
     if (viewOnly) return;
 
@@ -1010,25 +911,22 @@ const TreatmentPlanDetailsModal = ({
       }
 
       if (response.data.success) {
-        showToast(
-          `Treatment plan ${action === "remove" ? "removed" : "cancelled"} successfully!`,
-          "success",
-        );
+        toast.showSuccess(
+          `Treatment plan ${action === "remove" ? "removed" : "cancelled"} successfully!`);
         refetchTreatmentPlans?.();
         onClose();
       }
     } catch (error: any) {
       console.error(`Error ${action}ing plan:`, error);
-      showToast(
-        error.response?.data?.message || `Failed to ${action} plan`,
-        "error",
+      toast.showError(
+        error.response?.data?.message || `Failed to ${action} plan`
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // 8️⃣ Update Procedure Status
+  //Update Procedure Status
   const handleUpdateProcedureStatus = async (
     toothIndex: number,
     procedureIndex: number,
@@ -1043,7 +941,7 @@ const TreatmentPlanDetailsModal = ({
       // Get the procedure to find its stage
       const procedure = localPlan.teeth[toothIndex]?.procedures[procedureIndex];
       if (!procedure) {
-        showToast("Procedure not found", "error");
+        toast.showInfo("Procedure not found");
         return;
       }
 
@@ -1053,7 +951,7 @@ const TreatmentPlanDetailsModal = ({
       );
 
       if (stageIndex === -1) {
-        showToast("Stage not found for this procedure", "error");
+        toast.showInfo("Stage not found for this procedure");
         return;
       }
 
@@ -1066,43 +964,41 @@ const TreatmentPlanDetailsModal = ({
 
       if (response.data.success) {
         setLocalPlan(response.data.treatmentPlan);
-        showToast("Procedure status updated!", "success");
+        toast.showSuccess("Procedure status updated!");
         refetchTreatmentPlans?.();
-        await fetchPlanDetails(); // Refresh data
+        await fetchPlanDetails(); 
       }
     } catch (error: any) {
       console.error("Error updating procedure:", error);
-      showToast(
-        error.response?.data?.message || "Failed to update procedure",
-        "error",
-      );
+      toast.showError(
+        error.response?.data?.message || "Failed to update procedure");
     } finally {
       setLoading(false);
     }
   };
   useEffect(() => {
     if (plan) {
-      console.log("🚀 Treatment Plan Details Modal Opened");
-      console.log("📋 Full Plan Data Received:", plan);
+      // console.log("🚀 Treatment Plan Details Modal Opened");
+      // console.log("📋 Full Plan Data Received:", plan);
 
-      console.log("🔍 Plan Structure Check:");
-      console.log(
-        "   Has stages array?",
-        !!plan.stages && plan.stages.length > 0,
-      );
-      console.log("   Stages count:", plan.stages?.length || 0);
+      // console.log("🔍 Plan Structure Check:");
+      // console.log(
+      //   "   Has stages array?",
+      //   !!plan.stages && plan.stages.length > 0,
+      // );
+      // console.log("   Stages count:", plan.stages?.length || 0);
 
       if (plan.stages) {
-        console.log("📈 Stages Analysis:");
+        // console.log("📈 Stages Analysis:");
         plan.stages.forEach((stage, i) => {
-          console.log(
-            `   Stage ${i + 1}: ${stage.stageName || "Unnamed Stage"}`,
-          );
-          console.log(`     Status: ${stage.status}`);
-          console.log(
-            `     Tooth-Surface Procedures:`,
-            stage.toothSurfaceProcedures,
-          );
+          // console.log(
+          //   `   Stage ${i + 1}: ${stage.stageName || "Unnamed Stage"}`,
+          // );
+          // console.log(`     Status: ${stage.status}`);
+          // console.log(
+          //   `     Tooth-Surface Procedures:`,
+          //   stage.toothSurfaceProcedures,
+          // );
         });
       }
     }
@@ -1217,19 +1113,6 @@ const TreatmentPlanDetailsModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      {/* Toast Notification - hide if viewOnly */}
-      {!viewOnly && toast.show && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg ${
-            toast.type === "success"
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
-
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
@@ -1871,17 +1754,14 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
       },
     ],
   );
-  
-  // REMOVED: selectedProcedure, selectedSurface, estimatedCost - not needed anymore
-  
+  const toast = useToast();
+    
   // State for multi-select dropdowns
   const [selectedOnExamination, setSelectedOnExamination] = useState<any[]>([]);
   const [selectedDiagnosis, setSelectedDiagnosis] = useState<any[]>([]);
   const [selectedTreatment, setSelectedTreatment] = useState<any[]>([]);
   const [selectedSurface, setSelectedSurface] = useState<string>("entire");
   const [notes, setNotes] = useState("");
-  
-  // Loading states
   const [loadingExaminations, setLoadingExaminations] = useState(false);
   const [loadingDiagnoses, setLoadingDiagnoses] = useState(false);
   const [loadingTreatments, setLoadingTreatments] = useState(false);
@@ -1899,7 +1779,6 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
     initialData?.teeth.map((t) => ({
       toothNumber: t.toothNumber,
       priority: t.priority || "medium",
-      // Remove procedures - we're only storing clinical findings now
       onExamination: (t as any).onExamination || [],
       diagnosis: (t as any).diagnosis || [],
       treatment: (t as any).treatment || [],
@@ -2078,7 +1957,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   if (selectionMode === "single") {
     // Single tooth mode
     if (!selectedTooth) {
-      alert("Please select a tooth");
+      toast.showInfo("Please select a tooth");
       return;
     }
 
@@ -2154,7 +2033,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
   } else {
     // Multiple teeth mode
     if (selectedTeeth.length === 0) {
-      alert("Please select teeth first");
+      toast.showInfo("Please select teeth first");
       return;
     }
 
@@ -2237,7 +2116,7 @@ const TreatmentPlanForm: React.FC<TreatmentPlanFormProps> = ({
 
 const handleSavePlan = () => {
   if (teethPlans.length === 0) {
-    alert("Please add at least one tooth with clinical findings before saving the treatment plan");
+    toast.showInfo("Please add at least one tooth with clinical findings before saving the treatment plan");
     return;
   }
 
@@ -2401,7 +2280,7 @@ const handleSavePlan = () => {
 
   const handleRemoveStage = (index: number) => {
     if (stages.length <= 1) {
-      alert("At least one stage is required");
+      toast.showInfo("At least one stage is required");
       return;
     }
 
@@ -3594,7 +3473,7 @@ const MultiSelectDropdown = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const customOptionRef = useRef<HTMLDivElement | null>(null);
-
+const toast=useToast();
   // Load ALL options when dropdown opens
   useEffect(() => {
     const loadOptions = async () => {
@@ -4201,7 +4080,7 @@ export function AppointmentsList() {
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [isMobile, setIsMobile] = useState(false);
   // console.log("ded", selectedHistory);
-
+const toast=useToast();
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
     const hour = parseInt(hours);
@@ -4252,6 +4131,7 @@ const [isMobile, setIsMobile] = useState(false);
 
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("No authentication token found");
+      
 
       const cursor = resetSearch
         ? null
@@ -4660,7 +4540,7 @@ const [isMobile, setIsMobile] = useState(false);
       console.log("✅ Modal state updated, viewer should open");
     } else {
       console.error("❌ No valid resultFile or fileUrl provided");
-      alert("No valid scan file available");
+      toast.showInfo("No valid scan file available");
     }
   };
   // Add this near your other useEffects in AppointmentsList
@@ -4686,19 +4566,8 @@ const [isMobile, setIsMobile] = useState(false);
   // Fixed helper function to generate ObjectId-like strings
 
   const handleSaveConsultation = async () => {
-    // Validate required fields
-    // if (!chiefComplaint.trim()) {
-    //   alert("Please enter chief complaint");
-    //   return;
-    // }
-
-    // if (!diagnosis.trim()) {
-    //   alert("Please enter diagnosis");
-    //   return;
-    // }
-
     if (!appointmentDetail?._id) {
-      alert("Invalid appointment data");
+      toast.showError("Invalid appointment data");
       return;
     }
 
@@ -4727,11 +4596,6 @@ const [isMobile, setIsMobile] = useState(false);
       const validPrescriptions = prescriptions.filter(
         (p) => p.medicineName.trim() && p.dosage.trim(),
       );
-
-      // if (validPrescriptions.length === 0) {
-      //   alert("Please add at least one valid prescription");
-      //   return;
-      // }
 
       formData.append("prescriptions", JSON.stringify(validPrescriptions));
       formData.append("notes", additionalNotes?.trim() || "");
@@ -5032,12 +4896,37 @@ if (dentalData.treatmentPlan) {
       const data = response.data;
 
       if (data?.success) {
-        console.log("✅ Consultation saved successfully!");
+        toast.showSuccess("Consultation saved successfully!");
         console.log("Response data:", data);
 
         // Refresh patient treatment plans
         await fetchPatientTreatmentPlans();
-
+   if (selectedClinic) {
+        const updatedClinicAppointments = { ...selectedClinic };
+        const appointmentIndex = updatedClinicAppointments.appointments.findIndex(
+          (apt) => apt._id === appointmentDetail._id
+        );
+        
+        if (appointmentIndex !== -1) {
+          // Update the appointment status to "completed"
+          updatedClinicAppointments.appointments[appointmentIndex] = {
+            ...updatedClinicAppointments.appointments[appointmentIndex],
+            status: "completed"
+          };
+          
+          // Update the selected clinic state
+          setSelectedClinic(updatedClinicAppointments);
+          
+          // Also update the main clinicAppointments list
+          setClinicAppointments((prev) => 
+            prev.map((clinic) => 
+              clinic.clinicId === selectedClinic.clinicId
+                ? updatedClinicAppointments
+                : clinic
+            )
+          );
+        }
+      }
         // Clear editing state
         setEditingTreatmentPlan(null);
 
@@ -5088,24 +4977,24 @@ if (dentalData.treatmentPlan) {
         // Close dental chart if open
         setShowDentalChart(false);
 
-        alert("✅ Consultation saved successfully!");
+        console.log("Consultation saved successfully!");
 
         // Optionally close the consultation view
         handleBackToAppointments();
       } else {
-        alert(data?.message || "Failed to save consultation");
+        toast.showError(data?.message || "Failed to save consultation");
       }
     } catch (err: any) {
-      console.error("❌ Error saving consultation:", err);
+      toast.showError("Error saving consultation:");
       console.error("Error response:", err.response?.data);
 
       if (err.response?.data?.errors) {
         const errorMessages = Object.entries(err.response.data.errors)
           .map(([field, message]) => `${field}: ${message}`)
           .join("\n");
-        alert(`Validation errors:\n${errorMessages}`);
+        toast.showError(`Validation errors:\n${errorMessages}`);
       } else {
-        alert(err.response?.data?.message || "Error saving consultation");
+        toast.showError(err.response?.data?.message || "Error saving consultation");
       }
     } finally {
       setLoading(false);
@@ -5309,7 +5198,7 @@ const convertToDentalChartFormat = (
   if (!treatmentPlan) return null;
 
   console.log(
-    "🔄 Converting treatment plan to dental chart format:",
+    "Converting treatment plan to dental chart format:",
     treatmentPlan,
   );
 
@@ -5387,14 +5276,6 @@ const convertToDentalChartFormat = (
   return formattedPlan;
 };
 
-  // const formatDate = (dateString: string) => {
-  //   if (!dateString) return "N/A";
-  //   return new Date(dateString).toLocaleDateString('en-IN', {
-  //     day: 'numeric',
-  //     month: 'short',
-  //     year: 'numeric'
-  //   });
-  // };
   const addStage = () => {
     setStages((prev) => [
       ...prev,
@@ -5781,7 +5662,7 @@ const convertToDentalChartFormat = (
                       ...prev,
                       treatmentPlan: plan,
                     }));
-                    alert("Treatment plan created successfully!");
+                    toast.showSuccess("Treatment plan created successfully!");
                     setShowTreatmentPlanForm(false);
                   }}
                   initialData={treatmentPlan}
@@ -5835,8 +5716,7 @@ const convertToDentalChartFormat = (
       size={isMobile ? "sm" : "default"}
       className="whitespace-nowrap"
     >
-      <span className="hidden md:inline">Dental History</span>
-      <span className="md:hidden">History</span>
+      Dental History
     </Button>
   </div>
 </div>
@@ -7064,34 +6944,7 @@ const convertToDentalChartFormat = (
                           </div>
                         </div>
                       )}
-                      {/* Treatment Plan Form Modal - Standalone */}
-                      {/* {showTreatmentPlanForm && (
-    <TreatmentPlanForm
-      patientId={appointmentDetail?.patientId?._id || ""}
-      existingConditions={dentalData.performedTeeth || []}
-      onClose={() => setShowTreatmentPlanForm(false)}
-      onSave={(plan) => {
-        console.log("Saving treatment plan:", plan);
-        setDentalData(prev => ({
-          ...prev,
-          treatmentPlan: plan
-        }));
-        alert("Treatment plan created successfully!");
-        setShowTreatmentPlanForm(false);
-      }}
-      initialData={treatmentPlan}
-    />
-  )} */}
-
-                      {/* Treatment Plan Details Modal */}
-                      {/* {selectedTreatmentPlan && (
-    <TreatmentPlanDetailsModal
-      plan={selectedTreatmentPlan}
-      onClose={() => setSelectedTreatmentPlan(null)}
-      refetchTreatmentPlans={fetchPatientTreatmentPlans}
-    />
-  )} */}
-
+  
                       {/* Treatment Plan Details Modal */}
                       {selectedTreatmentPlan && (
                         <TreatmentPlanDetailsModal
@@ -7105,71 +6958,92 @@ const convertToDentalChartFormat = (
                         />
                       )}
 
-                      {/* Referral Section */}
-                      <div className="border-t border-gray-200 pt-6 mt-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Refer Patient
-                        </h3>
+                     <div className="border-t border-gray-200 pt-6 mt-4">
+  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+    Refer Patient
+  </h3>
 
-                        {/* Department Select */}
-                        <select
-                          className="w-full p-2 border rounded"
-                          value={selectedDepartment}
-                          onChange={(e) => {
-                            const depName = e.target.value;
-                            console.log("🟦 Department selected:", depName);
-                            setSelectedDepartment(depName);
-                            fetchDoctorsByDepartment(depName);
-                          }}
-                        >
-                          <option value="">Select Department</option>
-                          {departments.map((dep: any) => (
-                            <option key={dep._id} value={dep.departmentName}>
-                              {dep.departmentName}
-                            </option>
-                          ))}
-                        </select>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {/* Department Select */}
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+        Department
+      </label>
+      <select
+        className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+        value={selectedDepartment}
+        onChange={(e) => {
+          const depName = e.target.value;
+          setSelectedDepartment(depName);
+          fetchDoctorsByDepartment(depName);
+        }}
+      >
+        <option value="">Select department...</option>
+        {departments.map((dep: any) => (
+          <option key={dep._id} value={dep.departmentName}>
+            {dep.departmentName}
+          </option>
+        ))}
+      </select>
+    </div>
 
-                        {/* Doctors Dropdown */}
-                        <div className="mb-4">
-                          <label className="text-sm font-medium block mb-1">
-                            Refer To Doctor
-                          </label>
-                          <select
-                            className="w-full p-2 border rounded"
-                            value={referralDoctorId}
-                            onChange={(e) => {
-                              const doctorId = e.target.value;
-                              console.log("🟩 Doctor selected:", doctorId);
-                              setReferralDoctorId(doctorId);
-                            }}
-                          >
-                            <option value="">Select Doctor</option>
-                            {doctors.map((doc) => (
-                              <option key={doc.doctorId} value={doc.doctorId}>
-                                {doc.doctor?.name || "Unnamed Doctor"}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+    {/* Doctor Select */}
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+        Refer To Doctor
+      </label>
+      <select
+        className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+        value={referralDoctorId}
+        disabled={!selectedDepartment}
+        onChange={(e) => {
+          setReferralDoctorId(e.target.value);
+        }}
+      >
+        <option value="">
+          {!selectedDepartment
+            ? "Select a department first"
+            : doctors.length === 0
+            ? "No doctors available"
+            : "Select doctor..."}
+        </option>
+        {doctors.map((doc: any) => {
+          const name =
+            doc.doctor?.name ||
+            doc.doctorName ||
+            doc.name ||
+            "Unnamed Doctor";
+          const id = doc.doctorId || doc._id || doc.doctor?._id;
+          return (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          );
+        })}
+      </select>
+      {selectedDepartment && doctors.length === 0 && (
+        <p className="text-xs text-amber-600 mt-1">
+          No doctors found for this department
+        </p>
+      )}
+    </div>
+  </div>
 
-                        {/* Referral Reason */}
-                        {referralDoctorId && (
-                          <div className="mb-4">
-                            <label className="text-sm font-medium block mb-1">
-                              Referral Reason
-                            </label>
-                            <textarea
-                              className="w-full border p-2 rounded-lg text-sm min-h-[80px]"
-                              placeholder="Explain why patient is being referred..."
-                              value={referralReason}
-                              onChange={(e) =>
-                                setReferralReason(e.target.value)
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
+  {/* Referral Reason */}
+  {referralDoctorId && (
+    <div className="mt-4">
+      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+        Referral Reason
+      </label>
+      <textarea
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[90px] focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+        placeholder="Explain why the patient is being referred..."
+        value={referralReason}
+        onChange={(e) => setReferralReason(e.target.value)}
+      />
+    </div>
+  )}
+</div>
 
                       {/* Recall/Follow-up Section */}
                       <div className="border-t border-gray-200 pt-6 mt-4">
@@ -7296,7 +7170,7 @@ const convertToDentalChartFormat = (
             clinicId={selectedClinic?.clinicId}
             doctorId={getDoctorId()}
             onSuccess={() => {
-              alert("Lab order created successfully!");
+              toast.showSuccess("Lab order created successfully!");
             }}
           />
         </div>
@@ -7331,7 +7205,7 @@ const convertToDentalChartFormat = (
                 fileName={labDetails?.fileName || "CBCT Scan"}
                 onError={(msg) => {
                   console.error("Viewer error:", msg);
-                  alert("This 3D scan is too large to render on this device.");
+                  toast.showError("This 3D scan is too large to render on this device.");
                 }}
               />
             </div>

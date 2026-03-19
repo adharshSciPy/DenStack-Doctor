@@ -16,6 +16,8 @@ import { format } from "date-fns";
 import BlogCard from "./BlogCard";
 import styles from "../styles/BlogList.module.css";
 import blogServiceUrl from "../blogServiceUrl";
+import { useToast } from "../hooks/useToast";
+
 
 interface Doctor {
   _id: string;
@@ -114,6 +116,8 @@ export function BlogList() {
   });
   const [userRole, setUserRole] = useState<string>("doctor");
   const [liking, setLiking] = useState<string | null>(null);
+const  toast = useToast();
+
 
   const fetchBlogs = async () => {
     try {
@@ -177,6 +181,7 @@ export function BlogList() {
       }
 
     } catch (error: any) {
+      toast.showError("Something went wrong. Please try again later.")
       console.error("Error fetching blogs:", error.message);
       setBlogs([]);
       setAllTags([]);
@@ -249,6 +254,7 @@ export function BlogList() {
       );
 
     } catch (error) {
+      toast.showError("Something went wrong. Please try again later.")
       console.error("Error liking blog:", error);
       
       // Revert optimistic update on error

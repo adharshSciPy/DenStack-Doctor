@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import labBaseUrl from "../labBaseUrl";
 import axios from "axios";
+import { useToast } from "../hooks/useToast";
 
 interface DentalLabOrderModalProps {
   isOpen: boolean;
@@ -79,7 +80,7 @@ const DentalLabOrderModal: React.FC<DentalLabOrderModalProps> = ({
   const [inhouseLabs, setInhouseLabs] = useState<Lab[]>([]);
   const [externalLabs, setExternalLabs] = useState<Lab[]>([]);
   const [alignerLabs, setAlignerLabs] = useState<Lab[]>([]);
-
+const toast=useToast();
   const tabs = [
     { id: "inhouse" as const, label: "In-House Lab" },
     { id: "external" as const, label: "External Lab" },
@@ -119,6 +120,7 @@ const DentalLabOrderModal: React.FC<DentalLabOrderModalProps> = ({
   const fetchLabsByType = async (labType: string) => {
     if (!clinicId && labType === "inhouse") {
       console.error("Clinic ID is required for in-house labs");
+      toast.showInfo("Clinic ID is required for in-house labs");
       return;
     }
 
@@ -190,34 +192,34 @@ const DentalLabOrderModal: React.FC<DentalLabOrderModalProps> = ({
     
     // Validation
     if (!formData.vendor) {
-      alert("Please select a lab");
+      toast.showInfo("Please select a lab");
       return;
     }
     if (!patientId) {
-      alert("Patient ID is required");
+      toast.showInfo("Patient ID is required");
       return;
     }
     if (!formData.deliveryDate) {
-      alert("Please select delivery date");
+      toast.showInfo("Please select delivery date");
       return;
     }
     if (!formData.price || parseFloat(formData.price) <= 0) {
-      alert("Please enter a valid price");
+      toast.showInfo("Please enter a valid price");
       return;
     }
     if (!formData.note.trim()) {
-      alert("Please enter order notes");
+      toast.showInfo("Please enter order notes");
       return;
     }
 
     // Aligner-specific validation
     if (activeTab === "aligner") {
       if (formData.trays.upperArch <= 0 && formData.trays.lowerArch <= 0) {
-        alert("Please enter number of trays for at least one arch");
+        toast.showInfo("Please enter number of trays for at least one arch");
         return;
       }
       if (!formData.stlFiles.upper && !formData.stlFiles.lower) {
-        alert("Please upload STL files for at least one arch");
+        toast.showInfo("Please upload STL files for at least one arch");
         return;
       }
     }
@@ -273,7 +275,7 @@ const DentalLabOrderModal: React.FC<DentalLabOrderModalProps> = ({
         );
 
         if (response.status === 200 || response.status === 201) {
-          alert("Aligner order created successfully!");
+          toast.showSuccess("Aligner order created successfully!");
           onSuccess?.();
           onClose();
         }
@@ -306,7 +308,7 @@ const DentalLabOrderModal: React.FC<DentalLabOrderModalProps> = ({
         );
 
         if (response.status === 200 || response.status === 201 || response.data?.success) {
-          alert("Dental lab order created successfully!");
+          toast.showSuccess("Dental lab order created successfully!");
           onSuccess?.();
           onClose();
         }
@@ -318,7 +320,7 @@ const DentalLabOrderModal: React.FC<DentalLabOrderModalProps> = ({
         : error instanceof Error
           ? error.message
           : "Unknown error occurred";
-      alert("Error creating order: " + errorMessage);
+      toast.showError("Error creating order: " + errorMessage);
     } finally {
       setLoading(false);
     }

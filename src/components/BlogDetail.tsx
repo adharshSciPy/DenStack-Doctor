@@ -20,6 +20,7 @@ import CommentSection from "./CommentSection";
 import styles from "../styles/BlogDetail.module.css";
 import axios, { AxiosError } from "axios";
 import blogServiceUrl from "../blogServiceUrl";
+import { useToast } from "../hooks/useToast";
 
 
 
@@ -119,6 +120,7 @@ const BlogDetail: React.FC = () => {
   //     }
   //   }
   // }, [token]);
+const toast=useToast();
 
 const fetchBlog = async () => {
   if (!id) return;
@@ -152,6 +154,7 @@ const fetchBlog = async () => {
         );
         isLiked = likeResponse.data.liked || false;
       } catch (error) {
+        toast.showError("Error fetching like status")
         console.error("Error fetching like status:", error);
       }
     }
@@ -171,6 +174,7 @@ const fetchBlog = async () => {
       
       comments = commentsResponse.data.comments || commentsResponse.data || [];
     } catch (error) {
+      toast.showError("Error fetching comments")
       console.error("Error fetching comments:", error);
     }
 
@@ -184,7 +188,7 @@ const fetchBlog = async () => {
   } catch (error) {
     console.error("Error fetching blog:", error);
     const axiosError = error as AxiosError<{ message: string }>;
-    alert(axiosError.response?.data?.message || "Failed to load blog");
+    toast.showError(axiosError.response?.data?.message || "Failed to load blog");
   } finally {
     setLoading(false);
   }
@@ -198,7 +202,7 @@ const fetchBlog = async () => {
   const handleLike = async (blogId: string) => {
     if (!blog || liking || !token) {
       if (!token) {
-        alert("Please login to like blogs");
+        toast.showError("Please login to like blogs");
         navigate("/login");
       }
       return;
@@ -239,6 +243,7 @@ const fetchBlog = async () => {
         await fetchBlog();
       }
     } catch (error) {
+      toast.showError("Failed to like blog");
       console.error("Error liking blog:", error);
       // Revert optimistic update on error
       setBlog((prev) =>
@@ -250,7 +255,7 @@ const fetchBlog = async () => {
             }
           : null,
       );
-      alert("Failed to like blog. Please try again.");
+      toast.showError("Failed to like blog. Please try again.");
     } finally {
       setLiking(false);
     }
@@ -260,7 +265,7 @@ const fetchBlog = async () => {
     e.preventDefault();
     if (!comment.trim() || !id || !token) {
       if (!token) {
-        alert("Please login to comment");
+        toast.showInfo("Please login to comment");
         navigate("/login");
       }
       return;
@@ -291,12 +296,12 @@ const fetchBlog = async () => {
             : null,
         );
         setComment("");
-        alert("Comment added successfully!");
+        toast.showSuccess("Comment added successfully!");
       }
     } catch (error) {
       console.error("Error submitting comment:", error);
       const axiosError = error as AxiosError<{ message: string }>;
-      alert(axiosError.response?.data?.message || "Failed to add comment");
+      toast.showError(axiosError.response?.data?.message || "Failed to add comment");
     } finally {
       setSubmittingComment(false);
     }
@@ -324,7 +329,7 @@ const fetchBlog = async () => {
       });
 
       if (response.status === 200) {
-        alert(
+        toast.showSuccess(
           isAdmin && !isAuthor
             ? "Blog deleted by admin"
             : "Blog deleted successfully",
@@ -334,13 +339,13 @@ const fetchBlog = async () => {
     } catch (error) {
       console.error("Error deleting blog:", error);
       const axiosError = error as AxiosError<{ message: string }>;
-      alert(axiosError.response?.data?.message || "Failed to delete blog");
+      toast.showError(axiosError.response?.data?.message || "Failed to delete blog");
     }
   };
 
   const handleAdminDelete = async () => {
     if (!deleteReason.trim() && isAdmin && !isAuthor) {
-      alert("Please provide a reason for deletion");
+    toast.showInfo("Please provide a reason for deletion");
       return;
     }
 
@@ -368,7 +373,7 @@ const fetchBlog = async () => {
       }
     } else {
       navigator.clipboard.writeText(shareUrl);
-      alert("Link copied to clipboard!");
+    toast.showSuccess("Link copied to clipboard!");
     }
   };
 

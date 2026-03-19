@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useToast } from "../hooks/useToast";
 interface WeeklyStat {
   day: string;
   appointments: number;
@@ -53,6 +54,8 @@ export function ProductivityCharts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const token = localStorage.getItem("authToken");
+  const toast = useToast();
+
   useEffect(() => {
     const fetchAnalyticsData = async () => {
       try {
@@ -73,6 +76,9 @@ export function ProductivityCharts() {
           err instanceof Error ? err.message : "Failed to fetch analytics data",
         );
         console.error("Error fetching analytics:", err);
+        toast.showError(
+          "An error occurred while fetching analytics data. Please try again later.",
+        );
       } finally {
         setLoading(false);
       }

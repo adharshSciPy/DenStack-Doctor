@@ -39,6 +39,7 @@ import {
 import axios from "axios";
 import patientServiceBaseUrl from "../patientServiceBaseUrl";
 import  DentalChartView  from "./DentalChartView";
+import { useToast } from "../hooks/useToast";
 
 // Interface for Consulted Patients API response
 interface ConsultedPatient {
@@ -261,7 +262,8 @@ export function PatientRecords({ doctorId }: PatientRecordsProps) {
     totalCount: 0,
   });
   const [showDentalChart, setShowDentalChart] = useState(false);
-  
+  const toast = useToast();
+
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -313,7 +315,7 @@ export function PatientRecords({ doctorId }: PatientRecordsProps) {
   // Fetch consulted patients by doctor ID
   const fetchConsultedPatients = async (loadMore = false) => {
     if (!doctorId) {
-      alert("Doctor ID not found. Please login again.");
+      toast.showInfo("Doctor ID not found. Please login again.");
       return;
     }
 
@@ -346,7 +348,7 @@ export function PatientRecords({ doctorId }: PatientRecordsProps) {
       }
     } catch (error: any) {
       console.error("Error fetching consulted patients:", error);
-      alert(error.response?.data?.message || "Error fetching consulted patients");
+      toast.showError(error.response?.data?.message || "Error fetching consulted patients");
     } finally {
       setLoadingConsultedPatients(false);
     }
@@ -361,7 +363,7 @@ export function PatientRecords({ doctorId }: PatientRecordsProps) {
 // Search patient by Random ID - Using /single-patient endpoint
 const handlePatientSearch = async () => {
   if (!patientSearchQuery.trim()) {
-    alert("Enter Patient ID");
+    toast.showInfo("Enter Patient ID");
     return;
   }
 
@@ -386,11 +388,11 @@ const handlePatientSearch = async () => {
         setSelectedRecord(res.data.data.records[0]);
       }
     } else {
-      alert("No patient found");
+      toast.showInfo("No patient found");
     }
   } catch (error: any) {
     console.error("Error fetching patient:", error);
-    alert(error.response?.data?.message || "Error fetching patient");
+    toast.showError(error.response?.data?.message || "Error fetching patient");
   } finally {
     setSearchLoading(false);
   }
@@ -443,7 +445,7 @@ const handleSelectConsultedPatient = async (patient: ConsultedPatient) => {
 
   } catch (error: any) {
     console.error("Error selecting consulted patient:", error);
-    alert("Patient selected. Some details may be limited.");
+    toast.showInfo("Patient selected. Some details may be limited.");
   } finally {
     setSearchLoading(false);
   }
@@ -558,7 +560,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
         status: error.response?.status,
         data: error.response?.data
       });
-      alert(error.response?.data?.message || "Error fetching visit history");
+      toast.showError(error.response?.data?.message || "Error fetching visit history");
     } finally {
       setLoadingHistory(false);
     }
@@ -578,7 +580,7 @@ const fetchFullPatientDetails = async (patientId: string, clinicId: string) => {
   // Toggle consulted patients view
   const handleShowConsultedPatients = () => {
     if (!doctorId) {
-      alert("Doctor ID not found. Please login again.");
+      toast.showInfo("Doctor ID not found. Please login again.");
       return;
     }
 

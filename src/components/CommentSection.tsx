@@ -5,6 +5,7 @@ import styles from '../styles/CommentSection.module.css';
 import axios from 'axios';
 import blogServiceUrl from '../blogServiceUrl';
 import { jwtDecode } from 'jwt-decode';
+import { useToast } from '../hooks/useToast';
 
 interface DecodedToken {
   doctorId: string;
@@ -69,6 +70,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const [loadingReplies, setLoadingReplies] = useState<{ [key: string]: boolean }>({});
   const [expandedReplies, setExpandedReplies] = useState<{ [key: string]: boolean }>({});
   const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+const toast = useToast();
 
   // Get current doctor ID from token
   useEffect(() => {
@@ -170,6 +172,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         );
       }
     } catch (error: any) {
+      toast.showError(error.response?.data?.message || error.message);
       console.error('Error fetching nested replies:', error);
     } finally {
       setLoadingReplies(prev => ({ ...prev, [parentId]: false }));
@@ -210,12 +213,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   // Handle reply submission for any level (comment or reply)
   const handleReplySubmit = async (parentId: string, isReply: boolean = false) => {
     if (!replyText.trim()) {
-      alert('Reply cannot be empty');
+      toast.showInfo('Reply cannot be empty');
       return;
     }
     
     if (!currentDoctorId) {
-      alert('Please login to reply');
+      toast.showInfo('Please login to reply');
       return;
     }
     
@@ -273,7 +276,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         setReplyText('');
         setReplyingTo(null);
         setExpandedReplies(prev => ({ ...prev, [parentId]: true }));
-        alert('Reply added successfully');
+        toast.showSuccess('Reply added successfully');
         
         // Also refresh parent component if needed
         onCommentAdded();
@@ -281,11 +284,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     } catch (error: any) {
       console.error('Error adding reply:', error);
       if (error.response?.status === 400) {
-        alert(`Invalid request: ${error.response.data.message}`);
+        toast.showError(`Invalid request: ${error.response.data.message}`);
       } else if (error.response?.status === 404) {
-        alert(`${error.response.data.message}`);
+        toast.showError(`${error.response.data.message}`);
       } else {
-        alert(`Failed to add reply: ${error.response?.data?.message || error.message}`);
+        toast.showError(`Failed to add reply: ${error.response?.data?.message || error.message}`);
       }
     } finally {
       setSubmittingReply(null);
@@ -294,7 +297,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 
   const handleEditSubmit = async (commentId: string) => {
     if (!editText.trim()) {
-      alert('Comment cannot be empty');
+      toast.showInfo('Comment cannot be empty');
       return;
     }
     
@@ -340,12 +343,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         setEditText('');
         setEditingComment(null);
         setOpenMenu(null);
-        alert('Comment updated successfully');
+        toast.showSuccess('Comment updated successfully');
         onCommentAdded();
       }
     } catch (error: any) {
       console.error('Error editing comment:', error);
-      alert(`Failed to edit comment: ${error.response?.data?.message || error.message}`);
+      toast.showError(`Failed to edit comment: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -382,12 +385,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         
         setComments(prevComments => removeComment(prevComments, commentId));
         setOpenMenu(null);
-        alert('Comment deleted successfully');
+        toast.showSuccess('Comment deleted successfully');
         onCommentAdded();
       }
     } catch (error: any) {
       console.error('Error deleting comment:', error);
-      alert(`Failed to delete comment: ${error.response?.data?.message || error.message}`);
+      toast.showError(`Failed to delete comment: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -420,7 +423,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 
   const handleReplyToComment = (commentId: string, isReply: boolean = false) => {
     if (!currentDoctorId) {
-      alert('Please login to reply to comments');
+      toast.showInfo('Please login to reply to comments');
       return;
     }
     
@@ -438,7 +441,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     
     const item = findItem(comments, commentId);
     if (item && !canReplyTo(item)) {
-      alert('You cannot reply to your own comment');
+      toast.showInfo('You cannot reply to your own comment');
       return;
     }
     

@@ -32,6 +32,8 @@ import {
 import { Button } from "./ui/button";
 import DentalLoader from './DentalLoader';
 import { useImagePreloader } from "../hooks/useImagePreloader";
+import { useToast } from "../hooks/useToast";
+import patientServiceBaseUrl from "../patientServiceBaseUrl";
 
 // Import ToothSVG from your existing DentalChart component
 interface ToothSVGProps {
@@ -127,7 +129,7 @@ const ToothSVG: React.FC<ToothSVGProps> = ({
   );
 };
 
-// Tooth Data Arrays (keep same as before)
+// Tooth Data Arrayse
 const ADULT_TOOTH_DATA = [
   // Upper Right (Quadrant 1) - FDI numbers 18-11
   { number: 18, name: "Third Molar", quadrant: 1, svgName: "wisdom", rotation: 180 },
@@ -224,7 +226,7 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
   const [activeTab, setActiveTab] = useState<"teeth" | "summary" | "history">("teeth");
   const [isMobile, setIsMobile] = useState(false);
   const [selectedToothForMobile, setSelectedToothForMobile] = useState<number | null>(null);
-  
+  const toast = useToast();
   // Check for mobile screen
   useEffect(() => {
     const checkMobile = () => {
@@ -233,7 +235,6 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
@@ -258,7 +259,7 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
         setError(null);
         
         const response = await fetch(
-          `http://localhost:8002/api/v1/patient-service/patient/dental-chart/${patientId}`
+          `${patientServiceBaseUrl}/api/v1/patient-service/patient/dental-chart/${patientId}`
         );
         
         if (!response.ok) {
@@ -271,10 +272,12 @@ const DentalChartView: React.FC<DentalChartViewProps> = ({
           setData(result.data);
         } else {
           throw new Error(result.message || 'Failed to fetch dental chart data');
+
         }
       } catch (err: any) {
         setError(err.message || 'An error occurred while fetching dental chart');
         console.error('Error fetching dental chart:', err);
+        toast.showError("An error occurred while fetching dental chart. Please try again later.")
       } finally {
         setLoading(false);
       }

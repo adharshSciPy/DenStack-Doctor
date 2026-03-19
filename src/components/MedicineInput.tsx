@@ -5,6 +5,8 @@ import { getMedicineSuggestions, createMedicine } from '../utils/medicineService
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { useToast } from '../hooks/useToast';
+
 
 export interface MedicineSuggestion {
   _id: string;
@@ -95,6 +97,7 @@ const MedicineInput = ({
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+const toast = useToast();
 
   // Handle click outside to close suggestions
   useEffect(() => {
@@ -210,6 +213,7 @@ const fetchSuggestions = useCallback(async (searchTerm: string) => {
     setShowSuggestions(true);
   } catch (error) {
     console.error('Error fetching suggestions:', error);
+    toast.showError('Error fetching suggestions. Please try again.');
     setSuggestions([]);
     setShowSuggestions(false);
   } finally {
@@ -234,12 +238,12 @@ const fetchSuggestions = useCallback(async (searchTerm: string) => {
 
   const handleCreateNew = async () => {
     if (!inputValue.trim()) {
-      alert('Please enter a medicine name');
+      toast.showInfo('Please enter a medicine name');
       return;
     }
 
     if (!doctorId) {
-      alert('Doctor ID is required to create a new medicine.');
+      toast.showInfo('Doctor ID is required to create a new medicine.');
       return;
     }
 
@@ -276,7 +280,7 @@ const fetchSuggestions = useCallback(async (searchTerm: string) => {
       }
     } catch (error: any) {
       console.error('Error creating medicine:', error);
-      alert(error.message || 'Failed to create medicine. Please try again.');
+      toast.showError(error.message || 'Failed to create medicine. Please try again.');
     } finally {
       setLoading(false);
       setCreatingNew(false);

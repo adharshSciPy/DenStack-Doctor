@@ -1,5 +1,5 @@
 // DentalChart.tsx - COMPLETE CODE WITH SOFT TISSUE AND TMJ SUPPORT
-import React, { useState, useEffect, useRef, useCallback,useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback,useMemo, use } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -27,6 +27,7 @@ import { preloadAllDentalSvgs } from "../utils/dentalSvgCache";
 import { getSvgUrlFromCache } from "../utils/dentalSvgCache";
 import clinicServiceBaseUrl from "../clinicServiceUrl";
 import axios from "axios";
+import { useToast } from "../hooks/useToast";
 
 interface ToothCondition {
   toothNumber: number;
@@ -785,156 +786,6 @@ const DENTAL_PROCEDURES = [
   "Apicoectomy",
 ];
 
-// Soft Tissue Examination Options
-const SOFT_TISSUE_EXAMINATION_OPTIONS = [
-  "Normal",
-  "Erythema (Redness)",
-  "Edema (Swelling)",
-  "Ulceration",
-  "White Lesion",
-  "Red Lesion",
-  "Pigmented Lesion",
-  "Petechiae",
-  "Ecchymosis",
-  "Bleeding",
-  "Exudate",
-  "Dryness",
-  "Halitosis",
-  "Tenderness",
-  "Induration",
-  "Nodule",
-  "Mass",
-  "Asymmetry",
-];
-
-const SOFT_TISSUE_DIAGNOSIS_OPTIONS = [
-  "Normal",
-  "Gingivitis",
-  "Periodontitis",
-  "Stomatitis",
-  "Oral Candidiasis",
-  "Aphthous Ulcer",
-  "Herpetic Lesion",
-  "Leukoplakia",
-  "Erythroplakia",
-  "Oral Lichen Planus",
-  "Geographic Tongue",
-  "Fissured Tongue",
-  "Hairy Tongue",
-  "Angular Cheilitis",
-  "Mucocele",
-  "Fibroma",
-  "Papilloma",
-  "Traumatic Ulcer",
-  "Burn",
-  "Allergic Reaction",
-];
-
-const SOFT_TISSUE_TREATMENT_OPTIONS = [
-  "Observation",
-  "Oral Hygiene Instructions",
-  "Antibiotics",
-  "Antifungals",
-  "Antivirals",
-  "Corticosteroids",
-  "Analgesics",
-  "Antiseptic Mouthwash",
-  "Topical Gel/Ointment",
-  "Laser Therapy",
-  "Cryotherapy",
-  "Excision",
-  "Biopsy",
-  "Referral to Specialist",
-  "Dietary Modification",
-  "Smoking Cessation",
-  "Follow-up in 1 week",
-  "Follow-up in 2 weeks",
-  "Follow-up in 1 month",
-];
-
-// TMJ Examination Options
-const TMJ_EXAMINATION_OPTIONS = [
-  "Normal",
-  "Clicking",
-  "Popping",
-  "Crepitus",
-  "Pain on Palpation",
-  "Pain on Movement",
-  "Limited Opening",
-  "Deviation on Opening",
-  "Locking (Open)",
-  "Locking (Closed)",
-  "Muscle Tenderness",
-  "Joint Tenderness",
-  "Swelling",
-  "Bruxism",
-  "Clenching",
-  "Muscle Spasm",
-  "Headache",
-  "Ear Pain",
-  "Neck Pain",
-];
-
-const TMJ_DIAGNOSIS_OPTIONS = [
-  "Normal",
-  "TMJ Disorder",
-  "Myofascial Pain",
-  "Internal Derangement",
-  "Arthritis",
-  "Disc Displacement",
-  "Hyper mobility",
-  "Hypo mobility",
-  "Bruxism",
-  "Muscle Spasm",
-  "Tension Headache",
-  "Osteoarthritis",
-  "Rheumatoid Arthritis",
-  "Traumatic Injury",
-  "Post-surgical",
-  "Stress-related",
-  "Postural",
-  "Idiopathic",
-];
-
-const TMJ_TREATMENT_OPTIONS = [
-  "Observation",
-  "Soft Diet",
-  "Moist Heat",
-  "Ice Pack",
-  "NSAIDs",
-  "Muscle Relaxants",
-  "Physical Therapy",
-  "Occlusal Splint",
-  "Stress Management",
-  "Relaxation Exercises",
-  "Jaw Exercises",
-  "Postural Correction",
-  "Avoid Chewing Gum",
-  "Avoid Hard Foods",
-  "Massage Therapy",
-  "Acupuncture",
-  "Corticosteroid Injection",
-  "Arthrocentesis",
-  "Arthroscopy",
-  "Surgery",
-  "Referral to Specialist",
-];
-
-// Helper to convert hex color to hue value for filter
-const getHueFromColor = (hexColor: string): number => {
-  const colorMap: Record<string, number> = {
-    '#ef4444': 0,    // red (caries)
-    '#3b82f6': 220,  // blue (filling)
-    '#f59e0b': 40,   // orange (crown)
-    '#8b5cf6': 270,  // purple (root canal)
-    '#9ca3af': 0,    // gray (missing)
-    '#22c55e': 140,  // green (selected)
-    '#4b5563': 0,    // default gray
-  };
-  
-  return colorMap[hexColor.toLowerCase()] || 0;
-};
-
 const MultiSelectDropdown = ({
   label,
   value = [],
@@ -967,6 +818,7 @@ const MultiSelectDropdown = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const customOptionRef = useRef<HTMLDivElement | null>(null);
+const toast=useToast();
 
   // Load ALL options when dropdown opens
   useEffect(() => {
@@ -3149,98 +3001,6 @@ const DropdownToothSelector: React.FC<{
   );
 };
 
-// Dropdown Surface Selection Component
-const DropdownSurfaceSelector: React.FC<{
-  selectedSurfaces: string[];
-  onSelectSurfaces: (surfaces: string[]) => void;
-  mode: "view" | "edit";
-}> = ({ selectedSurfaces, onSelectSurfaces, mode }) => {
-  const surfaces = [
-    { id: "buccal", label: "Buccal (Cheek side)", color: "#f59e0b" },
-    { id: "lingual", label: "Lingual (Tongue side)", color: "#8b5cf6" },
-    { id: "mesial", label: "Mesial (Front side)", color: "#3b82f6" },
-    { id: "distal", label: "Distal (Back side)", color: "#10b981" },
-    { id: "occlusal", label: "Occlusal (Biting surface)", color: "#ef4444" },
-    { id: "entire", label: "Entire Tooth", color: "#6b7280" },
-  ];
-
-  const handleSurfaceToggle = (surfaceId: string) => {
-    const newSurfaces = selectedSurfaces.includes(surfaceId)
-      ? selectedSurfaces.filter((s) => s !== surfaceId)
-      : [...selectedSurfaces, surfaceId];
-    onSelectSurfaces(newSurfaces);
-  };
-
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">Select Surfaces</label>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {surfaces.map((surface) => {
-          const isSelected = selectedSurfaces.includes(surface.id);
-          return (
-            <button
-              key={surface.id}
-              type="button"
-              onClick={() => mode === "edit" && handleSurfaceToggle(surface.id)}
-              disabled={mode === "view"}
-              className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
-                isSelected ? "ring-2 ring-offset-1" : "hover:bg-gray-50"
-              } ${mode === "view" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-              style={{
-                borderColor: isSelected ? surface.color : "#e5e7eb",
-                backgroundColor: isSelected ? `${surface.color}20` : "white",
-              }}
-            >
-              <div
-                className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: surface.color }}
-              />
-              <span className="text-sm font-medium capitalize">
-                {surface.id}
-              </span>
-              {isSelected && (
-                <CheckSquare className="h-4 w-4 ml-auto text-gray-600" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedSurfaces.length > 0 && (
-        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-          <div className="flex flex-wrap gap-2">
-            {selectedSurfaces.map((surface) => {
-              const surfaceInfo = surfaces.find((s) => s.id === surface);
-              return (
-                <Badge
-                  key={surface}
-                  variant="secondary"
-                  className="flex items-center gap-1"
-                  style={{
-                    backgroundColor: surfaceInfo?.color,
-                    color: "white",
-                  }}
-                >
-                  {surfaceInfo?.id}
-                  {mode === "edit" && (
-                    <button
-                      type="button"
-                      onClick={() => handleSurfaceToggle(surface)}
-                      className="ml-1 hover:text-white/80"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </Badge>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default function DentalChart({
   patientId,
   visitId,
@@ -3346,7 +3106,7 @@ const [dropdownSelectedDiagnoses, setDropdownSelectedDiagnoses] = useState<any[]
 const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any[]>([]);
   const toothData =
     chartType === "adult" ? ADULT_TOOTH_DATA : PEDIATRIC_TOOTH_DATA;
-
+const toast=useToast();
   useEffect(() => {
     if (existingTreatmentPlan) {
       console.log("🔄 Existing treatment plan detected, auto-opening form...");
@@ -3411,6 +3171,7 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
       return transformedFindings;
     } catch (err: any) {
       console.error("❌ Error fetching examination findings:", err);
+      toast.showError("Something went wrong. Please try again later.")
       if (err.response?.status === 404) {
         console.error("Endpoint not found. Please check API URL structure.");
       }
@@ -3460,6 +3221,7 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
       return transformedDiagnoses;
     } catch (err: any) {
       console.error("❌ Error fetching diagnoses:", err);
+      toast.showError("Error fetching diagnoses")
       if (err.response?.status === 404) {
         console.error("Endpoint not found. Please check API URL structure.");
       }
@@ -3508,6 +3270,7 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
       return transformedTreatments;
     } catch (err: any) {
       console.error("❌ Error fetching treatments:", err);
+      toast.showError("Error fetching treatments")
       if (err.response?.status === 404) {
         console.error("Endpoint not found. Please check API URL structure.");
       }
@@ -3581,7 +3344,7 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
   // Open multi-tooth modal
   const handleOpenMultiToothModal = () => {
     if (selectedTeeth.length === 0) {
-      alert("Please select teeth first");
+      toast.showInfo("Please select teeth first");
       return;
     }
     setShowMultiToothModal(true);
@@ -3833,12 +3596,10 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
           stageNumber: stageNumber,
           stageName: stage.stageName || `Stage ${stageNumber}`,
           description: stage.description || "",
-          // ✅ Required procedureRefs property
           procedureRefs: procedureRefs,
           status: stage.status || "pending",
           scheduledDate:
             stage.scheduledDate || new Date().toISOString().split("T")[0],
-          // ✅ Optional toothSurfaceProcedures
           toothSurfaceProcedures: toothSurfaceProcedures,
           notes: stage.notes || "",
           ...(stage.status === "in-progress" && {
@@ -3919,8 +3680,6 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
     // Always format and send data, even if empty
     const dentalData = formatDentalDataForAPI();
 
-    // ✅ FIXED: Check if there's actually any meaningful data
-    // First, check if toothConditions has any actual data (not just empty objects)
     const hasActualToothConditions = toothConditions.some(tc => 
       (tc.conditions && tc.conditions.length > 0) ||
       (tc.surfaceConditions && tc.surfaceConditions.length > 0) ||
@@ -3965,7 +3724,7 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
 
     // Show alert ONLY if there's actual data
     if (hasData) {
-      alert("✅ Dental chart data saved successfully!");
+      toast.showSuccess("Dental chart data saved successfully!");
     } else {
       console.log("ℹ️ No actual data found, closing without alert");
     }
@@ -4133,12 +3892,12 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
   // NEW: Quick Add Procedure Function
   const handleQuickAddProcedure = () => {
     if (selectedTeeth.length === 0) {
-      alert("Please select teeth first");
+      toast.showInfo("Please select teeth first");
       return;
     }
 
     if (!selectedProcedure) {
-      alert("Please select a procedure");
+      toast.showInfo("Please select a procedure");
       return;
     }
 
@@ -4191,8 +3950,6 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
           color: "#4b5563",
         });
       }
-
-      // Trigger procedure added callback
       if (onProcedureAdded) {
         onProcedureAdded(toothNumber, {
           name: selectedProcedure,
@@ -4205,49 +3962,10 @@ const [dropdownSelectedTreatments, setDropdownSelectedTreatments] = useState<any
 
     setToothConditions(updatedConditions);
     setShowQuickAddModal(false);
-
-    // Reset form
     setSelectedProcedure("");
     setProcedureNotes("");
     setProcedureCost(0);
   };
-
-  // const getToothSize = () => {
-  //   if (typeof window !== 'undefined') {
-  //     const width = window.innerWidth;
-  //     if (width < 640) return 32; 
-  //     if (width < 768) return 36; 
-  //     if (width < 1024) return 40; 
-  //     if (width < 1280) return 44; 
-  //     return 48; 
-  //   }
-  //   return chartType === "adult" ? 48 : 44;
-  // };
-
-  // const getToothGap = () => {
-  //   if (typeof window !== 'undefined') {
-  //     const width = window.innerWidth;
-  //     if (width < 640) return 'gap-0.5'; 
-  //     if (width < 768) return 'gap-1'; 
-  //     if (width < 1024) return 'gap-1.5'; 
-  //     if (width < 1280) return 'gap-2'; 
-  //     return 'gap-2.5'; 
-  //   }
-  //   return 'gap-2';
-  // };
-
-  // const getContainerPadding = () => {
-  //   if (typeof window !== 'undefined') {
-  //     const width = window.innerWidth;
-  //     if (width < 640) return 'p-1'; 
-  //     if (width < 768) return 'p-2'; 
-  //     if (width < 1024) return 'p-3'; 
-  //     return 'p-4'; 
-  //   }
-  //   return 'p-4';
-  // };
-
-  // Check if we should use vertical layout (mobile)
   const [useVerticalLayout, setUseVerticalLayout] = useState(false);
 
   useEffect(() => {
@@ -4441,7 +4159,6 @@ const containerPadding = useMemo(() => {
 
       {/* Teeth Chart - Responsive with dynamic sizing */}
       <div className={`relative border border-border rounded-xl bg-white ${containerPadding}`}>
-        {/* Vertical midline - hides on very small screens */}
         {!useVerticalLayout && (
           <div className="absolute left-1/2 top-0 bottom-0 transform -translate-x-1/2">
             <div className="w-px h-full bg-gray-200"></div>
@@ -5276,7 +4993,7 @@ const containerPadding = useMemo(() => {
     if (selectedTeeth.length > 0) {
       setShowMultiToothModal(true);
     } else {
-      alert("Please select teeth first");
+      toast.showInfo("Please select teeth first");
     }
   }}
   disabled={false}
@@ -5625,95 +5342,6 @@ const containerPadding = useMemo(() => {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Treatment Plan</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {treatmentPlan ? (
-                    <div className="space-y-2">
-                      <div className="font-medium">
-                        {treatmentPlan.planName}
-                      </div>
-                      {treatmentPlan.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {treatmentPlan.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {treatmentPlan.stages.length} stages
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {treatmentPlan.teeth.reduce(
-                            (sum, tooth) => sum + tooth.procedures.length,
-                            0,
-                          )}{" "}
-                          procedures
-                        </Badge>
-                        <div className="text-xs text-gray-500">
-                          {
-                            treatmentPlan.stages.filter(
-                              (s) => s.status === "completed",
-                            ).length
-                          }{" "}
-                          completed,
-                          {
-                            treatmentPlan.stages.filter(
-                              (s) => s.status === "in-progress",
-                            ).length
-                          }{" "}
-                          in-progress
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        No treatment plan created
-                      </p>
-                      {mode === "edit" && activeTab === "teeth" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={handleCreateTreatmentPlan}
-                        >
-                          Create Treatment Plan
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card> */}
-
-              {/* <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start">
-                      Print Chart
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      Export as PDF
-                    </Button>
-                    {mode === "edit" &&
-                      !treatmentPlan &&
-                      activeTab === "teeth" && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={handleCreateTreatmentPlan}
-                        >
-                          Generate Treatment Plan
-                        </Button>
-                      )}
-                  </div>
-                </CardContent>
-              </Card> */}
             </div>
           )}
         </CardContent>

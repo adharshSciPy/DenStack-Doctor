@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
+import inventoryBaseUrl from "../inventoryBaseUrl";
 
 interface Product {
   _id: string;
@@ -563,7 +564,7 @@ interface DoctorMarketplaceProps {
 export function DoctorMarketplace({ token, doctorId, clinicId }: DoctorMarketplaceProps) {
   const navigate = useNavigate();
   const toast = useToast();
-  const inventoryBaseUrl = "http://localhost:5000"; // Replace with your actual base URL
+  // const inventoryBaseUrl = "http://localhost:8000"; // Replace with your actual base URL
 
   // State variables
   const [selectedCategory, setSelectedCategory] = useState("All Products");
@@ -604,6 +605,7 @@ export function DoctorMarketplace({ token, doctorId, clinicId }: DoctorMarketpla
     } catch (error) {
       console.error("Error checking ecommerce access:", error);
       setHasEcommerceAccess(false);
+      toast.showError("Error checking ecommerce access");
     } finally {
       setIsLoading(false);
     }
@@ -619,6 +621,7 @@ export function DoctorMarketplace({ token, doctorId, clinicId }: DoctorMarketpla
       setEcommerceProducts(response.data?.data || []);
     } catch (error) {
       console.error("Error fetching ecommerce products:", error);
+      toast.showError("Error fetching ecommerce products");
       setEcommerceProducts([]);
     }
   };
@@ -655,6 +658,7 @@ const navigateToEcommerce = () => {
       setCategories(["All Products", ...categoryNames]);
     } catch (error) {
       console.error("Error fetching categories:", error);
+      toast.showError("Error fetching categories");
       setCategories(["All Products"]);
     }
   };
@@ -669,6 +673,7 @@ const navigateToEcommerce = () => {
       setProducts(response.data?.data || []);
     } catch (error) {
       console.error("Error fetching products:", error);
+      toast.showError("Error fetching products");
       setProducts([]);
     }
   };
@@ -690,6 +695,7 @@ const navigateToEcommerce = () => {
         setCartItems(JSON.parse(savedCart));
       } catch (error) {
         console.error("Error loading cart:", error);
+        toast.showError("Error loading cart");
       }
     }
   }, []);

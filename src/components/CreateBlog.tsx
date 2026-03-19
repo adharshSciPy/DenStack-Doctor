@@ -4,6 +4,7 @@ import { Upload, X, Tag, Plus } from 'lucide-react';
 import axios, { AxiosError } from 'axios';
 import blogServiceUrl from '../blogServiceUrl';
 import styles from '../styles/CreateBlog.module.css';
+import { useToast } from '../hooks/useToast';
 
 interface BlogData {
   _id: string;
@@ -39,7 +40,7 @@ const CreateBlog: React.FC = () => {
   const [originalImages, setOriginalImages] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState<string>('');
-  
+  const toast = useToast();
   // Common medical tags for suggestions
   const commonTags = [
     'Cardiology', 'Neurology', 'Oncology', 'Pediatrics', 'Surgery',
@@ -60,7 +61,7 @@ const CreateBlog: React.FC = () => {
       const token = localStorage.getItem("authToken");
       
       if (!token) {
-        alert('Please login to edit blog');
+        toast.showInfo('Please login to edit blog');
         navigate('/login');
         return;
       }
@@ -85,7 +86,7 @@ const CreateBlog: React.FC = () => {
       
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
-      alert(axiosError.response?.data?.message || 'Failed to fetch blog');
+      toast.showError(axiosError.response?.data?.message || 'Failed to fetch blog');
       navigate('/blogs');
     } finally {
       setLoading(false);
@@ -97,14 +98,14 @@ const CreateBlog: React.FC = () => {
     const totalImages = images.length + files.length + existingImages.length;
     
     if (totalImages > 5) {
-      alert('Max 5 images');
+      toast.showInfo('Max 5 images');
       return;
     }
     
     // Check file sizes (optional)
     const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024); // 5MB
     if (oversizedFiles.length > 0) {
-      alert('Some files exceed 5MB limit');
+      toast.showInfo('Some files exceed 5MB limit');
       return;
     }
     
@@ -151,12 +152,12 @@ const CreateBlog: React.FC = () => {
     e.preventDefault();
     
     if (!title.trim()) {
-      alert('Please enter a title');
+      toast.showInfo('Please enter a title');
       return;
     }
     
     if (!content.trim()) {
-      alert('Please enter content');
+      toast.showInfo('Please enter content');
       return;
     }
     
@@ -167,7 +168,7 @@ const CreateBlog: React.FC = () => {
       const doctorId = localStorage.getItem("doctorId");
       
       if (!token || !doctorId) {
-        alert('Please login to continue');
+        toast.showInfo('Please login to continue');
         navigate('/login');
         return;
       }
@@ -221,13 +222,13 @@ const CreateBlog: React.FC = () => {
         },
       });
       
-      alert(response.data.message || (isEditing ? 'Blog updated!' : 'Blog created!'));
+      toast.showSuccess(response.data.message || (isEditing ? 'Blog updated!' : 'Blog created!'));
       navigate('/blog');
       console.log(response);  
       
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
-      alert(axiosError.response?.data?.message || 'Error saving blog');
+      toast.showError(axiosError.response?.data?.message || 'Error saving blog');
       console.log(error);
       
     } finally {
