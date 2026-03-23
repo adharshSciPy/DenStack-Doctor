@@ -24,6 +24,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import inventoryBaseUrl from "../inventoryBaseUrl";
+import ecomFrontendBaseurl from "../ecomFrontendBaseurl";
 
 interface Product {
   _id: string;
@@ -581,20 +582,25 @@ export function DoctorMarketplace({ token, doctorId, clinicId }: DoctorMarketpla
   const [searchQuery, setSearchQuery] = useState("");
 
   // Check if doctor has ecommerce access (through clinic)
-  const checkEcommerceAccess = async () => {
-    if (!token || !clinicId) {
-      setHasEcommerceAccess(false);
-      return;
-    }
+ // Updated: Check if doctor has ecommerce access
+const checkEcommerceAccess = async () => {
+  if (!token) {
+    setHasEcommerceAccess(false);
+    return;
+  }
 
-    try {
-      setIsLoading(true);
-      // Check if clinic has ecommerce orders
+  try {
+    setIsLoading(true);
+    
+    // Check if doctor has ecommerce access via doctor-specific endpoint
+    // or if clinic exists, check clinic orders
+    if (clinicId) {
+      // Check clinic orders
       const response = await axios.get(
         `${inventoryBaseUrl}/api/v1/ecommerce/orders/clinic/${clinicId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
+      
       if (response.data?.data && response.data.data.length > 0) {
         setHasEcommerceAccess(true);
         setEcommerceOrders(response.data.data);
@@ -602,14 +608,20 @@ export function DoctorMarketplace({ token, doctorId, clinicId }: DoctorMarketpla
       } else {
         setHasEcommerceAccess(false);
       }
-    } catch (error) {
-      console.error("Error checking ecommerce access:", error);
-      setHasEcommerceAccess(false);
-      toast.showError("Error checking ecommerce access");
-    } finally {
-      setIsLoading(false);
+    } else {
+      // For doctors without clinic, maybe check doctor-specific ecommerce access
+      // You might need to create a doctor-specific endpoint for this
+      setHasEcommerceAccess(true); // Or false based on your business logic
+      await fetchEcommerceProducts();
     }
-  };
+  } catch (error) {
+    console.error("Error checking ecommerce access:", error);
+    setHasEcommerceAccess(false);
+    toast.showError("Error checking ecommerce access");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Fetch ecommerce products
   const fetchEcommerceProducts = async () => {
@@ -638,7 +650,7 @@ const navigateToEcommerce = () => {
   const encodedToken = encodeURIComponent(token);
   
   // Create URL with doctor token only (no clinicId needed)
-  const ecommerceUrl = `http://localhost:4000/login?accessToken=${encodedToken}&doctorId=${doctorId}`;
+  const ecommerceUrl = `${ecomFrontendBaseurl}/login?accessToken=${encodedToken}&doctorId=${doctorId}`;
   
   // Open in new tab
   window.open(ecommerceUrl, '_blank');
