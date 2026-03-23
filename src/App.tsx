@@ -345,6 +345,7 @@ export default function App() {
     toast.showInfo("Logging out...");
     
     clearAllAuthData();
+      sessionStorage.removeItem('dentalSvgsPreloaded');
     
     setAuthState({
       token: null,
